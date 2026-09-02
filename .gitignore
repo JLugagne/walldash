@@ -1,0 +1,28 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+ha-dash
+
+# Test binary, artifacts, coverage
+*.test
+*.out
+coverage.html
+
+# Database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Frontend build & dependencies
+frontend/node_modules/
+frontend/dist/
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
