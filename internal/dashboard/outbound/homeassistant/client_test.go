@@ -77,6 +77,9 @@ func TestHomeAssistantClient_RealServer(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(mockStates[0])
 		case "/api/states/non_existent.id":
 			w.WriteHeader(http.StatusNotFound)
+		case "/api/services/light/toggle":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode([]map[string]any{mockStates[0]})
 		default:
 			http.NotFound(w, r)
 		}
@@ -112,6 +115,63 @@ func TestHomeAssistantClient_RealServer(t *testing.T) {
 
 	t.Run("GetState returns ErrDeviceNotFound for 404", func(t *testing.T) {
 		_, err := client.GetState(ctx, "non_existent.id")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrDeviceNotFound)
+	})
+
+	t.Run("CallService executes POST against HA services API", func(t *testing.T) {
+		err := client.CallService(ctx, "light", "toggle", "light.living_room")
+		require.NoError(t, err)
+	})
+}
+
+func TestHomeAssistantClient_CallServiceFallback(t *testing.T) {
+	ctx := context.Background()
+	client := homeassistant.NewClient("", "", nil)
+
+	t.Run("toggle toggles state between on and off", func(t *testing.T) {
+		dev, err := client.GetState(ctx, "light.salon_plafond")
+		require.NoError(t, err)
+		initialState := dev.State
+
+		err = client.CallService(ctx, "light", "toggle", "light.salon_plafond")
+		require.NoError(t, err)
+
+		updated, err := client.GetState(ctx, "light.salon_plafond")
+		require.NoError(t, err)
+		if initialState == "on" {
+			assert.Equal(t, "off", updated.State)
+		} else {
+			assert.Equal(t, "on", updated.State)
+		}
+
+		// Toggle back
+		err = client.CallService(ctx, "light", "toggle", "light.salon_plafond")
+		require.NoError(t, err)
+
+		restored, err := client.GetState(ctx, "light.salon_plafond")
+		require.NoError(t, err)
+		assert.Equal(t, initialState, restored.State)
+	})
+
+	t.Run("turn_on and turn_off set state explicitly", func(t *testing.T) {
+		err := client.CallService(ctx, "switch", "turn_off", "switch.machine_a_cafe")
+		require.NoError(t, err)
+
+		dev, err := client.GetState(ctx, "switch.machine_a_cafe")
+		require.NoError(t, err)
+		assert.Equal(t, "off", dev.State)
+
+		err = client.CallService(ctx, "switch", "turn_on", "switch.machine_a_cafe")
+		require.NoError(t, err)
+
+		dev, err = client.GetState(ctx, "switch.machine_a_cafe")
+		require.NoError(t, err)
+		assert.Equal(t, "on", dev.State)
+	})
+
+	t.Run("CallService on non-existent device returns ErrDeviceNotFound", func(t *testing.T) {
+		err := client.CallService(ctx, "light", "toggle", "light.non_existent")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrDeviceNotFound)
 	})

@@ -12,8 +12,9 @@ import (
 
 // MockHomeAssistantRepository is a function-based mock implementation of ha.HomeAssistantRepository.
 type MockHomeAssistantRepository struct {
-	GetStatesFunc func(ctx context.Context) ([]domain.Device, error)
-	GetStateFunc  func(ctx context.Context, entityID string) (domain.Device, error)
+	GetStatesFunc   func(ctx context.Context) ([]domain.Device, error)
+	GetStateFunc    func(ctx context.Context, entityID string) (domain.Device, error)
+	CallServiceFunc func(ctx context.Context, domain string, service string, entityID string) error
 }
 
 func (m *MockHomeAssistantRepository) GetStates(ctx context.Context) ([]domain.Device, error) {
@@ -28,6 +29,13 @@ func (m *MockHomeAssistantRepository) GetState(ctx context.Context, entityID str
 		panic("called not defined GetStateFunc")
 	}
 	return m.GetStateFunc(ctx, entityID)
+}
+
+func (m *MockHomeAssistantRepository) CallService(ctx context.Context, domain string, service string, entityID string) error {
+	if m.CallServiceFunc == nil {
+		panic("called not defined CallServiceFunc")
+	}
+	return m.CallServiceFunc(ctx, domain, service, entityID)
 }
 
 // HomeAssistantRepositoryContractTesting runs contract tests for HomeAssistantRepository implementations.
@@ -60,5 +68,10 @@ func HomeAssistantRepositoryContractTesting(t *testing.T, repo ha.HomeAssistantR
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrDeviceNotFound)
 		assert.True(t, domain.IsDomainError(err))
+	})
+
+	t.Run("Contract: CallService toggles or executes service for entity", func(t *testing.T) {
+		err := repo.CallService(ctx, "light", "toggle", "light.salon_plafond")
+		require.NoError(t, err)
 	})
 }
