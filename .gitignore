@@ -26,3 +26,9 @@ frontend/dist/
 .DS_Store
 .idea/
 .vscode/
+
+# Agent skills & lockfiles
+.agents/
+.claude/
+skills-lock.json
+
