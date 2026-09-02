@@ -6,10 +6,13 @@ import (
 	"time"
 
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	repoha "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/ha"
 	repohealth "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health"
 	repolevels "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels"
+	repoplacements "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/placements"
 	repoplans "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow"
+	svcdevices "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/devices"
 	svchealth "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/health"
 	svclevels "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/levels"
 	"github.com/JLugagne/ha-dash/internal/pkg/logger"
@@ -17,19 +20,23 @@ import (
 
 // App encapsulates the dashboard core business logic and implements domain service interfaces.
 type App struct {
-	healthRepo repohealth.Repository
-	levelsRepo repolevels.LevelRepository
-	plansRepo  repoplans.PlanRepository
-	uow        uow.UnitOfWork
-	version    string
+	healthRepo     repohealth.Repository
+	levelsRepo     repolevels.LevelRepository
+	plansRepo      repoplans.PlanRepository
+	placementsRepo repoplacements.DevicePlacementRepository
+	haRepo         repoha.HomeAssistantRepository
+	uow            uow.UnitOfWork
+	version        string
 }
 
 // Ensure App implements domain service interfaces.
 var (
-	_ svchealth.HealthQueries  = (*App)(nil)
-	_ svchealth.HealthCommands = (*App)(nil)
-	_ svclevels.LevelQueries   = (*App)(nil)
-	_ svclevels.LevelCommands  = (*App)(nil)
+	_ svchealth.HealthQueries   = (*App)(nil)
+	_ svchealth.HealthCommands  = (*App)(nil)
+	_ svclevels.LevelQueries    = (*App)(nil)
+	_ svclevels.LevelCommands   = (*App)(nil)
+	_ svcdevices.DeviceQueries  = (*App)(nil)
+	_ svcdevices.DeviceCommands = (*App)(nil)
 )
 
 // New initializes the application service with repositories and configuration.
@@ -37,6 +44,8 @@ func New(
 	healthRepo repohealth.Repository,
 	levelsRepo repolevels.LevelRepository,
 	plansRepo repoplans.PlanRepository,
+	placementsRepo repoplacements.DevicePlacementRepository,
+	haRepo repoha.HomeAssistantRepository,
 	uow uow.UnitOfWork,
 	version string,
 ) *App {
@@ -44,11 +53,13 @@ func New(
 		version = "0.1.0"
 	}
 	return &App{
-		healthRepo: healthRepo,
-		levelsRepo: levelsRepo,
-		plansRepo:  plansRepo,
-		uow:        uow,
-		version:    version,
+		healthRepo:     healthRepo,
+		levelsRepo:     levelsRepo,
+		plansRepo:      plansRepo,
+		placementsRepo: placementsRepo,
+		haRepo:         haRepo,
+		uow:            uow,
+		version:        version,
 	}
 }
 

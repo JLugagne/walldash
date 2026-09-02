@@ -27,7 +27,7 @@ func TestHealthServiceContract(t *testing.T) {
 		},
 	}
 
-	service := app.New(mockRepo, nil, nil, mockUow, "0.1.0")
+	service := app.New(mockRepo, nil, nil, nil, nil, mockUow, "0.1.0")
 	svchealthtest.HealthQueriesContractTesting(t, service)
 }
 
@@ -42,7 +42,7 @@ func TestHealthService_GetHealth(t *testing.T) {
 		}
 		mockUow := &uowtest.MockUnitOfWork{}
 
-		service := app.New(mockRepo, nil, nil, mockUow, "0.1.0")
+		service := app.New(mockRepo, nil, nil, nil, nil, mockUow, "0.1.0")
 		health, err := service.GetHealth(ctx)
 
 		require.NoError(t, err)
@@ -61,7 +61,7 @@ func TestHealthService_GetHealth(t *testing.T) {
 		}
 		mockUow := &uowtest.MockUnitOfWork{}
 
-		service := app.New(mockRepo, nil, nil, mockUow, "0.1.0")
+		service := app.New(mockRepo, nil, nil, nil, nil, mockUow, "0.1.0")
 		_, err := service.GetHealth(ctx)
 
 		require.Error(t, err)
