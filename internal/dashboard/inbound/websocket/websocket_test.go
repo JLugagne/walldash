@@ -178,3 +178,53 @@ func TestWebSocketHub_ClientActionExecution(t *testing.T) {
 		assert.Contains(t, resp["error"], "not permitted by action whitelist")
 	})
 }
+
+func TestWebSocketHub_OriginCheck(t *testing.T) {
+	mockCommands := &actionstest.MockActionCommands{}
+	hub := ws.NewHub(mockCommands, "http://trusted.local")
+	go hub.Run()
+	defer hub.Stop()
+
+	server := httptest.NewServer(http.HandlerFunc(hub.ServeWS))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	t.Run("connection without origin succeeds", func(t *testing.T) {
+		dialer := gorilla_ws.Dialer{}
+		conn, resp, err := dialer.Dial(wsURL, nil)
+		require.NoError(t, err)
+		defer conn.Close()
+		assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
+	})
+
+	t.Run("connection with matching same-origin succeeds", func(t *testing.T) {
+		dialer := gorilla_ws.Dialer{}
+		header := http.Header{"Origin": []string{server.URL}}
+		conn, resp, err := dialer.Dial(wsURL, header)
+		require.NoError(t, err)
+		defer conn.Close()
+		assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
+	})
+
+	t.Run("connection with allowed origin succeeds", func(t *testing.T) {
+		dialer := gorilla_ws.Dialer{}
+		header := http.Header{"Origin": []string{"http://trusted.local"}}
+		conn, resp, err := dialer.Dial(wsURL, header)
+		require.NoError(t, err)
+		defer conn.Close()
+		assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
+	})
+
+	t.Run("connection with unauthorized origin is rejected with 403", func(t *testing.T) {
+		dialer := gorilla_ws.Dialer{}
+		header := http.Header{"Origin": []string{"http://evil.com"}}
+		conn, resp, err := dialer.Dial(wsURL, header)
+		if conn != nil {
+			conn.Close()
+		}
+		require.Error(t, err)
+		require.NotNil(t, resp)
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	})
+}

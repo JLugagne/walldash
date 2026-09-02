@@ -1,12 +1,17 @@
 services:
   ha-dash:
+    image: ha-dash:test
     build:
       context: .
       dockerfile: Dockerfile
     container_name: ha-dash
     restart: unless-stopped
+    entrypoint: ["sh", "-c", "/app/ha-dash"]
     ports:
-      - "9090:8080"
+      - "8080:8080"
+    env_file:
+      - path: .env
+        required: false
     environment:
       - PORT=8080
       - DB_PATH=/app/data/ha-dash.db

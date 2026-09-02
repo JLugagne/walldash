@@ -43,13 +43,46 @@ func TestDashboardNew(t *testing.T) {
 	router.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	// 2. Create a Level via POST /api/levels
+	// 2. Obtain CSRF token via GET /api/csrf-token
+	req = httptest.NewRequest(http.MethodGet, "/api/csrf-token", nil)
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var csrfResp struct {
+		Status string                         `json:"status"`
+		Data   pkgdashboard.CSRFTokenResponse `json:"data"`
+	}
+	err = json.NewDecoder(rec.Body).Decode(&csrfResp)
+	require.NoError(t, err)
+	csrfToken := csrfResp.Data.CSRFToken
+	require.NotEmpty(t, csrfToken)
+
+	// 3. Verify CORS preflight on /api/levels
+	preflightReq := httptest.NewRequest(http.MethodOptions, "/api/levels", nil)
+	preflightReq.Header.Set("Origin", "http://localhost:8080")
+	preflightReq.Header.Set("Access-Control-Request-Method", "POST")
+	preflightRec := httptest.NewRecorder()
+	router.ServeHTTP(preflightRec, preflightReq)
+	assert.Equal(t, http.StatusNoContent, preflightRec.Code)
+	assert.NotEmpty(t, preflightRec.Header().Get("Access-Control-Allow-Origin"))
+	assert.Contains(t, preflightRec.Header().Get("Access-Control-Allow-Methods"), "POST")
+	assert.Contains(t, preflightRec.Header().Get("Access-Control-Allow-Headers"), "X-CSRF-Token")
+
+	// 4. Verify CSRF rejection on state-changing method without CSRF header
 	createPayload := pkgdashboard.CreateLevelRequest{
 		Name:      "Rez-de-chaussée",
 		IsOutdoor: false,
 	}
 	body, _ := json.Marshal(createPayload)
+	unauthReq := httptest.NewRequest(http.MethodPost, "/api/levels", bytes.NewReader(body))
+	unauthRec := httptest.NewRecorder()
+	router.ServeHTTP(unauthRec, unauthReq)
+	assert.Equal(t, http.StatusForbidden, unauthRec.Code, "mutation without CSRF token/header must be rejected")
+
+	// 5. Create a Level via POST /api/levels with valid X-CSRF-Token
 	req = httptest.NewRequest(http.MethodPost, "/api/levels", bytes.NewReader(body))
+	req.Header.Set("X-CSRF-Token", csrfToken)
 	rec = httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -64,7 +97,7 @@ func TestDashboardNew(t *testing.T) {
 	levelID := createResp.Data.ID
 	assert.NotEmpty(t, levelID)
 
-	// 3. List levels via GET /api/levels
+	// 6. List levels via GET /api/levels
 	req = httptest.NewRequest(http.MethodGet, "/api/levels", nil)
 	rec = httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -78,7 +111,7 @@ func TestDashboardNew(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, listResp.Data, 1)
 
-	// 4. Save Plan via PUT /api/levels/{id}/plan
+	// 7. Save Plan via PUT /api/levels/{id}/plan with custom header X-Requested-With
 	savePlanPayload := pkgdashboard.SavePlanRequest{
 		Walls: []pkgdashboard.WallSegmentDTO{
 			{ID: "w-test", X1: 0, Y1: 0, X2: 100, Y2: 0, Thickness: 10},
@@ -98,11 +131,12 @@ func TestDashboardNew(t *testing.T) {
 	}
 	planBody, _ := json.Marshal(savePlanPayload)
 	req = httptest.NewRequest(http.MethodPut, "/api/levels/"+levelID+"/plan", bytes.NewReader(planBody))
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	rec = httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 
-	// 5. Get Plan via GET /api/levels/{id}/plan
+	// 8. Get Plan via GET /api/levels/{id}/plan
 	req = httptest.NewRequest(http.MethodGet, "/api/levels/"+levelID+"/plan", nil)
 	rec = httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -118,7 +152,31 @@ func TestDashboardNew(t *testing.T) {
 	assert.Len(t, planResp.Data.Walls, 1)
 	assert.Len(t, planResp.Data.Zones, 1)
 
-	// 6. Test WebSocket /api/ws integration
+	// 9. Embedded Frontend Serving and SPA fallback
+	t.Run("embedded frontend serves index.html at root", func(t *testing.T) {
+		req = httptest.NewRequest(http.MethodGet, "/", nil)
+		rec = httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "<div id=\"root\"></div>")
+	})
+
+	t.Run("embedded frontend falls back to index.html for client route", func(t *testing.T) {
+		req = httptest.NewRequest(http.MethodGet, "/levels/view/123", nil)
+		rec = httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "<div id=\"root\"></div>")
+	})
+
+	t.Run("unknown api route returns 404 not SPA index.html", func(t *testing.T) {
+		req = httptest.NewRequest(http.MethodGet, "/api/nonexistent", nil)
+		rec = httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	// 10. Test WebSocket /api/ws integration
 	server := httptest.NewServer(router)
 	defer server.Close()
 
