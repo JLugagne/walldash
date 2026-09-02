@@ -53,4 +53,20 @@ var (
 		Code:    "NOT_FOUND",
 		Message: "requested entity was not found",
 	}
+	ErrLevelNotFound = &Error{
+		Code:    "LEVEL_NOT_FOUND",
+		Message: "level not found",
+	}
+	ErrInvalidLevel = &Error{
+		Code:    "INVALID_LEVEL",
+		Message: "invalid level data",
+	}
+	ErrPlanNotFound = &Error{
+		Code:    "PLAN_NOT_FOUND",
+		Message: "plan not found",
+	}
+	ErrInvalidPlan = &Error{
+		Code:    "INVALID_PLAN",
+		Message: "invalid plan data",
+	}
 )

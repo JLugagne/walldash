@@ -7,31 +7,46 @@ import (
 
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
 	repohealth "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health"
+	repolevels "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels"
+	repoplans "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow"
 	svchealth "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/health"
+	svclevels "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/levels"
 	"github.com/JLugagne/ha-dash/internal/pkg/logger"
 )
 
 // App encapsulates the dashboard core business logic and implements domain service interfaces.
 type App struct {
 	healthRepo repohealth.Repository
+	levelsRepo repolevels.LevelRepository
+	plansRepo  repoplans.PlanRepository
 	uow        uow.UnitOfWork
 	version    string
 }
 
-// Ensure App implements svchealth.HealthQueries and svchealth.HealthCommands.
+// Ensure App implements domain service interfaces.
 var (
 	_ svchealth.HealthQueries  = (*App)(nil)
 	_ svchealth.HealthCommands = (*App)(nil)
+	_ svclevels.LevelQueries   = (*App)(nil)
+	_ svclevels.LevelCommands  = (*App)(nil)
 )
 
 // New initializes the application service with repositories and configuration.
-func New(healthRepo repohealth.Repository, uow uow.UnitOfWork, version string) *App {
+func New(
+	healthRepo repohealth.Repository,
+	levelsRepo repolevels.LevelRepository,
+	plansRepo repoplans.PlanRepository,
+	uow uow.UnitOfWork,
+	version string,
+) *App {
 	if version == "" {
 		version = "0.1.0"
 	}
 	return &App{
 		healthRepo: healthRepo,
+		levelsRepo: levelsRepo,
+		plansRepo:  plansRepo,
 		uow:        uow,
 		version:    version,
 	}

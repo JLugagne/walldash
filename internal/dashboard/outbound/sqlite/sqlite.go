@@ -11,6 +11,8 @@ import (
 
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health"
+	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels"
+	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow"
 	"github.com/JLugagne/ha-dash/internal/pkg/logger"
 	_ "modernc.org/sqlite"
@@ -19,15 +21,23 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
+type dbExecutor interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
 // Adapter provides the SQLite storage adapter implementing domain repositories and Unit of Work.
 type Adapter struct {
 	db *sql.DB
 }
 
-// Ensure Adapter implements health.Repository and uow.UnitOfWork.
+// Ensure Adapter implements domain repositories and uow.UnitOfWork.
 var (
-	_ health.Repository = (*Adapter)(nil)
-	_ uow.UnitOfWork    = (*Adapter)(nil)
+	_ health.Repository      = (*Adapter)(nil)
+	_ levels.LevelRepository = (*Adapter)(nil)
+	_ plans.PlanRepository   = (*Adapter)(nil)
+	_ uow.UnitOfWork         = (*Adapter)(nil)
 )
 
 // New initializes an Adapter connected to the SQLite database at dbPath and runs migrations.
@@ -91,6 +101,8 @@ func (a *Adapter) Do(ctx context.Context, fn func(repos uow.Repositories) error)
 
 	repos := uow.Repositories{
 		Health: &txHealthRepo{tx: tx},
+		Levels: &levelRepo{db: tx},
+		Plans:  &planRepo{db: tx},
 	}
 
 	if err := fn(repos); err != nil {
