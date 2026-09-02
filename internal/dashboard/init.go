@@ -10,6 +10,7 @@ import (
 	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
 	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/commands"
 	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/queries"
+	"github.com/JLugagne/ha-dash/internal/dashboard/outbound/homeassistant"
 	"github.com/JLugagne/ha-dash/internal/dashboard/outbound/sqlite"
 	"github.com/gorilla/mux"
 )
@@ -54,7 +55,8 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		return nil, err
 	}
 
-	application := app.New(adapter, adapter, adapter, adapter, conf.Version)
+	haClient := homeassistant.NewClient(conf.HAUrl, conf.HAToken, nil)
+	application := app.New(adapter, adapter, adapter, adapter, haClient, adapter, conf.Version)
 	controller := inbound.NewController()
 
 	// Register inbound routes
