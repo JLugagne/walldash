@@ -93,4 +93,24 @@ var (
 		Code:    "ACTION_NOT_ALLOWED",
 		Message: "action not permitted by whitelist",
 	}
+	ErrOverviewNotFound = &Error{
+		Code:    "OVERVIEW_NOT_FOUND",
+		Message: "overview dashboard not found",
+	}
+	ErrInvalidOverview = &Error{
+		Code:    "INVALID_OVERVIEW",
+		Message: "invalid overview dashboard data",
+	}
+	ErrWidgetNotFound = &Error{
+		Code:    "WIDGET_NOT_FOUND",
+		Message: "widget not found",
+	}
+	ErrInvalidWidget = &Error{
+		Code:    "INVALID_WIDGET",
+		Message: "invalid widget data",
+	}
+	ErrAutomationNotFound = &Error{
+		Code:    "AUTOMATION_NOT_FOUND",
+		Message: "automation not found",
+	}
 )

@@ -10,20 +10,26 @@ const (
 	ActionToggle  = "toggle"
 	ActionTurnOn  = "turn_on"
 	ActionTurnOff = "turn_off"
+	ActionTrigger = "trigger"
 )
+
+// DomainAutomation defines the Home Assistant automation domain.
+const DomainAutomation = "automation"
 
 // AllowedActions defines the strict whitelist of permissible user actions.
 var AllowedActions = []string{
 	ActionToggle,
 	ActionTurnOn,
 	ActionTurnOff,
+	ActionTrigger,
 }
 
-// AllowedActionDomains defines the domains that accept toggle / turn_on / turn_off actions.
+// AllowedActionDomains defines the domains that accept actions.
 var AllowedActionDomains = []string{
 	DomainLight,
 	DomainSwitch,
 	DomainMediaPlayer,
+	DomainAutomation,
 }
 
 // IsAllowedAction returns true if the action string is strictly allowed by the whitelist.
@@ -46,7 +52,7 @@ func IsAllowedActionDomain(domain string) bool {
 	return false
 }
 
-// ActionCommand specifies an action to execute against a specific device entity.
+// ActionCommand specifies an action to execute against a specific device or automation entity.
 type ActionCommand struct {
 	EntityID string
 	Action   string
@@ -71,6 +77,17 @@ func (c ActionCommand) Validate() error {
 
 	if !IsAllowedAction(c.Action) {
 		return errors.Join(ErrActionNotAllowed, errors.New("action "+c.Action+" is not permitted by whitelist"))
+	}
+
+	// Domain-specific action restrictions per ADR 0002
+	if domainStr == DomainAutomation {
+		if c.Action != ActionTrigger {
+			return errors.Join(ErrActionNotAllowed, errors.New("automation domain only permits trigger action"))
+		}
+	} else {
+		if c.Action == ActionTrigger {
+			return errors.Join(ErrActionNotAllowed, errors.New("device domains do not permit trigger action"))
+		}
 	}
 
 	return nil

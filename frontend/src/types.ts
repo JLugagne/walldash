@@ -62,3 +62,35 @@ export interface SavePlacementRequest {
   icon?: string
   custom_name?: string
 }
+
+export interface WidgetConfig {
+  entity_ids?: string[]
+}
+
+export interface Widget {
+  id: string
+  dashboard_id: string
+  type: string
+  title: string
+  order: number
+  config: WidgetConfig
+  created_at?: string
+  updated_at?: string
+}
+
+export interface OverviewDashboard {
+  id: string
+  name: string
+  order: number
+  created_at?: string
+  updated_at?: string
+  widgets: Widget[]
+}
+
+export interface Automation {
+  id: string
+  name: string
+  state: string
+  current: number
+  last_triggered: string | null
+}

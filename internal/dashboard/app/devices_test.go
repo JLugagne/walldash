@@ -49,6 +49,8 @@ func setupTestAppWithMocks() (
 		plansRepo,
 		placementsRepo,
 		haRepo,
+		nil,
+		nil,
 		mockUOW,
 		"1.0.0",
 	)
@@ -143,6 +145,8 @@ func TestDeviceServiceContract(t *testing.T) {
 		nil,
 		placementsRepo,
 		haRepo,
+		nil,
+		nil,
 		mockUOW,
 		"1.0.0",
 	)

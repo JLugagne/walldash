@@ -12,9 +12,12 @@ import (
 
 // MockHomeAssistantRepository is a function-based mock implementation of ha.HomeAssistantRepository.
 type MockHomeAssistantRepository struct {
-	GetStatesFunc   func(ctx context.Context) ([]domain.Device, error)
-	GetStateFunc    func(ctx context.Context, entityID string) (domain.Device, error)
-	CallServiceFunc func(ctx context.Context, domain string, service string, entityID string) error
+	GetStatesFunc         func(ctx context.Context) ([]domain.Device, error)
+	GetStateFunc          func(ctx context.Context, entityID string) (domain.Device, error)
+	CallServiceFunc       func(ctx context.Context, domain string, service string, entityID string) error
+	GetAutomationsFunc    func(ctx context.Context) ([]domain.Automation, error)
+	GetAutomationFunc     func(ctx context.Context, entityID string) (domain.Automation, error)
+	TriggerAutomationFunc func(ctx context.Context, entityID string) error
 }
 
 func (m *MockHomeAssistantRepository) GetStates(ctx context.Context) ([]domain.Device, error) {
@@ -36,6 +39,27 @@ func (m *MockHomeAssistantRepository) CallService(ctx context.Context, domain st
 		panic("called not defined CallServiceFunc")
 	}
 	return m.CallServiceFunc(ctx, domain, service, entityID)
+}
+
+func (m *MockHomeAssistantRepository) GetAutomations(ctx context.Context) ([]domain.Automation, error) {
+	if m.GetAutomationsFunc == nil {
+		panic("called not defined GetAutomationsFunc")
+	}
+	return m.GetAutomationsFunc(ctx)
+}
+
+func (m *MockHomeAssistantRepository) GetAutomation(ctx context.Context, entityID string) (domain.Automation, error) {
+	if m.GetAutomationFunc == nil {
+		panic("called not defined GetAutomationFunc")
+	}
+	return m.GetAutomationFunc(ctx, entityID)
+}
+
+func (m *MockHomeAssistantRepository) TriggerAutomation(ctx context.Context, entityID string) error {
+	if m.TriggerAutomationFunc == nil {
+		panic("called not defined TriggerAutomationFunc")
+	}
+	return m.TriggerAutomationFunc(ctx, entityID)
 }
 
 // HomeAssistantRepositoryContractTesting runs contract tests for HomeAssistantRepository implementations.
@@ -72,6 +96,43 @@ func HomeAssistantRepositoryContractTesting(t *testing.T, repo ha.HomeAssistantR
 
 	t.Run("Contract: CallService toggles or executes service for entity", func(t *testing.T) {
 		err := repo.CallService(ctx, "light", "toggle", "light.salon_plafond")
+		require.NoError(t, err)
+	})
+
+	t.Run("Contract: GetAutomations returns list of automations", func(t *testing.T) {
+		automations, err := repo.GetAutomations(ctx)
+		require.NoError(t, err)
+		assert.NotEmpty(t, automations)
+
+		for _, a := range automations {
+			assert.NotEmpty(t, a.ID)
+			assert.Contains(t, a.ID, "automation.")
+			assert.NotEmpty(t, a.Name)
+		}
+	})
+
+	t.Run("Contract: GetAutomation returns single automation or ErrAutomationNotFound", func(t *testing.T) {
+		automations, err := repo.GetAutomations(ctx)
+		require.NoError(t, err)
+		require.NotEmpty(t, automations)
+
+		firstID := automations[0].ID
+		a, err := repo.GetAutomation(ctx, firstID)
+		require.NoError(t, err)
+		assert.Equal(t, firstID, a.ID)
+
+		_, err = repo.GetAutomation(ctx, "automation.unknown_automation_id")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrAutomationNotFound)
+	})
+
+	t.Run("Contract: TriggerAutomation executes successfully", func(t *testing.T) {
+		automations, err := repo.GetAutomations(ctx)
+		require.NoError(t, err)
+		require.NotEmpty(t, automations)
+
+		firstID := automations[0].ID
+		err = repo.TriggerAutomation(ctx, firstID)
 		require.NoError(t, err)
 	})
 }
