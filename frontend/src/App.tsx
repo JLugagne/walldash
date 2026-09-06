@@ -9,11 +9,13 @@ import {
   ShieldCheck,
   Wifi,
   Edit3,
+  LayoutDashboard,
 } from 'lucide-react'
 import type { Level } from './types'
 import { LevelsManager } from './components/LevelsManager'
 import { PlanEditor2D } from './components/PlanEditor2D'
 import { IsometricView } from './components/IsometricView'
+import { OverviewsView } from './components/OverviewsView'
 
 interface HealthData {
   status: string
@@ -22,13 +24,15 @@ interface HealthData {
   timestamp: string
 }
 
-type ViewMode = '3d' | 'admin'
+type ViewMode = '3d' | 'admin' | 'overviews'
 
 function App() {
   const [mode, setMode] = useState<ViewMode>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
-      if (params.get('mode') === 'admin') return 'admin'
+      const m = params.get('mode')
+      if (m === 'admin') return 'admin'
+      if (m === 'overviews') return 'overviews'
     }
     return '3d'
   })
@@ -133,6 +137,18 @@ function App() {
           </button>
           <button
             type="button"
+            onClick={() => setMode('overviews')}
+            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              mode === 'overviews'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            <span>Overviews</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setMode('admin')}
             className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               mode === 'admin'
@@ -141,7 +157,7 @@ function App() {
             }`}
           >
             <Edit3 className="w-4 h-4" />
-            <span>Éditeur 2D (Admin)</span>
+            <span>Éditeur 2D</span>
           </button>
         </div>
 
@@ -149,7 +165,9 @@ function App() {
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 text-xs">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-slate-300 font-medium">Backend: {loading ? 'Checking...' : health?.status || 'Offline'}</span>
+            <span className="text-slate-300 font-medium">
+              Backend: {loading ? 'Checking...' : health?.status || 'Offline'}
+            </span>
           </div>
           <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 text-xs">
             <Wifi className="w-3.5 h-3.5 text-indigo-400" />
@@ -158,8 +176,10 @@ function App() {
         </div>
       </header>
 
-      {/* Mode View: Admin 2D Plan Editor vs 3D Isometric View */}
-      {mode === 'admin' ? (
+      {/* Mode View: Overviews vs Admin 2D vs 3D Isometric View */}
+      {mode === 'overviews' ? (
+        <OverviewsView initialIsAdmin={false} />
+      ) : mode === 'admin' ? (
         <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Left Sidebar: Levels Manager */}
           <aside className="w-full md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-slate-800 bg-slate-900/40 p-4 overflow-y-auto">
@@ -189,27 +209,35 @@ function App() {
           {/* Sidebar Information & Dashboard widgets */}
           <aside className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-slate-800 bg-slate-900/40 p-6 flex flex-col space-y-6">
             <div>
-              <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-3">System & Runtime</h2>
+              <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-3">
+                System & Runtime
+              </h2>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-800">
                   <div className="flex items-center space-x-2 text-slate-400 text-xs mb-1">
                     <Database className="w-3.5 h-3.5 text-cyan-400" />
                     <span>Storage</span>
                   </div>
-                  <span className="text-sm font-semibold text-slate-200">{health?.database ? 'SQLite: ' + health.database : 'SQLite'}</span>
+                  <span className="text-sm font-semibold text-slate-200">
+                    {health?.database ? 'SQLite: ' + health.database : 'SQLite'}
+                  </span>
                 </div>
                 <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-800">
                   <div className="flex items-center space-x-2 text-slate-400 text-xs mb-1">
                     <Server className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Version</span>
                   </div>
-                  <span className="text-sm font-semibold text-slate-200">{health?.version || '0.1.0'}</span>
+                  <span className="text-sm font-semibold text-slate-200">
+                    {health?.version || '0.1.0'}
+                  </span>
                 </div>
               </div>
             </div>
 
             <div>
-              <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-3">Architecture & Modules</h2>
+              <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-3">
+                Architecture & Modules
+              </h2>
               <ul className="space-y-2 text-xs">
                 <li className="flex items-center justify-between p-2.5 rounded-md bg-slate-800/40 border border-slate-800/60">
                   <span className="flex items-center space-x-2 text-slate-300">
@@ -217,6 +245,13 @@ function App() {
                     <span>Hexagonal Clean Backend</span>
                   </span>
                   <span className="text-emerald-400 font-mono text-[11px]">Go 1.26</span>
+                </li>
+                <li className="flex items-center justify-between p-2.5 rounded-md bg-slate-800/40 border border-slate-800/60">
+                  <span className="flex items-center space-x-2 text-slate-300">
+                    <LayoutDashboard className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Overview Dashboards & Widgets</span>
+                  </span>
+                  <span className="text-cyan-400 font-mono text-[11px]">ADR-0003</span>
                 </li>
                 <li className="flex items-center justify-between p-2.5 rounded-md bg-slate-800/40 border border-slate-800/60">
                   <span className="flex items-center space-x-2 text-slate-300">

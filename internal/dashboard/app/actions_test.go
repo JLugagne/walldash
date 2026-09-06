@@ -45,6 +45,8 @@ func setupTestAppWithHA(mockHA *hatest.MockHomeAssistantRepository) *app.App {
 		mockPlans,
 		mockPlacements,
 		mockHA,
+		nil,
+		nil,
 		mockUOW,
 		"0.1.0",
 	)

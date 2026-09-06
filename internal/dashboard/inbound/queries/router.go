@@ -6,6 +6,7 @@ import (
 	svcdevices "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/devices"
 	svchealth "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/health"
 	svclevels "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/levels"
+	svcoverviews "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/overviews"
 	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
 	"github.com/gorilla/mux"
 )
@@ -21,5 +22,9 @@ func SetupRoutes(r *mux.Router, controller *inbound.Controller, queries svchealt
 
 	if deviceQueries, ok := queries.(svcdevices.DeviceQueries); ok {
 		SetupDeviceRoutes(r, controller, deviceQueries)
+	}
+
+	if overviewQueries, ok := queries.(svcoverviews.OverviewQueries); ok {
+		SetupOverviewRoutes(r, controller, overviewQueries)
 	}
 }

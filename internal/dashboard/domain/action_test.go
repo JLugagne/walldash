@@ -13,6 +13,7 @@ func TestAllowedActions(t *testing.T) {
 		domain.ActionToggle,
 		domain.ActionTurnOn,
 		domain.ActionTurnOff,
+		domain.ActionTrigger,
 	}
 
 	for _, a := range allowed {
@@ -21,7 +22,7 @@ func TestAllowedActions(t *testing.T) {
 		})
 	}
 
-	disallowed := []string{"", "dim", "set_color", "press", "delete", "trigger"}
+	disallowed := []string{"", "dim", "set_color", "press", "delete"}
 	for _, a := range disallowed {
 		t.Run("disallowed action: "+a, func(t *testing.T) {
 			assert.False(t, domain.IsAllowedAction(a))
@@ -34,6 +35,7 @@ func TestAllowedActionDomains(t *testing.T) {
 		domain.DomainLight,
 		domain.DomainSwitch,
 		domain.DomainMediaPlayer,
+		domain.DomainAutomation,
 	}
 
 	for _, d := range allowed {
@@ -42,7 +44,7 @@ func TestAllowedActionDomains(t *testing.T) {
 		})
 	}
 
-	disallowed := []string{"sensor", "climate", "camera", "vacuum", "automation"}
+	disallowed := []string{"sensor", "climate", "camera", "vacuum"}
 	for _, d := range disallowed {
 		t.Run("disallowed action domain: "+d, func(t *testing.T) {
 			assert.False(t, domain.IsAllowedActionDomain(d))
@@ -57,6 +59,7 @@ func TestActionCommandValidation(t *testing.T) {
 			{EntityID: "light.cuisine_spot", Action: "turn_on"},
 			{EntityID: "switch.machine_a_cafe", Action: "turn_off"},
 			{EntityID: "media_player.enceinte_salon", Action: "toggle"},
+			{EntityID: "automation.eteindre_tout", Action: "trigger"},
 		}
 
 		for _, cmd := range validCmds {
@@ -73,6 +76,26 @@ func TestActionCommandValidation(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrActionNotAllowed)
 		assert.True(t, domain.IsDomainError(err))
+	})
+
+	t.Run("trigger on device domain returns ErrActionNotAllowed", func(t *testing.T) {
+		cmd := domain.ActionCommand{
+			EntityID: "light.salon_plafond",
+			Action:   "trigger",
+		}
+		err := cmd.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrActionNotAllowed)
+	})
+
+	t.Run("toggle on automation domain returns ErrActionNotAllowed", func(t *testing.T) {
+		cmd := domain.ActionCommand{
+			EntityID: "automation.eteindre_tout",
+			Action:   "toggle",
+		}
+		err := cmd.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrActionNotAllowed)
 	})
 
 	t.Run("disallowed domains return ErrActionNotAllowed", func(t *testing.T) {

@@ -15,7 +15,7 @@ import (
 )
 
 func TestHomeAssistantClient_FallbackContract(t *testing.T) {
-	// When empty URL or token, client should use fallback/mock devices and satisfy contract test
+	// When empty URL or token, client should use fallback/mock devices and automations and satisfy contract test
 	client := homeassistant.NewClient("", "", nil)
 	hatest.HomeAssistantRepositoryContractTesting(t, client)
 }
@@ -48,7 +48,7 @@ func TestHomeAssistantClient_RealServer(t *testing.T) {
 			},
 		},
 		{
-			// Unsupported domain: should be filtered out
+			// Unsupported domain: should be filtered out from devices
 			"entity_id": "camera.front_door",
 			"state":     "idle",
 			"attributes": map[string]any{
@@ -56,11 +56,12 @@ func TestHomeAssistantClient_RealServer(t *testing.T) {
 			},
 		},
 		{
-			// Unsupported domain: should be filtered out
 			"entity_id": "automation.morning_routine",
 			"state":     "on",
 			"attributes": map[string]any{
-				"friendly_name": "Routine Matin",
+				"friendly_name":  "Routine Matin",
+				"current":        0,
+				"last_triggered": "2026-09-02T07:30:00+00:00",
 			},
 		},
 	}
@@ -75,11 +76,17 @@ func TestHomeAssistantClient_RealServer(t *testing.T) {
 		case "/api/states/light.living_room":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(mockStates[0])
+		case "/api/states/automation.morning_routine":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(mockStates[4])
 		case "/api/states/non_existent.id":
 			w.WriteHeader(http.StatusNotFound)
 		case "/api/services/light/toggle":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode([]map[string]any{mockStates[0]})
+		case "/api/services/automation/trigger":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode([]map[string]any{mockStates[4]})
 		default:
 			http.NotFound(w, r)
 		}
@@ -121,6 +128,29 @@ func TestHomeAssistantClient_RealServer(t *testing.T) {
 
 	t.Run("CallService executes POST against HA services API", func(t *testing.T) {
 		err := client.CallService(ctx, "light", "toggle", "light.living_room")
+		require.NoError(t, err)
+	})
+
+	t.Run("GetAutomations returns automations from states", func(t *testing.T) {
+		automations, err := client.GetAutomations(ctx)
+		require.NoError(t, err)
+		require.Len(t, automations, 1)
+		assert.Equal(t, "automation.morning_routine", automations[0].ID)
+		assert.Equal(t, "Routine Matin", automations[0].Name)
+		assert.Equal(t, "on", automations[0].State)
+		assert.Equal(t, 0, automations[0].Current)
+		require.NotNil(t, automations[0].LastTriggered)
+	})
+
+	t.Run("GetAutomation returns single automation", func(t *testing.T) {
+		auto, err := client.GetAutomation(ctx, "automation.morning_routine")
+		require.NoError(t, err)
+		assert.Equal(t, "automation.morning_routine", auto.ID)
+		assert.Equal(t, "Routine Matin", auto.Name)
+	})
+
+	t.Run("TriggerAutomation posts to /api/services/automation/trigger", func(t *testing.T) {
+		err := client.TriggerAutomation(ctx, "automation.morning_routine")
 		require.NoError(t, err)
 	})
 }
@@ -174,5 +204,14 @@ func TestHomeAssistantClient_CallServiceFallback(t *testing.T) {
 		err := client.CallService(ctx, "light", "toggle", "light.non_existent")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrDeviceNotFound)
+	})
+
+	t.Run("TriggerAutomation updates last triggered in fallback mode", func(t *testing.T) {
+		err := client.TriggerAutomation(ctx, "automation.eteindre_toutes_les_lumieres")
+		require.NoError(t, err)
+
+		auto, err := client.GetAutomation(ctx, "automation.eteindre_toutes_les_lumieres")
+		require.NoError(t, err)
+		require.NotNil(t, auto.LastTriggered)
 	})
 }

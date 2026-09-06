@@ -9,6 +9,7 @@ import (
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health/healthtest"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels/levelstest"
+	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/overviews/overviewstest"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/placements/placementstest"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans/planstest"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow/uowtest"
@@ -63,4 +64,14 @@ func TestSQLiteDevicePlacementRepositoryContract(t *testing.T) {
 	require.NoError(t, err)
 
 	placementstest.DevicePlacementRepositoryContractTesting(t, adapter, testLevelID)
+}
+
+func TestSQLiteOverviewRepositoryContract(t *testing.T) {
+	adapter := setupTestDB(t)
+	overviewstest.OverviewRepositoryContractTesting(t, adapter)
+}
+
+func TestSQLiteWidgetRepositoryContract(t *testing.T) {
+	adapter := setupTestDB(t)
+	overviewstest.WidgetRepositoryContractTesting(t, adapter, adapter)
 }

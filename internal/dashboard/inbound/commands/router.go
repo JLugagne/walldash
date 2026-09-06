@@ -5,6 +5,7 @@ import (
 	svcdevices "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/devices"
 	svchealth "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/health"
 	svclevels "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/levels"
+	svcoverviews "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/overviews"
 	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
 	"github.com/gorilla/mux"
 )
@@ -21,5 +22,9 @@ func SetupRoutes(r *mux.Router, controller *inbound.Controller, commands svcheal
 
 	if actionCommands, ok := commands.(svcactions.ActionCommands); ok {
 		SetupActionRoutes(r, controller, actionCommands)
+	}
+
+	if overviewCommands, ok := commands.(svcoverviews.OverviewCommands); ok {
+		SetupOverviewRoutes(r, controller, overviewCommands)
 	}
 }

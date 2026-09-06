@@ -33,7 +33,7 @@ func TestLevelServiceContract(t *testing.T) {
 	mockHealth := &repohealthtest.MockRepository{}
 	mockUow := &uowtest.MockUnitOfWork{}
 
-	service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, mockUow, "0.1.0")
+	service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
 	svclevelstest.LevelQueriesContractTesting(t, service)
 }
 
@@ -56,7 +56,7 @@ func TestLevelService_Operations(t *testing.T) {
 		mockHealth := &repohealthtest.MockRepository{}
 		mockUow := &uowtest.MockUnitOfWork{}
 
-		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, mockUow, "0.1.0")
+		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
 		created, err := service.CreateLevel(ctx, actor, domain.Level{Name: "Étage 1"})
 		require.NoError(t, err)
 		assert.NotEmpty(t, created.ID)
@@ -69,7 +69,7 @@ func TestLevelService_Operations(t *testing.T) {
 		mockHealth := &repohealthtest.MockRepository{}
 		mockUow := &uowtest.MockUnitOfWork{}
 
-		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, mockUow, "0.1.0")
+		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
 		_, err := service.CreateLevel(ctx, actor, domain.Level{Name: ""})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidLevel)
@@ -85,7 +85,7 @@ func TestLevelService_Operations(t *testing.T) {
 		mockHealth := &repohealthtest.MockRepository{}
 		mockUow := &uowtest.MockUnitOfWork{}
 
-		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, mockUow, "0.1.0")
+		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
 		lvl := domain.Level{
 			ID:        "lvl-1",
 			Name:      "RDC Renommé",
@@ -109,7 +109,7 @@ func TestLevelService_Operations(t *testing.T) {
 		mockHealth := &repohealthtest.MockRepository{}
 		mockUow := &uowtest.MockUnitOfWork{}
 
-		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, mockUow, "0.1.0")
+		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
 		err := service.DeleteLevel(ctx, actor, "lvl-123")
 		require.NoError(t, err)
 		assert.Equal(t, "lvl-123", deletedID)
@@ -127,7 +127,7 @@ func TestLevelService_Operations(t *testing.T) {
 		mockHealth := &repohealthtest.MockRepository{}
 		mockUow := &uowtest.MockUnitOfWork{}
 
-		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, mockUow, "0.1.0")
+		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
 		err := service.ReorderLevels(ctx, actor, []string{"lvl-2", "lvl-1"})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"lvl-2", "lvl-1"}, ordered)
@@ -143,7 +143,7 @@ func TestLevelService_Operations(t *testing.T) {
 		mockHealth := &repohealthtest.MockRepository{}
 		mockUow := &uowtest.MockUnitOfWork{}
 
-		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, mockUow, "0.1.0")
+		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
 		_, err := service.SavePlan(ctx, actor, domain.Plan{
 			LevelID: "lvl-missing",
 			Walls:   []domain.WallSegment{},
@@ -167,7 +167,7 @@ func TestLevelService_Operations(t *testing.T) {
 		mockHealth := &repohealthtest.MockRepository{}
 		mockUow := &uowtest.MockUnitOfWork{}
 
-		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, mockUow, "0.1.0")
+		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
 		plan := domain.Plan{
 			LevelID: "lvl-exists",
 			Walls: []domain.WallSegment{

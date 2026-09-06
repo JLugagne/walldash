@@ -61,7 +61,7 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	}
 
 	haClient := homeassistant.NewClient(conf.HAUrl, conf.HAToken, nil)
-	application := app.New(adapter, adapter, adapter, adapter, haClient, adapter, conf.Version)
+	application := app.New(adapter, adapter, adapter, adapter, haClient, adapter, adapter, adapter, conf.Version)
 	controller := inbound.NewController()
 
 	wsHub := websocket.NewHub(application)

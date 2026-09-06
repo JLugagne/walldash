@@ -29,7 +29,7 @@ type Client struct {
 func NewClient(baseURL, token string, httpClient *http.Client) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{
-			Timeout: 5 * time.Second,
+			Timeout: 10 * time.Second,
 		}
 	}
 	return &Client{
@@ -46,6 +46,10 @@ type haEntityState struct {
 }
 
 var (
+	defaultLastTriggered1 = time.Now().UTC().Add(-45 * time.Minute)
+	defaultLastTriggered2 = time.Now().UTC().Add(-3 * time.Hour)
+	defaultLastTriggered3 = time.Now().UTC().Add(-12 * time.Minute)
+
 	fallbackMu      sync.RWMutex
 	fallbackDevices = []domain.Device{
 		{
@@ -139,10 +143,40 @@ var (
 			},
 		},
 	}
+
+	fallbackAutomations = []domain.Automation{
+		{
+			ID:            "automation.eteindre_toutes_les_lumieres",
+			Name:          "Éteindre toutes les lumières",
+			State:         "on",
+			Current:       0,
+			LastTriggered: &defaultLastTriggered1,
+		},
+		{
+			ID:            "automation.scenario_depart_maison",
+			Name:          "Scénario Départ Maison",
+			State:         "on",
+			Current:       0,
+			LastTriggered: &defaultLastTriggered2,
+		},
+		{
+			ID:            "automation.arrosage_automatique_jardin",
+			Name:          "Arrosage Automatique Jardin",
+			State:         "on",
+			Current:       1,
+			LastTriggered: &defaultLastTriggered3,
+		},
+		{
+			ID:            "automation.simulation_presence",
+			Name:          "Simulation de Présence Soirée",
+			State:         "off",
+			Current:       0,
+			LastTriggered: nil,
+		},
+	}
 )
 
 // GetStates fetches all states from Home Assistant, filtering to supported domains.
-// If the remote server is unreachable or unconfigured, it gracefully falls back to mock devices.
 func (c *Client) GetStates(ctx context.Context) ([]domain.Device, error) {
 	log := logger.LoggerFromContext(ctx)
 
@@ -276,11 +310,13 @@ func (c *Client) GetState(ctx context.Context, entityID string) (domain.Device, 
 }
 
 // CallService calls a Home Assistant service for the specified entity.
-// In dev/mock mode or when HA is unreachable, it mutates state in fallback devices.
 func (c *Client) CallService(ctx context.Context, domainStr string, service string, entityID string) error {
 	log := logger.LoggerFromContext(ctx)
 
 	if c.baseURL == "" || c.token == "" {
+		if domainStr == "automation" && service == "trigger" {
+			return c.mutateFallbackAutomation(ctx, entityID)
+		}
 		return c.mutateFallbackDevice(ctx, service, entityID)
 	}
 
@@ -301,7 +337,10 @@ func (c *Client) CallService(ctx context.Context, domainStr string, service stri
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		log.WithError(err).Warn("HA API unreachable, falling back to mock device mutation")
+		log.WithError(err).Warn("HA API unreachable, falling back to mock mutation")
+		if domainStr == "automation" && service == "trigger" {
+			return c.mutateFallbackAutomation(ctx, entityID)
+		}
 		return c.mutateFallbackDevice(ctx, service, entityID)
 	}
 	defer resp.Body.Close()
@@ -314,6 +353,151 @@ func (c *Client) CallService(ctx context.Context, domainStr string, service stri
 	}
 
 	return nil
+}
+
+// GetAutomations fetches all automations (domain == "automation") from Home Assistant states.
+func (c *Client) GetAutomations(ctx context.Context) ([]domain.Automation, error) {
+	log := logger.LoggerFromContext(ctx)
+
+	if c.baseURL == "" || c.token == "" {
+		log.Info("HA URL or token unconfigured, using fallback automations")
+		return copyFallbackAutomations(), nil
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/states", nil)
+	if err != nil {
+		log.WithError(err).Error("failed to create HA states request for automations")
+		return copyFallbackAutomations(), nil
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		log.WithError(err).Warn("HA API unreachable, falling back to mock automations")
+		return copyFallbackAutomations(), nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.WithField("status_code", resp.StatusCode).Warn("HA API returned non-200 for automations, falling back to mock automations")
+		return copyFallbackAutomations(), nil
+	}
+
+	var rawStates []haEntityState
+	if err := json.NewDecoder(resp.Body).Decode(&rawStates); err != nil {
+		log.WithError(err).Error("failed to decode HA states JSON")
+		return copyFallbackAutomations(), nil
+	}
+
+	var automations []domain.Automation
+	for _, raw := range rawStates {
+		if !strings.HasPrefix(raw.EntityID, "automation.") {
+			continue
+		}
+		automations = append(automations, parseAutomation(raw))
+	}
+
+	if automations == nil {
+		automations = []domain.Automation{}
+	}
+	return automations, nil
+}
+
+// GetAutomation fetches a single automation from Home Assistant.
+func (c *Client) GetAutomation(ctx context.Context, entityID string) (domain.Automation, error) {
+	log := logger.LoggerFromContext(ctx)
+
+	if !strings.HasPrefix(entityID, "automation.") {
+		return domain.Automation{}, errors.Join(domain.ErrAutomationNotFound, fmt.Errorf("invalid automation id: %s", entityID))
+	}
+
+	if c.baseURL == "" || c.token == "" {
+		fallbackMu.RLock()
+		defer fallbackMu.RUnlock()
+		for _, a := range fallbackAutomations {
+			if a.ID == entityID {
+				return a, nil
+			}
+		}
+		return domain.Automation{}, errors.Join(domain.ErrAutomationNotFound, fmt.Errorf("automation %s not found in fallback automations", entityID))
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/states/"+entityID, nil)
+	if err != nil {
+		return domain.Automation{}, errors.Join(domain.ErrAutomationNotFound, err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		log.WithError(err).Warn("HA API automation fetch failed, trying fallback")
+		fallbackMu.RLock()
+		defer fallbackMu.RUnlock()
+		for _, a := range fallbackAutomations {
+			if a.ID == entityID {
+				return a, nil
+			}
+		}
+		return domain.Automation{}, errors.Join(domain.ErrAutomationNotFound, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return domain.Automation{}, errors.Join(domain.ErrAutomationNotFound, fmt.Errorf("automation %s not found on HA", entityID))
+	}
+	if resp.StatusCode != http.StatusOK {
+		return domain.Automation{}, errors.Join(domain.ErrAutomationNotFound, fmt.Errorf("HA returned status %d for automation %s", resp.StatusCode, entityID))
+	}
+
+	var raw haEntityState
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return domain.Automation{}, errors.Join(domain.ErrAutomationNotFound, err)
+	}
+
+	return parseAutomation(raw), nil
+}
+
+// TriggerAutomation triggers an automation via POST /api/services/automation/trigger.
+func (c *Client) TriggerAutomation(ctx context.Context, entityID string) error {
+	if !strings.HasPrefix(entityID, "automation.") {
+		return errors.Join(domain.ErrAutomationNotFound, fmt.Errorf("invalid automation entity id: %s", entityID))
+	}
+	return c.CallService(ctx, "automation", "trigger", entityID)
+}
+
+func parseAutomation(raw haEntityState) domain.Automation {
+	name := raw.EntityID
+	if fn, ok := raw.Attributes["friendly_name"].(string); ok && strings.TrimSpace(fn) != "" {
+		name = fn
+	}
+
+	current := 0
+	if currVal, ok := raw.Attributes["current"].(float64); ok {
+		current = int(currVal)
+	} else if currInt, ok := raw.Attributes["current"].(int); ok {
+		current = currInt
+	}
+
+	var lastTriggered *time.Time
+	if ltStr, ok := raw.Attributes["last_triggered"].(string); ok && ltStr != "" && ltStr != "null" {
+		if t, err := time.Parse(time.RFC3339, ltStr); err == nil {
+			utc := t.UTC()
+			lastTriggered = &utc
+		} else if t, err := time.Parse("2006-01-02T15:04:05.999999-07:00", ltStr); err == nil {
+			utc := t.UTC()
+			lastTriggered = &utc
+		}
+	}
+
+	return domain.Automation{
+		ID:            raw.EntityID,
+		Name:          name,
+		State:         raw.State,
+		Current:       current,
+		LastTriggered: lastTriggered,
+	}
 }
 
 func (c *Client) mutateFallbackDevice(ctx context.Context, service, entityID string) error {
@@ -349,10 +533,41 @@ func (c *Client) mutateFallbackDevice(ctx context.Context, service, entityID str
 	return nil
 }
 
+func (c *Client) mutateFallbackAutomation(ctx context.Context, entityID string) error {
+	log := logger.LoggerFromContext(ctx)
+
+	fallbackMu.Lock()
+	defer fallbackMu.Unlock()
+
+	found := false
+	now := time.Now().UTC()
+	for i := range fallbackAutomations {
+		if fallbackAutomations[i].ID == entityID {
+			found = true
+			fallbackAutomations[i].LastTriggered = &now
+			log.WithField("automation_id", entityID).Info("fallback automation triggered")
+			break
+		}
+	}
+
+	if !found {
+		return errors.Join(domain.ErrAutomationNotFound, fmt.Errorf("automation %s not found in fallback automations", entityID))
+	}
+	return nil
+}
+
 func copyFallbackDevices() []domain.Device {
 	fallbackMu.RLock()
 	defer fallbackMu.RUnlock()
 	res := make([]domain.Device, len(fallbackDevices))
 	copy(res, fallbackDevices)
+	return res
+}
+
+func copyFallbackAutomations() []domain.Automation {
+	fallbackMu.RLock()
+	defer fallbackMu.RUnlock()
+	res := make([]domain.Automation, len(fallbackAutomations))
+	copy(res, fallbackAutomations)
 	return res
 }
