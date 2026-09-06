@@ -18,6 +18,14 @@ function App() {
             if (prev && payload.data.some((l: Level) => l.id === prev)) {
               return prev
             }
+            const hash = window.location.hash
+            const match = hash.match(/\/floor\/(.+)/)
+            if (match) {
+              const urlLevelId = match[1]
+              if (payload.data.some((l: Level) => l.id === urlLevelId)) {
+                return urlLevelId
+              }
+            }
             return payload.data.length > 0 ? payload.data[0].id : null
           })
         }
