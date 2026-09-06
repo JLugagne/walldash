@@ -736,55 +736,20 @@ function DevicePanel({ placement, devices, level, onUpdatePlacement, onDeleteSel
       </Field>
 
       <Field label="Display Layer" trailing={<span className="text-[11px] font-mono text-indigo-300">{currentLayer}</span>}>
-        <div className="space-y-1.5">
-          <select
-            value={currentLayer}
-            onChange={(e) => onUpdatePlacement(placement, { layer: e.target.value })}
-            className="w-full h-9 bg-slate-950 border border-slate-800 rounded-lg px-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-          >
-            {allLayers.map((l) => (
-              <option key={l} value={l}>
-                {l} {l === 'controls' ? '(default)' : ''}
-              </option>
-            ))}
-          </select>
-
-          <div className="flex items-center gap-1.5">
-            <input
-              type="text"
-              placeholder="New layer…"
-              key={`layer-input-${placement.id}`}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = (e.target as HTMLInputElement).value.trim().toLowerCase()
-                  if (val && val !== currentLayer) {
-                    onUpdatePlacement(placement, { layer: val })
-                    ;(e.target as HTMLInputElement).value = ''
-                  }
-                }
-              }}
-              className="flex-1 min-w-0 h-8 bg-slate-950 border border-slate-800 rounded-lg px-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
-            />
-            <button
-              type="button"
-              onClick={(e) => {
-                const input = e.currentTarget.previousElementSibling as HTMLInputElement | null
-                const val = input?.value.trim().toLowerCase()
-                if (val && val !== currentLayer) {
-                  onUpdatePlacement(placement, { layer: val })
-                  if (input) input.value = ''
-                }
-              }}
-              className="h-8 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer shrink-0"
-            >
-              <Plus className="w-3 h-3" />
-              Assign
-            </button>
-          </div>
-          <p className="text-[11px] text-slate-500 leading-snug">
-            Assigns the device to a Display Layer to filter the view per level.
-          </p>
-        </div>
+        <select
+          value={currentLayer}
+          onChange={(e) => onUpdatePlacement(placement, { layer: e.target.value })}
+          className="w-full h-9 bg-slate-950 border border-slate-800 rounded-lg px-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+        >
+          {allLayers.map((l) => (
+            <option key={l} value={l}>
+              {l} {l === 'controls' ? '(default)' : ''}
+            </option>
+          ))}
+        </select>
+        <p className="text-[11px] text-slate-500 leading-snug mt-1.5">
+          Manage layers in the <span className="text-indigo-400">Layers</span> panel.
+        </p>
       </Field>
 
       <Field label="Displayed as" trailing={<span className="text-[11px] text-slate-500">actual: {device?.domain ?? '—'}</span>}>

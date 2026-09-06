@@ -11,6 +11,7 @@ import { DevicePalette } from './editor/DevicePalette'
 import { DimensionLabel, WallLayer } from './editor/canvas/WallLayer'
 import { ZoneDraft, ZoneLayer } from './editor/canvas/ZoneLayer'
 import { DeviceLayer } from './editor/canvas/DeviceLayer'
+import { LayerPanel } from './editor/LayerPanel'
 import { CANVAS, GRID_SIZES, TOOLS, type ToolMode } from './editor/constants'
 import * as geo from './editor/geometry'
 import type { EditorSelection, OpeningDragMode } from './editor/types'
@@ -82,11 +83,13 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
   const [error, setError] = useState<string | null>(null)
   const [showImport, setShowImport] = useState(false)
   const [levelsOpen, setLevelsOpen] = useState(false)
+  const [layersOpen, setLayersOpen] = useState(true)
 
   const [devices, setDevices] = useState<Device[]>([])
   const [placements, setPlacements] = useState<DevicePlacement[]>([])
   const [loadingDevices, setLoadingDevices] = useState(false)
   const [deviceToPlace, setDeviceToPlace] = useState<Device | null>(null)
+  const [activeLayer, setActiveLayer] = useState('controls')
 
   const [tool, setToolState] = useState<ToolMode>('select')
   const [snapGrid, setSnapGrid] = useState(true)
@@ -126,6 +129,10 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
 
   const isDirty = useMemo(() => serializePlan(plan) !== savedJson, [plan, savedJson])
   const placedDeviceIds = useMemo(() => new Set(placements.map((p) => p.device_id)), [placements])
+  const visiblePlacements = useMemo(
+    () => placements.filter((p) => (p.layer || 'controls') === activeLayer),
+    [placements, activeLayer]
+  )
 
   const fetchDevices = useCallback(async () => {
     setLoadingDevices(true)
@@ -145,6 +152,17 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
   useEffect(() => {
     fetchDevices()
   }, [fetchDevices])
+
+  const refreshPlacements = useCallback(async () => {
+    if (!level?.id) return
+    try {
+      const res = await fetch(`/api/levels/${level.id}/placements`)
+      const data = await res.json()
+      if (data?.data) setPlacements(data.data)
+    } catch {
+      // ignore
+    }
+  }, [level?.id])
 
   useEffect(() => {
     const el = svgRef.current
@@ -242,6 +260,18 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
       ignore = true
     }
   }, [levelId, resetEditing])
+
+  // Keep activeLayer in sync with the level's available layers.
+  useEffect(() => {
+    if (!level) return
+    const available = level.layers && level.layers.length > 0 ? level.layers : ['controls', 'sensors']
+    setActiveLayer((prev) => (available.includes(prev) ? prev : available[0]))
+  }, [level])
+
+  // Clear device selection when switching layers (device becomes invisible on canvas).
+  useEffect(() => {
+    setSelection((prev) => (prev?.type === 'device' ? null : prev))
+  }, [activeLayer])
 
   useEffect(() => {
     if (!isDirty) return
@@ -545,6 +575,20 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
       return
     }
     if (mod || e.altKey) return
+    // Digit keys 1-9 switch layers (like Photoshop)
+    const digit = parseInt(e.key, 10)
+    if (digit >= 1 && digit <= 9) {
+      const available = level?.layers && level.layers.length > 0 ? level.layers : ['controls', 'sensors']
+      const idx = digit - 1
+      if (idx < available.length) {
+        setActiveLayer(available[idx])
+      }
+      return
+    }
+    if (e.key === 'l' || e.key === 'L') {
+      setLayersOpen((v) => !v)
+      return
+    }
     const key = e.key.toUpperCase()
     const toolDef = TOOLS.find((t) => t.shortcut === key)
     if (toolDef) {
@@ -845,7 +889,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
   const handleTap = (raw: Point2D, shift: boolean) => {
     if (deviceToPlace) {
       const { point } = snapPoint(raw, { noVertex: true })
-      savePlacement({ device_id: deviceToPlace.id, x: point.x, y: point.y, custom_name: deviceToPlace.name, icon: deviceToPlace.domain })
+      savePlacement({ device_id: deviceToPlace.id, x: point.x, y: point.y, custom_name: deviceToPlace.name, icon: deviceToPlace.domain, layer: activeLayer })
       setDeviceToPlace(null)
       return
     }
@@ -975,7 +1019,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
     const raw = toSvgPoint(e.clientX, e.clientY)
     if (!dev || !raw || !level) return
     const { point } = snapPoint(raw, { noVertex: true })
-    savePlacement({ device_id: dev.id, x: point.x, y: point.y, custom_name: dev.name, icon: dev.domain })
+    savePlacement({ device_id: dev.id, x: point.x, y: point.y, custom_name: dev.name, icon: dev.domain, layer: activeLayer })
   }
 
   const handleSelectLevel = (id: string) => {
@@ -1062,7 +1106,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
 
   const statusText = (() => {
     if (!level) return 'Select or create a level to get started.'
-    if (deviceToPlace) return `Click on the plan to place "${deviceToPlace.name}" · Escape to cancel`
+    if (deviceToPlace) return `Click to place "${deviceToPlace.name}" on layer "${activeLayer}" · Escape to cancel`
     switch (tool) {
       case 'wall':
         return wallStart
@@ -1145,7 +1189,21 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
       )}
 
       <div className="flex-1 flex min-h-0">
-        <ToolRail tool={tool} onSelectTool={setTool} snapGrid={snapGrid} onToggleSnap={() => setSnapGrid((v) => !v)} gridSize={gridSize} onCycleGrid={cycleGrid} />
+        <div className="flex">
+          <ToolRail tool={tool} onSelectTool={setTool} snapGrid={snapGrid} onToggleSnap={() => setSnapGrid((v) => !v)} gridSize={gridSize} onCycleGrid={cycleGrid} layersOpen={layersOpen} onToggleLayers={() => setLayersOpen((v) => !v)} />
+          {layersOpen && (
+            <div className="w-52 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col min-h-0">
+              <LayerPanel
+                level={level}
+                placements={placements}
+                activeLayer={activeLayer}
+                onSelectLayer={setActiveLayer}
+                onRefreshLevels={onRefreshLevels}
+                onRefreshPlacements={refreshPlacements}
+              />
+            </div>
+          )}
+        </div>
 
         <div className="flex-1 relative min-w-0 min-h-0 overflow-hidden" style={{ backgroundColor: CANVAS.background }}>
           <svg
@@ -1244,7 +1302,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
             )}
 
             <DeviceLayer
-              placements={placements}
+              placements={visiblePlacements}
               devices={devices}
               selection={selection}
               interactive={!deviceToPlace}
@@ -1302,7 +1360,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-indigo-950/90 backdrop-blur-md border border-indigo-500/50 text-indigo-100 text-xs px-3 py-1.5 rounded-full shadow-xl flex items-center gap-2">
               <Cpu className="w-3.5 h-3.5" />
               <span>
-                Placement of <strong className="text-white">{deviceToPlace.name}</strong>
+                Place <strong className="text-white">{deviceToPlace.name}</strong> on <strong className="text-indigo-300">{activeLayer}</strong>
               </span>
               <button type="button" onClick={() => setDeviceToPlace(null)} className="ml-1 text-indigo-300 hover:text-white cursor-pointer">
                 <X className="w-3.5 h-3.5" />

@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Canvas } from '@react-three/fiber'
 import { Layers, Edit3, Maximize2, Minimize2 } from 'lucide-react'
 import type { Level, Plan } from '../types'
 import { IsometricScene } from './IsometricScene'
 import { LevelSelector } from './LevelSelector'
 import { LayerSelector } from './LayerSelector'
-import { ViewModeMenu, type ViewMode } from './ViewModeMenu'
+import { ViewModeMenu } from './ViewModeMenu'
 import { useRealtimeDevices } from '../hooks/useRealtimeDevices'
 import { DEFAULT_LAYERS } from '../utils/layers'
 
@@ -13,19 +14,14 @@ interface IsometricViewProps {
   level: Level | null
   levels: Level[]
   onSelectLevel: (levelId: string) => void
-  onSwitchToAdmin: () => void
-  viewMode: ViewMode
-  onSelectViewMode: (mode: ViewMode) => void
 }
 
 export function IsometricView({
   level,
   levels,
   onSelectLevel,
-  onSwitchToAdmin,
-  viewMode,
-  onSelectViewMode,
 }: IsometricViewProps) {
+  const navigate = useNavigate()
   const [plan, setPlan] = useState<Plan | null>(null)
   const [loading, setLoading] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -165,7 +161,7 @@ export function IsometricView({
           onSelectLevel={onSelectLevel}
         />
 
-        {level && (
+        {level && availableLayers.length > 1 && (
           <LayerSelector
             layers={level.layers}
             activeLayer={activeLayer}
@@ -191,11 +187,7 @@ export function IsometricView({
               <Maximize2 className="w-5 h-5" />
             )}
           </button>
-          <ViewModeMenu
-            mode={viewMode}
-            onSelect={onSelectViewMode}
-            direction="up"
-          />
+          <ViewModeMenu direction="up" />
         </div>
       </div>
 
@@ -214,7 +206,7 @@ export function IsometricView({
             </div>
             <button
               type="button"
-              onClick={onSwitchToAdmin}
+              onClick={() => navigate('/admin')}
               className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg shadow-indigo-500/30 transition-all flex items-center justify-center space-x-2"
             >
               <Edit3 className="w-4 h-4" />
@@ -241,7 +233,7 @@ export function IsometricView({
             </div>
             <button
               type="button"
-              onClick={onSwitchToAdmin}
+              onClick={() => navigate('/admin')}
               className="shrink-0 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-md transition-all flex items-center space-x-1.5"
             >
               <Edit3 className="w-3.5 h-3.5" />

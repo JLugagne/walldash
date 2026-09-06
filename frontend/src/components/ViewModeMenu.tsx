@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Box, LayoutDashboard, Edit3, Layers, type LucideIcon } from 'lucide-react'
 
 export type ViewMode = '3d' | 'admin' | 'overviews'
@@ -7,29 +8,36 @@ interface ViewModeOption {
   key: ViewMode
   label: string
   icon: LucideIcon
+  to: string
 }
 
 const OPTIONS: ViewModeOption[] = [
-  { key: '3d', label: '3D View', icon: Box },
-  { key: 'overviews', label: 'Overviews', icon: LayoutDashboard },
-  { key: 'admin', label: '2D Editor', icon: Edit3 },
+  { key: '3d', label: '3D View', icon: Box, to: '/' },
+  { key: 'overviews', label: 'Overviews', icon: LayoutDashboard, to: '/overviews' },
+  { key: 'admin', label: '2D Editor', icon: Edit3, to: '/admin' },
 ]
 
+function resolveMode(pathname: string): ViewMode {
+  if (pathname.startsWith('/admin')) return 'admin'
+  if (pathname.startsWith('/overviews')) return 'overviews'
+  return '3d'
+}
+
 interface ViewModeMenuProps {
-  mode: ViewMode
-  onSelect: (mode: ViewMode) => void
   direction?: 'up' | 'down'
   useLayersIcon?: boolean
 }
 
 export function ViewModeMenu({
-  mode,
-  onSelect,
   direction = 'down',
   useLayersIcon,
 }: ViewModeMenuProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const mode = resolveMode(location.pathname)
   const activeOption = OPTIONS.find((o) => o.key === mode) ?? OPTIONS[0]
   const showLayersIcon = useLayersIcon ?? (direction === 'up')
   const TriggerIcon = showLayersIcon ? Layers : activeOption.icon
@@ -73,7 +81,7 @@ export function ViewModeMenu({
                 key={option.key}
                 type="button"
                 onClick={() => {
-                  onSelect(option.key)
+                  navigate(option.to)
                   setOpen(false)
                 }}
                 className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 cursor-pointer ${
