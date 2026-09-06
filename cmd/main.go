@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/JLugagne/ha-dash/frontend"
 	dashboard "github.com/JLugagne/ha-dash/internal/dashboard"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -25,14 +26,25 @@ func main() {
 	dbPath := getEnv("DB_PATH", "ha-dash.db")
 	haURL := getEnv("HA_URL", "http://homeassistant.local:8123")
 	haToken := getEnv("HA_TOKEN", "")
-	frontendDir := getEnv("FRONTEND_DIR", "frontend/dist")
+	frontendDir := os.Getenv("FRONTEND_DIR")
+	allowedOriginsStr := os.Getenv("ALLOWED_ORIGINS")
+	var allowedOrigins []string
+	if allowedOriginsStr != "" {
+		for _, o := range strings.Split(allowedOriginsStr, ",") {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				allowedOrigins = append(allowedOrigins, trimmed)
+			}
+		}
+	}
 
 	conf := dashboard.Config{
-		DBPath:      dbPath,
-		HAUrl:       haURL,
-		HAToken:     haToken,
-		Version:     "0.1.0",
-		FrontendDir: frontendDir,
+		DBPath:         dbPath,
+		HAUrl:          haURL,
+		HAToken:        haToken,
+		Version:        "0.1.0",
+		FrontendDir:    frontendDir,
+		AssetsFS:       frontend.FS(),
+		AllowedOrigins: allowedOrigins,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

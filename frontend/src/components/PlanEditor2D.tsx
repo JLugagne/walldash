@@ -24,6 +24,7 @@ import {
   Plus,
 } from 'lucide-react'
 import type { Level, Plan, WallSegment, Zone, Point2D, Device, DevicePlacement, SavePlacementRequest } from '../types'
+import { apiFetch } from '../api'
 
 interface PlanEditor2DProps {
   level: Level | null
@@ -306,7 +307,7 @@ export function PlanEditor2D({ level }: PlanEditor2DProps) {
       if (!level) return
       setError(null)
       try {
-        const res = await fetch(`/api/levels/${level.id}/placements`, {
+        const res = await apiFetch(`/api/levels/${level.id}/placements`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(req),
@@ -340,7 +341,7 @@ export function PlanEditor2D({ level }: PlanEditor2DProps) {
       if (!level) return
       setError(null)
       try {
-        const res = await fetch(`/api/levels/${level.id}/placements/${placementId}`, {
+        const res = await apiFetch(`/api/levels/${level.id}/placements/${placementId}`, {
           method: 'DELETE',
         })
         const payload = await res.json()
@@ -610,7 +611,7 @@ export function PlanEditor2D({ level }: PlanEditor2DProps) {
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch(`/api/levels/${level.id}/plan`, {
+      const res = await apiFetch(`/api/levels/${level.id}/plan`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

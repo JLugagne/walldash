@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,7 +26,15 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow local dashboard connections
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		return strings.EqualFold(u.Host, r.Host)
 	},
 }
 
@@ -38,20 +48,57 @@ type Hub struct {
 	broadcast      chan []byte
 	stop           chan struct{}
 	actionCommands svcactions.ActionCommands
+	allowedOrigins []string
+	upgrader       websocket.Upgrader
 	mu             sync.Mutex
 	running        bool
 }
 
-// NewHub creates a new WebSocket Hub instance.
-func NewHub(actionCommands svcactions.ActionCommands) *Hub {
-	return &Hub{
+// NewHub creates a new WebSocket Hub instance with optional allowed origins for CORS/CSWSH protection.
+func NewHub(actionCommands svcactions.ActionCommands, allowedOrigins ...string) *Hub {
+	h := &Hub{
 		clients:        make(map[*Client]bool),
 		register:       make(chan *Client),
 		unregister:     make(chan *Client),
 		broadcast:      make(chan []byte, 256),
 		stop:           make(chan struct{}),
 		actionCommands: actionCommands,
+		allowedOrigins: allowedOrigins,
 	}
+	h.upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     h.CheckOrigin,
+	}
+	return h
+}
+
+// CheckOrigin verifies that the WebSocket request origin matches the server host or allowed origins.
+func (h *Hub) CheckOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+
+	if strings.EqualFold(u.Host, r.Host) {
+		return true
+	}
+
+	for _, allowed := range h.allowedOrigins {
+		if allowed == "*" || strings.EqualFold(u.Host, allowed) || strings.EqualFold(origin, allowed) {
+			return true
+		}
+		if allowedURL, err := url.Parse(allowed); err == nil && strings.EqualFold(u.Host, allowedURL.Host) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Run listens for register, unregister and broadcast events until Stop is called.
@@ -138,7 +185,7 @@ func (h *Hub) BroadcastDevice(device domain.Device) {
 
 // ServeWS upgrades the HTTP connection to a WebSocket connection.
 func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		logger.LoggerFromContext(r.Context()).WithError(err).Warn("failed to upgrade websocket connection")
 		return

@@ -13,6 +13,7 @@ import {
 import type { OverviewDashboard, Automation } from '../types'
 import { AutomationListWidget } from './AutomationListWidget'
 import { AddWidgetModal } from './AddWidgetModal'
+import { apiFetch } from '../api'
 
 interface OverviewsViewProps {
   initialIsAdmin?: boolean
@@ -80,7 +81,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
   // Create an initial default overview if none exists
   const handleCreateDefaultOverview = async () => {
     try {
-      const res = await fetch('/api/overviews', {
+      const res = await apiFetch('/api/overviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'Vue Synthétique', order: 0 }),
@@ -89,7 +90,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
         const payload = await res.json()
         if (payload?.data?.id) {
           // Also add a default automation list widget
-          const widgetRes = await fetch(`/api/overviews/${payload.data.id}/widgets`, {
+          const widgetRes = await apiFetch(`/api/overviews/${payload.data.id}/widgets`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -118,7 +119,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
     if (!newOverviewName.trim()) return
 
     try {
-      const res = await fetch('/api/overviews', {
+      const res = await apiFetch('/api/overviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newOverviewName.trim(), order: overviews.length }),
@@ -138,7 +139,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
     if (!activeOverviewId || !renameValue.trim()) return
 
     try {
-      const res = await fetch(`/api/overviews/${activeOverviewId}`, {
+      const res = await apiFetch(`/api/overviews/${activeOverviewId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: renameValue.trim(), order: activeOverview?.order || 0 }),
@@ -156,7 +157,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce tableau de bord ?')) return
 
     try {
-      const res = await fetch(`/api/overviews/${id}`, {
+      const res = await apiFetch(`/api/overviews/${id}`, {
         method: 'DELETE',
       })
       if (res.ok) {
@@ -170,7 +171,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
   const handleAddWidget = async (title: string, selectedEntityIds: string[]) => {
     if (!activeOverviewId) return
 
-    const res = await fetch(`/api/overviews/${activeOverviewId}/widgets`, {
+    const res = await apiFetch(`/api/overviews/${activeOverviewId}/widgets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -193,7 +194,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
     if (!window.confirm('Supprimer ce widget ?')) return
 
     try {
-      const res = await fetch(`/api/overviews/${activeOverviewId}/widgets/${widgetId}`, {
+      const res = await apiFetch(`/api/overviews/${activeOverviewId}/widgets/${widgetId}`, {
         method: 'DELETE',
       })
       if (res.ok) {

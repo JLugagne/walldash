@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Zap, Play, CheckCircle2, Trash2, Clock, Activity } from 'lucide-react'
 import type { Widget, Automation } from '../types'
+import { apiFetch } from '../api'
 
 interface AutomationListWidgetProps {
   widget: Widget
@@ -55,7 +56,7 @@ export const AutomationListWidget: React.FC<AutomationListWidgetProps> = ({
     setTriggeringId(automationId)
 
     try {
-      const res = await fetch(`/api/automations/${encodeURIComponent(automationId)}/trigger`, {
+      const res = await apiFetch(`/api/automations/${encodeURIComponent(automationId)}/trigger`, {
         method: 'POST',
       })
       if (res.ok) {

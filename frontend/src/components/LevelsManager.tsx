@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, Trash2, ArrowUp, ArrowDown, Trees, Home, Layers, Check } from 'lucide-react'
 import type { Level } from '../types'
+import { apiFetch } from '../api'
 
 interface LevelsManagerProps {
   levels: Level[]
@@ -27,7 +28,7 @@ export function LevelsManager({
     setIsSubmitting(true)
     setError(null)
     try {
-      const res = await fetch('/api/levels', {
+      const res = await apiFetch('/api/levels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -58,7 +59,7 @@ export function LevelsManager({
     if (!confirm('Voulez-vous supprimer ce niveau et son plan 2D ?')) return
 
     try {
-      const res = await fetch(`/api/levels/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/levels/${id}`, { method: 'DELETE' })
       if (res.ok) {
         await onRefreshLevels()
       }
@@ -80,7 +81,7 @@ export function LevelsManager({
     const levelIds = newOrder.map((l) => l.id)
 
     try {
-      const res = await fetch('/api/levels/reorder', {
+      const res = await apiFetch('/api/levels/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ level_ids: levelIds }),

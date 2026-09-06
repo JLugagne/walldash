@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Device, DevicePlacement } from '../types'
+import { apiFetch } from '../api'
 
 export function useRealtimeDevices(levelId: string | null) {
   const [deviceMap, setDeviceMap] = useState<Record<string, Device>>({})
@@ -150,7 +151,7 @@ export function useRealtimeDevices(levelId: string | null) {
 
       // 3. REST fallback
       try {
-        const res = await fetch('/api/actions', {
+        const res = await apiFetch('/api/actions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
