@@ -1,14 +1,19 @@
 package commands
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	svclevels "github.com/JLugagne/walldash/internal/dashboard/domain/service/levels"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
+	"github.com/JLugagne/walldash/internal/dashboard/outbound/aijson"
+	"github.com/JLugagne/walldash/internal/dashboard/outbound/sweethome3d"
 	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
@@ -175,7 +180,59 @@ func SetupLevelRoutes(r *mux.Router, controller *inbound.Controller, commands sv
 	handler := NewLevelsHandler(controller, commands)
 	r.HandleFunc("/api/levels", handler.CreateLevel).Methods(http.MethodPost)
 	r.HandleFunc("/api/levels/reorder", handler.ReorderLevels).Methods(http.MethodPost)
+	r.HandleFunc("/api/levels/{id}/plan/import", handler.ImportPlan).Methods(http.MethodPost)
 	r.HandleFunc("/api/levels/{id}/plan", handler.SavePlan).Methods(http.MethodPut)
 	r.HandleFunc("/api/levels/{id}", handler.UpdateLevel).Methods(http.MethodPut)
 	r.HandleFunc("/api/levels/{id}", handler.DeleteLevel).Methods(http.MethodDelete)
+}
+
+func (h *LevelsHandler) ImportPlan(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	var plan domain.Plan
+	var err error
+
+	contentType := r.Header.Get("Content-Type")
+
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		reader, parseErr := r.MultipartReader()
+		if parseErr != nil {
+			h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidSavePlanRequest, parseErr))
+			return
+		}
+		part, partErr := reader.NextPart()
+		if partErr != nil {
+			h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidSavePlanRequest, partErr))
+			return
+		}
+		plan, err = sweethome3d.FromReader(part, id)
+	} else {
+		body, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidSavePlanRequest, readErr))
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		plan, err = aijson.FromJSON(body, id)
+	}
+
+	if err != nil {
+		h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidSavePlanRequest, err))
+		return
+	}
+
+	actor := domain.ActorFromContext(r.Context())
+	saved, err := h.commands.SavePlan(r.Context(), actor, plan)
+	if err != nil {
+		if errors.Is(err, domain.ErrLevelNotFound) || errors.Is(err, domain.ErrInvalidPlan) {
+			h.controller.SendFail(w, r, nil, err)
+			return
+		}
+		h.controller.SendError(w, r, err)
+		return
+	}
+
+	response := converters.ToPublicPlan(saved)
+	h.controller.SendSuccess(w, r, response)
 }
