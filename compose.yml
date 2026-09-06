@@ -6,7 +6,6 @@ services:
       dockerfile: Dockerfile
     container_name: walldash
     restart: unless-stopped
-    entrypoint: ["sh", "-c", "/app/walldash"]
     ports:
       - "9090:8080"
     env_file:
