@@ -143,6 +143,8 @@ func TestPlanValidation(t *testing.T) {
 	t.Run("zone with valid sensors and thresholds passes validation", func(t *testing.T) {
 		minTemp := 18.5
 		maxTemp := 24.0
+		minHum := 40.0
+		maxHum := 65.0
 		validSensorZone := domain.Zone{
 			ID:             "z-sensor-1",
 			Name:           "Chambre",
@@ -152,6 +154,8 @@ func TestPlanValidation(t *testing.T) {
 			TempMin:        &minTemp,
 			TempMax:        &maxTemp,
 			HumiditySensor: "sensor.chambre_humidity",
+			HumidityMin:    &minHum,
+			HumidityMax:    &maxHum,
 		}
 		require.NoError(t, validSensorZone.Validate())
 	})
@@ -186,6 +190,36 @@ func TestPlanValidation(t *testing.T) {
 		require.NoError(t, equalTempZone.Validate())
 	})
 
+	t.Run("zone with humidity_min greater than humidity_max fails validation", func(t *testing.T) {
+		minHum := 70.0
+		maxHum := 40.0
+		invalidHumZone := domain.Zone{
+			ID:          "z-hum-inv",
+			Name:        "Bathroom",
+			Color:       "#3b82f6",
+			Points:      validZone.Points,
+			HumidityMin: &minHum,
+			HumidityMax: &maxHum,
+		}
+		err := invalidHumZone.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidPlan)
+		assert.True(t, domain.IsDomainError(err))
+	})
+
+	t.Run("zone with humidity_min equal to humidity_max passes validation", func(t *testing.T) {
+		hum := 50.0
+		equalHumZone := domain.Zone{
+			ID:          "z-hum-eq",
+			Name:        "Bureau",
+			Color:       "#3b82f6",
+			Points:      validZone.Points,
+			HumidityMin: &hum,
+			HumidityMax: &hum,
+		}
+		require.NoError(t, equalHumZone.Validate())
+	})
+
 	t.Run("zone with only one threshold passes validation", func(t *testing.T) {
 		temp := 18.0
 		onlyMinZone := domain.Zone{
@@ -205,6 +239,25 @@ func TestPlanValidation(t *testing.T) {
 			TempMax: &temp,
 		}
 		require.NoError(t, onlyMaxZone.Validate())
+
+		hum := 45.0
+		onlyMinHumZone := domain.Zone{
+			ID:          "z-min-hum-only",
+			Name:        "Cellar",
+			Color:       "#3b82f6",
+			Points:      validZone.Points,
+			HumidityMin: &hum,
+		}
+		require.NoError(t, onlyMinHumZone.Validate())
+
+		onlyMaxHumZone := domain.Zone{
+			ID:          "z-max-hum-only",
+			Name:        "Attic",
+			Color:       "#3b82f6",
+			Points:      validZone.Points,
+			HumidityMax: &hum,
+		}
+		require.NoError(t, onlyMaxHumZone.Validate())
 	})
 
 	t.Run("zone with malformed sensor entity ID fails validation", func(t *testing.T) {

@@ -74,6 +74,8 @@ type ZoneDTO struct {
 	TempMin        *float64     `json:"temp_min,omitempty"`
 	TempMax        *float64     `json:"temp_max,omitempty"`
 	HumiditySensor string       `json:"humidity_sensor,omitempty"`
+	HumidityMin    *float64     `json:"humidity_min,omitempty"`
+	HumidityMax    *float64     `json:"humidity_max,omitempty"`
 }
 
 // SavePlanRequest contains the walls and zones to persist for a level's plan.

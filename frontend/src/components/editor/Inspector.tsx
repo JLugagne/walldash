@@ -542,6 +542,7 @@ function ZonePanel({ zone, devices, onUpdateZone, onDeleteSelection, onSelect }:
   }
 
   const hasThresholds = zone.temp_min !== undefined || zone.temp_max !== undefined
+  const hasHumThresholds = zone.humidity_min !== undefined || zone.humidity_max !== undefined
 
   return (
     <PanelShell icon={<Hexagon className="w-4 h-4" />} title={zone.name || 'Zone'} subtitle={`${zone.points.length} vertices`} onClose={() => onSelect(null)}>
@@ -672,6 +673,62 @@ function ZonePanel({ zone, devices, onUpdateZone, onDeleteSelection, onSelect }:
             )}
           </div>
         </Field>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Humidity alert thresholds</span>
+            {hasHumThresholds && (
+              <button
+                type="button"
+                onClick={() => onUpdateZone(zone.id, { humidity_min: undefined, humidity_max: undefined })}
+                className="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer"
+              >
+                Clear thresholds
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="block text-[10px] text-slate-400">Dry alert &lt;</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="1"
+                  placeholder="Ex: 30"
+                  value={zone.humidity_min ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? undefined : Number(e.target.value)
+                    onUpdateZone(zone.id, { humidity_min: val !== undefined && Number.isFinite(val) ? val : undefined })
+                  }}
+                  className="w-full h-8 bg-slate-950 border border-slate-800 rounded-lg pl-2 pr-7 text-xs text-white font-mono text-right focus:outline-none focus:border-indigo-500"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">%</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[10px] text-slate-400">Humid alert &gt;</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="1"
+                  placeholder="Ex: 70"
+                  value={zone.humidity_max ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? undefined : Number(e.target.value)
+                    onUpdateZone(zone.id, { humidity_max: val !== undefined && Number.isFinite(val) ? val : undefined })
+                  }}
+                  className="w-full h-8 bg-slate-950 border border-slate-800 rounded-lg pl-2 pr-7 text-xs text-white font-mono text-right focus:outline-none focus:border-indigo-500"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">%</span>
+              </div>
+            </div>
+          </div>
+          {zone.humidity_min !== undefined && zone.humidity_max !== undefined && zone.humidity_min > zone.humidity_max && (
+            <p className="text-[11px] text-rose-400 font-medium pt-0.5">
+              Warning: the dry threshold ({zone.humidity_min}%) is higher than the humid threshold ({zone.humidity_max}%).
+            </p>
+          )}
+        </div>
       </div>
 
       <Field label="Actions">

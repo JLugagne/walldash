@@ -330,6 +330,71 @@ describe('ceilingDisplay utils', () => {
       expect(metrics.isAlert).toBe(true)
       expect(metrics.alertType).toBe('hot')
     })
+
+    it('progressively interpolates humidity gauge color based on thresholds', () => {
+      // In comfort range (48% between 40% and 60%): comfort teal
+      const comfortZone: Zone = {
+        id: 'z-comf',
+        name: 'Bedroom',
+        color: '#3b82f6',
+        points: [],
+        humidity_sensor: 'sensor.salon_humidity', // 48%
+        humidity_min: 40,
+        humidity_max: 60,
+      }
+      const comfMetrics = getZoneHUDMetrics(comfortZone, mockDevices)
+      expect(comfMetrics.humidityColor).toBe('#2dd4bf')
+
+      // Partial dry transition (48% with min = 53%, delta = 5%, half transition)
+      const partialDryZone: Zone = {
+        id: 'z-partial-dry',
+        name: 'Bedroom',
+        color: '#3b82f6',
+        points: [],
+        humidity_sensor: 'sensor.salon_humidity', // 48%
+        humidity_min: 53,
+      }
+      const partialDryMetrics = getZoneHUDMetrics(partialDryZone, mockDevices)
+      expect(partialDryMetrics.humidityColor).not.toBe('#2dd4bf')
+      expect(partialDryMetrics.humidityColor).not.toBe('#38bdf8')
+
+      // Fully saturated dry (48% with min = 60%, delta = 12% >= 10% transition window)
+      const fullDryZone: Zone = {
+        id: 'z-full-dry',
+        name: 'Bedroom',
+        color: '#3b82f6',
+        points: [],
+        humidity_sensor: 'sensor.salon_humidity', // 48%
+        humidity_min: 60,
+      }
+      const fullDryMetrics = getZoneHUDMetrics(fullDryZone, mockDevices)
+      expect(fullDryMetrics.humidityColor).toBe('#38bdf8')
+
+      // Partial humid transition (48% with max = 43%, delta = 5%, half transition)
+      const partialHumidZone: Zone = {
+        id: 'z-partial-humid',
+        name: 'Bedroom',
+        color: '#3b82f6',
+        points: [],
+        humidity_sensor: 'sensor.salon_humidity', // 48%
+        humidity_max: 43,
+      }
+      const partialHumidMetrics = getZoneHUDMetrics(partialHumidZone, mockDevices)
+      expect(partialHumidMetrics.humidityColor).not.toBe('#2dd4bf')
+      expect(partialHumidMetrics.humidityColor).not.toBe('#ef4444')
+
+      // Fully saturated humid (48% with max = 35%, delta = 13% >= 10% transition window)
+      const fullHumidZone: Zone = {
+        id: 'z-full-humid',
+        name: 'Bedroom',
+        color: '#3b82f6',
+        points: [],
+        humidity_sensor: 'sensor.salon_humidity', // 48%
+        humidity_max: 35,
+      }
+      const fullHumidMetrics = getZoneHUDMetrics(fullHumidZone, mockDevices)
+      expect(fullHumidMetrics.humidityColor).toBe('#ef4444')
+    })
   })
 
   describe('calculateDiscDiameter', () => {

@@ -206,6 +206,8 @@ func TestPlanConverters(t *testing.T) {
 func TestZoneConverters(t *testing.T) {
 	tempMin := 17.5
 	tempMax := 23.0
+	humMin := 40.0
+	humMax := 60.0
 
 	t.Run("ToDomainZone converts dto to domain with sensors and thresholds", func(t *testing.T) {
 		dto := pkgdashboard.ZoneDTO{
@@ -217,6 +219,8 @@ func TestZoneConverters(t *testing.T) {
 			TempMin:        &tempMin,
 			TempMax:        &tempMax,
 			HumiditySensor: "sensor.chambre_humidity",
+			HumidityMin:    &humMin,
+			HumidityMax:    &humMax,
 		}
 
 		z := converters.ToDomainZone(dto)
@@ -229,6 +233,8 @@ func TestZoneConverters(t *testing.T) {
 		assert.Equal(t, &tempMin, z.TempMin)
 		assert.Equal(t, &tempMax, z.TempMax)
 		assert.Equal(t, "sensor.chambre_humidity", z.HumiditySensor)
+		assert.Equal(t, &humMin, z.HumidityMin)
+		assert.Equal(t, &humMax, z.HumidityMax)
 	})
 
 	t.Run("ToPublicZone converts domain to dto with sensors and thresholds", func(t *testing.T) {
@@ -241,6 +247,8 @@ func TestZoneConverters(t *testing.T) {
 			TempMin:        &tempMin,
 			TempMax:        &tempMax,
 			HumiditySensor: "sensor.salon_humidity",
+			HumidityMin:    &humMin,
+			HumidityMax:    &humMax,
 		}
 
 		dto := converters.ToPublicZone(zone)
@@ -252,5 +260,7 @@ func TestZoneConverters(t *testing.T) {
 		assert.Equal(t, &tempMin, dto.TempMin)
 		assert.Equal(t, &tempMax, dto.TempMax)
 		assert.Equal(t, "sensor.salon_humidity", dto.HumiditySensor)
+		assert.Equal(t, &humMin, dto.HumidityMin)
+		assert.Equal(t, &humMax, dto.HumidityMax)
 	})
 }

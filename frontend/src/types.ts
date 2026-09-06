@@ -45,6 +45,8 @@ export interface Zone {
   temp_min?: number
   temp_max?: number
   humidity_sensor?: string
+  humidity_min?: number
+  humidity_max?: number
 }
 
 export interface Plan {

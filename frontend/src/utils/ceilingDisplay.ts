@@ -179,6 +179,7 @@ export interface ZoneHUDMetrics {
   tempValue: string | null
   humidityValue: string | null
   humidityPct: number | null
+  humidityColor: string
   statusText: string
   accentColor: string
   isAlert: boolean
@@ -189,6 +190,48 @@ export const HUD_COLOR_COMFORT = '#2dd4bf'
 export const HUD_COLOR_COLD = '#38bdf8'
 export const HUD_COLOR_HOT = '#f87171'
 export const HUD_COLOR_MUTED = '#94a3b8'
+
+export const GAUGE_COLOR_DRY = '#38bdf8'     // Cyan neon for dry / below min
+export const GAUGE_COLOR_COMFORT = '#2dd4bf' // Teal / comfort
+export const GAUGE_COLOR_HUMID = '#ef4444'   // Coral/red for humid / above max
+
+/**
+ * Calculates progressive chromatic interpolation for the humidity gauge arc.
+ * Transitions smoothly (interpolated) rather than abruptly:
+ * - Around and below humMin: progressively transitions from comfort (#2dd4bf) to dry cyan (#38bdf8).
+ *   Full cyan saturation is reached 10% below min (or at min if margin is small).
+ * - Around and above humMax: progressively transitions from comfort (#2dd4bf) to humid red/coral (#ef4444).
+ *   Full saturation is reached 10% above max.
+ * - In comfort zone: remains comfortable teal.
+ * If thresholds are not defined, defaults to smooth transitions around 30% and 60%.
+ */
+export function calculateHumidityGaugeColor(
+  humidityPct: number | null,
+  humMin?: number | null,
+  humMax?: number | null
+): string {
+  if (humidityPct === null || isNaN(humidityPct)) {
+    return GAUGE_COLOR_COMFORT
+  }
+
+  const min = humMin != null && !isNaN(humMin) ? humMin : 30
+  const max = humMax != null && !isNaN(humMax) ? humMax : 60
+  const TRANSITION_MARGIN = 10 // 10% progressive gradient window
+
+  if (humidityPct < min) {
+    const delta = min - humidityPct
+    const t = Math.min(1, Math.max(0, delta / TRANSITION_MARGIN))
+    return interpolateHexColor(GAUGE_COLOR_COMFORT, GAUGE_COLOR_DRY, t)
+  }
+
+  if (humidityPct > max) {
+    const delta = humidityPct - max
+    const t = Math.min(1, Math.max(0, delta / TRANSITION_MARGIN))
+    return interpolateHexColor(GAUGE_COLOR_COMFORT, GAUGE_COLOR_HUMID, t)
+  }
+
+  return GAUGE_COLOR_COMFORT
+}
 
 /**
  * Computes structured HUD metrics for circular 3D ceiling display.
@@ -207,6 +250,7 @@ export function getZoneHUDMetrics(
       tempValue: null,
       humidityValue: null,
       humidityPct: null,
+      humidityColor: GAUGE_COLOR_COMFORT,
       statusText: '',
       accentColor: HUD_COLOR_MUTED,
       isAlert: false,
@@ -238,6 +282,7 @@ export function getZoneHUDMetrics(
   const tempValue = temp !== null ? `${Math.round(temp * 10) / 10}` : null
   const humidityValue = hum !== null ? `${Math.round(hum)}% RH` : null
   const humidityPct = hum !== null ? Math.round(hum) : null
+  const humidityColor = calculateHumidityGaugeColor(humidityPct, zone.humidity_min, zone.humidity_max)
 
   return {
     zoneName,
@@ -245,6 +290,7 @@ export function getZoneHUDMetrics(
     tempValue,
     humidityValue,
     humidityPct,
+    humidityColor,
     statusText,
     accentColor,
     isAlert,

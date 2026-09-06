@@ -82,6 +82,8 @@ type Zone struct {
 	TempMin        *float64
 	TempMax        *float64
 	HumiditySensor string
+	HumidityMin    *float64
+	HumidityMax    *float64
 }
 
 // Validate ensures the zone is well-formed.
@@ -100,6 +102,9 @@ func (z Zone) Validate() error {
 	}
 	if z.TempMin != nil && z.TempMax != nil && *z.TempMin > *z.TempMax {
 		return errors.Join(ErrInvalidPlan, errors.New("temp_min cannot be greater than temp_max"))
+	}
+	if z.HumidityMin != nil && z.HumidityMax != nil && *z.HumidityMin > *z.HumidityMax {
+		return errors.Join(ErrInvalidPlan, errors.New("humidity_min cannot be greater than humidity_max"))
 	}
 	if z.TempSensor != "" {
 		parts := strings.Split(z.TempSensor, ".")

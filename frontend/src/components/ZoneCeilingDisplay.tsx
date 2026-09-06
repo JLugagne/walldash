@@ -113,28 +113,23 @@ export function ZoneCeilingDisplay({
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
 
-    // Zone name at top
-    ctx.font = '600 48px ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif'
-    ctx.fillStyle = '#cbd5e1'
-    ctx.fillText(hud.zoneName, cx, cy - radius * 0.52)
-
     if (hud.hasSensors) {
-      // Temperature value + °C
-      ctx.font = '700 164px ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif'
+      // Temperature value + °C centered in upper/middle area
+      ctx.font = '700 176px ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif'
       ctx.fillStyle = hud.isAlert ? hud.accentColor : '#ffffff'
       ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'
       ctx.shadowBlur = 14
       const tempText = hud.tempValue || '--'
       const tempMetrics = ctx.measureText(tempText)
-      const unitFontSize = 48
+      const unitFontSize = 52
       const gap = 12
-      const totalWidth = tempMetrics.width + gap + ctx.measureText('°C').width * (unitFontSize / 164)
+      const totalWidth = tempMetrics.width + gap + ctx.measureText('°C').width * (unitFontSize / 176)
       const startX = cx - totalWidth / 2 + tempMetrics.width / 2
-      ctx.fillText(tempText, startX, cy - radius * 0.05)
+      ctx.fillText(tempText, startX, cy - radius * 0.12)
       ctx.shadowBlur = 0
       ctx.font = `600 ${unitFontSize}px ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif`
       ctx.fillStyle = '#94a3b8'
-      ctx.fillText('°C', startX + tempMetrics.width / 2 + gap + ctx.measureText('°C').width / 2, cy - radius * 0.05 - 14)
+      ctx.fillText('°C', startX + tempMetrics.width / 2 + gap + ctx.measureText('°C').width / 2, cy - radius * 0.12 - 16)
 
       // Humidity gauge arc on top border
       if (hud.humidityPct !== null) {
@@ -143,14 +138,6 @@ export function ZoneCeilingDisplay({
         const gaugeSpan = 2 * Math.PI - gaugeStart + gaugeEnd
         const pct = Math.min(hud.humidityPct / 100, 1)
         const fillAngle = gaugeStart + gaugeSpan * pct
-
-        // Color gradient: teal (dry) → blue (comfort) → orange (humid)
-        function humidityColor(p: number) {
-          if (p < 0.3) return '#22d3ee'
-          if (p < 0.5) return '#60a5fa'
-          if (p < 0.7) return '#818cf8'
-          return '#f59e0b'
-        }
 
         // Background track
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'
@@ -161,7 +148,7 @@ export function ZoneCeilingDisplay({
         ctx.stroke()
 
         // Filled portion
-        ctx.strokeStyle = humidityColor(pct)
+        ctx.strokeStyle = hud.humidityColor
         ctx.lineWidth = 44
         ctx.lineCap = 'round'
         ctx.beginPath()
@@ -169,10 +156,16 @@ export function ZoneCeilingDisplay({
         ctx.stroke()
       }
 
-      // Status text at bottom
-      ctx.font = '700 38px ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif'
+      // Status text (COMFORT, TOO COOL, etc.) prominently displayed and centered below
+      ctx.font = '700 56px ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif'
       ctx.fillStyle = hud.accentColor
-      ctx.fillText(hud.statusText, cx, cy + radius * 0.48)
+      ctx.letterSpacing = '2px'
+      ctx.fillText(hud.statusText, cx, cy + radius * 0.42)
+    } else {
+      // If no sensors, display zone name in center
+      ctx.font = '600 56px ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif'
+      ctx.fillStyle = '#cbd5e1'
+      ctx.fillText(hud.zoneName, cx, cy)
     }
 
     const tex = new THREE.CanvasTexture(canvas)

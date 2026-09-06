@@ -110,6 +110,8 @@ func ToDomainZone(z pkgdashboard.ZoneDTO) domain.Zone {
 		TempMin:        z.TempMin,
 		TempMax:        z.TempMax,
 		HumiditySensor: z.HumiditySensor,
+		HumidityMin:    z.HumidityMin,
+		HumidityMax:    z.HumidityMax,
 	}
 }
 
@@ -131,6 +133,8 @@ func ToPublicZone(z domain.Zone) pkgdashboard.ZoneDTO {
 		TempMin:        z.TempMin,
 		TempMax:        z.TempMax,
 		HumiditySensor: z.HumiditySensor,
+		HumidityMin:    z.HumidityMin,
+		HumidityMax:    z.HumidityMax,
 	}
 }
 

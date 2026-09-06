@@ -16,6 +16,8 @@ func TestPlanRepository_ZoneSensorsAndAlertThresholds(t *testing.T) {
 	t.Run("stores and retrieves zone sensor attributes and thresholds in zones_json", func(t *testing.T) {
 		tempMin := 17.5
 		tempMax := 24.0
+		humMin := 35.0
+		humMax := 65.0
 		plan := domain.Plan{
 			LevelID: "lvl-zone-sensors-test",
 			Walls: []domain.WallSegment{
@@ -38,6 +40,8 @@ func TestPlanRepository_ZoneSensorsAndAlertThresholds(t *testing.T) {
 					TempMin:        &tempMin,
 					TempMax:        &tempMax,
 					HumiditySensor: "sensor.bedroom_humidity",
+					HumidityMin:    &humMin,
+					HumidityMax:    &humMax,
 				},
 			},
 		}
@@ -51,6 +55,10 @@ func TestPlanRepository_ZoneSensorsAndAlertThresholds(t *testing.T) {
 		require.NotNil(t, saved.Zones[0].TempMax)
 		assert.Equal(t, tempMax, *saved.Zones[0].TempMax)
 		assert.Equal(t, "sensor.bedroom_humidity", saved.Zones[0].HumiditySensor)
+		require.NotNil(t, saved.Zones[0].HumidityMin)
+		assert.Equal(t, humMin, *saved.Zones[0].HumidityMin)
+		require.NotNil(t, saved.Zones[0].HumidityMax)
+		assert.Equal(t, humMax, *saved.Zones[0].HumidityMax)
 
 		retrieved, err := adapter.FindByLevelID(ctx, plan.LevelID)
 		require.NoError(t, err)
@@ -65,6 +73,10 @@ func TestPlanRepository_ZoneSensorsAndAlertThresholds(t *testing.T) {
 		require.NotNil(t, rz.TempMax)
 		assert.Equal(t, tempMax, *rz.TempMax)
 		assert.Equal(t, "sensor.bedroom_humidity", rz.HumiditySensor)
+		require.NotNil(t, rz.HumidityMin)
+		assert.Equal(t, humMin, *rz.HumidityMin)
+		require.NotNil(t, rz.HumidityMax)
+		assert.Equal(t, humMax, *rz.HumidityMax)
 	})
 
 	t.Run("backward compatibility with legacy zones without sensor fields", func(t *testing.T) {
@@ -96,5 +108,7 @@ func TestPlanRepository_ZoneSensorsAndAlertThresholds(t *testing.T) {
 		assert.Nil(t, rz.TempMin)
 		assert.Nil(t, rz.TempMax)
 		assert.Empty(t, rz.HumiditySensor)
+		assert.Nil(t, rz.HumidityMin)
+		assert.Nil(t, rz.HumidityMax)
 	})
 }
