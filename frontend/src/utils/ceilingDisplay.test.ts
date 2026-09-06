@@ -266,7 +266,7 @@ describe('ceilingDisplay utils', () => {
         points: [],
       }
       const metrics = getZoneHUDMetrics(zone, mockDevices)
-      expect(metrics.zoneName).toBe('COULOIR')
+      expect(metrics.zoneName).toBe('HALLWAY')
       expect(metrics.hasSensors).toBe(false)
       expect(metrics.tempValue).toBeNull()
       expect(metrics.humidityValue).toBeNull()
