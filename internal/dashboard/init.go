@@ -54,7 +54,7 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		return nil, err
 	}
 
-	application := app.New(adapter, adapter, conf.Version)
+	application := app.New(adapter, adapter, adapter, adapter, conf.Version)
 	controller := inbound.NewController()
 
 	// Register inbound routes

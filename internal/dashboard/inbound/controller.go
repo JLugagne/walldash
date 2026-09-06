@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	rootDomain "github.com/JLugagne/ha-dash/domain"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
 	"github.com/JLugagne/ha-dash/internal/pkg/logger"
 )
@@ -73,6 +74,11 @@ func (c *Controller) SendFail(w http.ResponseWriter, r *http.Request, data any, 
 				Code:    domainErr.Code,
 				Message: domainErr.Message,
 			}
+		} else if rootErr, ok := rootDomain.AsDomainError(err); ok {
+			res.Error = &Error{
+				Code:    rootErr.Code,
+				Message: rootErr.Message,
+			}
 		} else {
 			res.Error = &Error{
 				Code:    "BAD_REQUEST",
@@ -100,6 +106,8 @@ func (c *Controller) SendError(w http.ResponseWriter, r *http.Request, err error
 		msg = err.Error()
 		if domainErr, ok := domain.AsDomainError(err); ok {
 			code = domainErr.Code
+		} else if rootErr, ok := rootDomain.AsDomainError(err); ok {
+			code = rootErr.Code
 		}
 	}
 

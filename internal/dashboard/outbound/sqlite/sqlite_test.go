@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health/healthtest"
+	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels/levelstest"
+	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans/planstest"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow/uowtest"
 	"github.com/JLugagne/ha-dash/internal/dashboard/outbound/sqlite"
 	"github.com/stretchr/testify/require"
@@ -32,4 +34,14 @@ func TestSQLiteHealthRepositoryContract(t *testing.T) {
 func TestSQLiteUnitOfWorkContract(t *testing.T) {
 	adapter := setupTestDB(t)
 	uowtest.UnitOfWorkContractTesting(t, adapter)
+}
+
+func TestSQLiteLevelRepositoryContract(t *testing.T) {
+	adapter := setupTestDB(t)
+	levelstest.LevelRepositoryContractTesting(t, adapter)
+}
+
+func TestSQLitePlanRepositoryContract(t *testing.T) {
+	adapter := setupTestDB(t)
+	planstest.PlanRepositoryContractTesting(t, adapter)
 }
