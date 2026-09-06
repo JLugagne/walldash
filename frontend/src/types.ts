@@ -1,9 +1,14 @@
+export interface Layer {
+  name: string
+  hide_gauges: boolean
+}
+
 export interface Level {
   id: string
   name: string
   order: number
   is_outdoor: boolean
-  layers?: string[]
+  layers?: Layer[]
   created_at: string
   updated_at: string
 }

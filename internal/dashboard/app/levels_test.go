@@ -62,7 +62,7 @@ func TestLevelService_Operations(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, created.ID)
 		assert.Equal(t, "1st Floor", created.Name)
-		assert.Equal(t, []string{"controls", "sensors"}, created.Layers)
+		assert.Equal(t, []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "sensors", HideGauges: false}}, created.Layers)
 	})
 
 	t.Run("CreateLevel preserves custom layers", func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestLevelService_Operations(t *testing.T) {
 				return []domain.Level{}, nil
 			},
 			CreateFunc: func(ctx context.Context, level domain.Level) (domain.Level, error) {
-				assert.Equal(t, []string{"controls", "custom_layer"}, level.Layers)
+				assert.Equal(t, []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "custom_layer", HideGauges: false}}, level.Layers)
 				return level, nil
 			},
 		}
@@ -82,10 +82,10 @@ func TestLevelService_Operations(t *testing.T) {
 		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
 		created, err := service.CreateLevel(ctx, actor, domain.Level{
 			Name:   "1st Floor",
-			Layers: []string{"controls", "custom_layer"},
+			Layers: []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "custom_layer", HideGauges: false}},
 		})
 		require.NoError(t, err)
-		assert.Equal(t, []string{"controls", "custom_layer"}, created.Layers)
+		assert.Equal(t, []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "custom_layer", HideGauges: false}}, created.Layers)
 	})
 
 	t.Run("CreateLevel rejects empty name", func(t *testing.T) {
@@ -103,7 +103,7 @@ func TestLevelService_Operations(t *testing.T) {
 	t.Run("UpdateLevel validates and updates existing level", func(t *testing.T) {
 		mockLevels := &repolevelstest.MockLevelRepository{
 			FindByIDFunc: func(ctx context.Context, id string) (domain.Level, error) {
-				return domain.Level{ID: id, Name: "Ground Floor", Layers: []string{"controls", "sensors"}}, nil
+				return domain.Level{ID: id, Name: "Ground Floor", Layers: []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "sensors", HideGauges: false}}}, nil
 			},
 			UpdateFunc: func(ctx context.Context, level domain.Level) (domain.Level, error) {
 				return level, nil
@@ -131,7 +131,7 @@ func TestLevelService_Operations(t *testing.T) {
 				return domain.Level{
 					ID:     id,
 					Name:   "Ground Floor",
-					Layers: []string{"controls", "sensors", "security"},
+					Layers: []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "sensors", HideGauges: false}, {Name: "security", HideGauges: false}},
 				}, nil
 			},
 			UpdateFunc: func(ctx context.Context, level domain.Level) (domain.Level, error) {
@@ -156,13 +156,13 @@ func TestLevelService_Operations(t *testing.T) {
 		lvl := domain.Level{
 			ID:     "lvl-1",
 			Name:   "Ground Floor",
-			Layers: []string{"controls", "sensors"}, // "security" removed
+			Layers: []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "sensors", HideGauges: false}}, // "security" removed
 		}
 		updated, err := service.UpdateLevel(ctx, actor, lvl)
 		require.NoError(t, err)
 		assert.Equal(t, "security", reassignedOld)
 		assert.Equal(t, "controls", reassignedNew)
-		assert.Equal(t, []string{"controls", "sensors"}, updated.Layers)
+		assert.Equal(t, []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "sensors", HideGauges: false}}, updated.Layers)
 	})
 
 	t.Run("DeleteLevel deletes level", func(t *testing.T) {

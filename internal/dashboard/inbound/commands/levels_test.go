@@ -60,7 +60,11 @@ func TestLevelsCommandHandler(t *testing.T) {
 		assert.Equal(t, "success", resp.Status)
 		assert.Equal(t, "lvl-created", resp.Data.ID)
 		assert.Equal(t, "1st Floor", resp.Data.Name)
-		assert.Equal(t, []string{"controls", "sensors"}, resp.Data.Layers)
+		require.Len(t, resp.Data.Layers, 2)
+		assert.Equal(t, "controls", resp.Data.Layers[0].Name)
+		assert.Equal(t, false, resp.Data.Layers[0].HideGauges)
+		assert.Equal(t, "sensors", resp.Data.Layers[1].Name)
+		assert.Equal(t, false, resp.Data.Layers[1].HideGauges)
 	})
 
 	t.Run("POST /api/levels with empty name returns 400 validation error", func(t *testing.T) {

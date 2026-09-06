@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { IsometricView } from './IsometricView'
-import type { Level, DevicePlacement } from '../types'
+import type { Level, DevicePlacement, Layer } from '../types'
 
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children }: { children: React.ReactNode }) => (
@@ -46,12 +46,23 @@ function renderInRouter(ui: React.ReactElement) {
 }
 
 describe('IsometricView Layer Selection and Filtering', () => {
+  const defaultLayers: Layer[] = [
+    { name: 'controls', hide_gauges: false },
+    { name: 'sensors', hide_gauges: false },
+    { name: 'security', hide_gauges: false },
+  ]
+
+  const gardenLayers: Layer[] = [
+    { name: 'garden_sensors', hide_gauges: false },
+    { name: 'irrigation', hide_gauges: false },
+  ]
+
   const level1: Level = {
     id: 'l1',
     name: 'Ground Floor',
     order: 0,
     is_outdoor: false,
-    layers: ['controls', 'sensors', 'security'],
+    layers: defaultLayers,
     created_at: '2026-01-01',
     updated_at: '2026-01-01',
   }
@@ -61,7 +72,7 @@ describe('IsometricView Layer Selection and Filtering', () => {
     name: 'Jardin',
     order: 1,
     is_outdoor: true,
-    layers: ['garden_sensors', 'irrigation'],
+    layers: gardenLayers,
     created_at: '2026-01-01',
     updated_at: '2026-01-01',
   }

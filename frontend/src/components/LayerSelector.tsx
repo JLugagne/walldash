@@ -1,7 +1,8 @@
 import { DEFAULT_LAYERS, formatLayerLabel } from '../utils/layers'
+import type { Layer } from '../types'
 
 export interface LayerSelectorProps {
-  layers?: string[]
+  layers?: Layer[]
   activeLayer: string
   onSelectLayer: (layer: string) => void
 }
@@ -20,14 +21,14 @@ export function LayerSelector({
       className="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-full p-1 shadow-xl flex items-center space-x-1 pointer-events-auto"
     >
       {displayLayers.map((layer) => {
-        const isActive = layer === activeLayer
-        const label = formatLayerLabel(layer)
+        const isActive = layer.name === activeLayer
+        const label = formatLayerLabel(layer.name)
 
         return (
           <button
-            key={layer}
+            key={layer.name}
             type="button"
-            onClick={() => onSelectLayer(layer)}
+            onClick={() => onSelectLayer(layer.name)}
             aria-pressed={isActive}
             aria-label={`Layer ${label}`}
             className={`px-3.5 py-1 rounded-full text-xs transition-all cursor-pointer whitespace-nowrap select-none ${

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, Check, Home, Layers, Pencil, Plus, Trash2, Trees, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Home, Layers, Pencil, Plus, Trash2, Trees, X, Gauge, SlidersHorizontal } from 'lucide-react'
 import type { Level } from '../types'
 import { apiFetch } from '../api'
 
@@ -21,7 +21,10 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
 
   const sorted = [...levels].sort((a, b) => a.order - b.order)
   const activeLevel = levels.find((l) => l.id === activeLevelId)
-  const activeLayers = activeLevel?.layers && activeLevel.layers.length > 0 ? activeLevel.layers : ['controls', 'sensors']
+  const activeLayers = activeLevel?.layers && activeLevel.layers.length > 0 ? activeLevel.layers : [
+    { name: 'controls', hide_gauges: false },
+    { name: 'sensors', hide_gauges: false },
+  ]
 
   const request = async (input: string, init: RequestInit, failure: string) => {
     setBusy(true)
@@ -90,11 +93,11 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
     if (!activeLevel) return
     const trimmed = newLayer.trim().toLowerCase()
     if (!trimmed) return
-    if (activeLayers.includes(trimmed)) {
+    if (activeLayers.some((l) => l.name === trimmed)) {
       setError(`Layer "${trimmed}" already exists`)
       return
     }
-    const updatedLayers = [...activeLayers, trimmed]
+    const updatedLayers = [...activeLayers, { name: trimmed, hide_gauges: false }]
     const result = await request(
       `/api/levels/${activeLevel.id}`,
       {
@@ -109,6 +112,22 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
     }
   }
 
+  const handleToggleHideGauges = async (layerName: string) => {
+    if (!activeLevel) return
+    const updatedLayers = activeLayers.map((l) =>
+      l.name === layerName ? { ...l, hide_gauges: !l.hide_gauges } : l
+    )
+    await request(
+      `/api/levels/${activeLevel.id}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: activeLevel.name, is_outdoor: activeLevel.is_outdoor, layers: updatedLayers }),
+      },
+      'Error while updating layer'
+    )
+  }
+
   const handleDeleteLayer = async (layerToDelete: string) => {
     if (!activeLevel) return
     if (layerToDelete === 'controls') {
@@ -116,7 +135,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
       return
     }
     if (!confirm(`Delete layer "${layerToDelete}"? Associated devices will be reassigned to "controls".`)) return
-    const updatedLayers = activeLayers.filter((l) => l !== layerToDelete)
+    const updatedLayers = activeLayers.filter((l) => l.name !== layerToDelete)
     await request(
       `/api/levels/${activeLevel.id}`,
       {
@@ -248,18 +267,30 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
           <div className="flex flex-wrap gap-1.5 py-1">
             {activeLayers.map((layer) => (
               <span
-                key={layer}
+                key={layer.name}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/90 border border-slate-700/60 text-xs text-slate-200"
               >
-                <span>{layer}</span>
-                {layer === 'controls' ? (
+                <span>{layer.name}</span>
+                <button
+                  type="button"
+                  onClick={() => handleToggleHideGauges(layer.name)}
+                  title={layer.hide_gauges ? 'Show gauges for zones in this layer' : 'Hide gauges for zones in this layer'}
+                  className={`w-5 h-5 rounded flex items-center justify-center cursor-pointer ml-0.5 transition-colors ${
+                    layer.hide_gauges
+                      ? 'bg-amber-900/30 text-amber-400 hover:bg-amber-900/50'
+                      : 'hover:bg-slate-700 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {layer.hide_gauges ? <SlidersHorizontal className="w-3 h-3" /> : <Gauge className="w-3 h-3" />}
+                </button>
+                {layer.name === 'controls' ? (
                   <span className="text-[9px] font-mono text-indigo-400 uppercase tracking-wider">(default)</span>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => handleDeleteLayer(layer)}
+                    onClick={() => handleDeleteLayer(layer.name)}
                     disabled={busy}
-                    title={`Delete layer "${layer}" (reassigns to controls)`}
+                    title={`Delete layer "${layer.name}" (reassigns to controls)`}
                     className="text-slate-400 hover:text-rose-400 cursor-pointer ml-0.5"
                   >
                     <X className="w-3 h-3" />

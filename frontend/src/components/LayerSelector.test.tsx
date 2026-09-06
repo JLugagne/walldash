@@ -1,8 +1,20 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { LayerSelector } from './LayerSelector'
+import type { Layer } from '../types'
 
 describe('LayerSelector', () => {
+  const defaultLayers: Layer[] = [
+    { name: 'controls', hide_gauges: false },
+    { name: 'sensors', hide_gauges: false },
+  ]
+
+  const customLayers: Layer[] = [
+    { name: 'controls', hide_gauges: false },
+    { name: 'security', hide_gauges: false },
+    { name: 'climate', hide_gauges: false },
+  ]
+
   it('renders default layers ("Controls" and "Sensors") when layers prop is empty or undefined', () => {
     const handleSelect = vi.fn()
     render(<LayerSelector activeLayer="controls" onSelectLayer={handleSelect} />)
@@ -15,7 +27,7 @@ describe('LayerSelector', () => {
     const handleSelect = vi.fn()
     render(
       <LayerSelector
-        layers={['controls', 'security', 'climate']}
+        layers={customLayers}
         activeLayer="controls"
         onSelectLayer={handleSelect}
       />
@@ -30,7 +42,7 @@ describe('LayerSelector', () => {
     const handleSelect = vi.fn()
     render(
       <LayerSelector
-        layers={['controls', 'sensors']}
+        layers={defaultLayers}
         activeLayer="sensors"
         onSelectLayer={handleSelect}
       />
@@ -51,7 +63,11 @@ describe('LayerSelector', () => {
     const handleSelect = vi.fn()
     render(
       <LayerSelector
-        layers={['controls', 'sensors', 'security']}
+        layers={[
+          { name: 'controls', hide_gauges: false },
+          { name: 'sensors', hide_gauges: false },
+          { name: 'security', hide_gauges: false },
+        ]}
         activeLayer="controls"
         onSelectLayer={handleSelect}
       />
@@ -68,7 +84,7 @@ describe('LayerSelector', () => {
     const handleSelect = vi.fn()
     render(
       <LayerSelector
-        layers={['controls', 'sensors']}
+        layers={defaultLayers}
         activeLayer="controls"
         onSelectLayer={handleSelect}
       />

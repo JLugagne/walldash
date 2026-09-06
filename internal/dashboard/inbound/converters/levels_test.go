@@ -15,25 +15,33 @@ func TestLevelConverters(t *testing.T) {
 		req := pkgdashboard.CreateLevelRequest{
 			Name:      "Ground Floor",
 			IsOutdoor: false,
-			Layers:    []string{"controls", "sensors"},
+			Layers:    []pkgdashboard.LayerRequest{{Name: "controls", HideGauges: false}, {Name: "sensors", HideGauges: false}},
 		}
 		domainLevel := converters.ToDomainCreateLevel(req)
 		assert.Equal(t, req.Name, domainLevel.Name)
 		assert.Equal(t, req.IsOutdoor, domainLevel.IsOutdoor)
-		assert.Equal(t, req.Layers, domainLevel.Layers)
+		assert.Len(t, domainLevel.Layers, 2)
+		assert.Equal(t, "controls", domainLevel.Layers[0].Name)
+		assert.False(t, domainLevel.Layers[0].HideGauges)
+		assert.Equal(t, "sensors", domainLevel.Layers[1].Name)
+		assert.False(t, domainLevel.Layers[1].HideGauges)
 	})
 
 	t.Run("ToDomainUpdateLevel converts request with ID", func(t *testing.T) {
 		req := pkgdashboard.UpdateLevelRequest{
 			Name:      "1st Floor",
 			IsOutdoor: true,
-			Layers:    []string{"controls", "hvac"},
+			Layers:    []pkgdashboard.LayerRequest{{Name: "controls", HideGauges: false}, {Name: "hvac", HideGauges: false}},
 		}
 		domainLevel := converters.ToDomainUpdateLevel("lvl-123", req)
 		assert.Equal(t, "lvl-123", domainLevel.ID)
 		assert.Equal(t, req.Name, domainLevel.Name)
 		assert.Equal(t, req.IsOutdoor, domainLevel.IsOutdoor)
-		assert.Equal(t, req.Layers, domainLevel.Layers)
+		assert.Len(t, domainLevel.Layers, 2)
+		assert.Equal(t, "controls", domainLevel.Layers[0].Name)
+		assert.False(t, domainLevel.Layers[0].HideGauges)
+		assert.Equal(t, "hvac", domainLevel.Layers[1].Name)
+		assert.False(t, domainLevel.Layers[1].HideGauges)
 	})
 
 	t.Run("ToPublicLevel converts domain level", func(t *testing.T) {
@@ -43,7 +51,7 @@ func TestLevelConverters(t *testing.T) {
 			Name:      "Living Room",
 			Order:     2,
 			IsOutdoor: false,
-			Layers:    []string{"controls", "custom"},
+			Layers:    []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "custom", HideGauges: false}},
 			CreatedAt: now,
 			UpdatedAt: now,
 		}
@@ -52,7 +60,7 @@ func TestLevelConverters(t *testing.T) {
 		assert.Equal(t, domainLevel.Name, publicLevel.Name)
 		assert.Equal(t, domainLevel.Order, publicLevel.Order)
 		assert.Equal(t, domainLevel.IsOutdoor, publicLevel.IsOutdoor)
-		assert.Equal(t, []string{"controls", "custom"}, publicLevel.Layers)
+		assert.Equal(t, []pkgdashboard.LayerResponse{{Name: "controls", HideGauges: false}, {Name: "custom", HideGauges: false}}, publicLevel.Layers)
 		assert.Equal(t, domainLevel.CreatedAt, publicLevel.CreatedAt)
 		assert.Equal(t, domainLevel.UpdatedAt, publicLevel.UpdatedAt)
 	})
@@ -67,7 +75,7 @@ func TestLevelConverters(t *testing.T) {
 			UpdatedAt: now,
 		}
 		publicLevel := converters.ToPublicLevel(domainLevel)
-		assert.Equal(t, []string{"controls", "sensors"}, publicLevel.Layers)
+		assert.Equal(t, []pkgdashboard.LayerResponse{{Name: "controls", HideGauges: false}, {Name: "sensors", HideGauges: false}}, publicLevel.Layers)
 	})
 
 	t.Run("ToPublicLevels converts slice of domain levels", func(t *testing.T) {

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { Plan, WallSegment, Zone, Device, DevicePlacement } from '../types'
+import type { Plan, WallSegment, Zone, Device, DevicePlacement, Layer } from '../types'
 import { DeviceBadge3D } from './DeviceBadge3D'
 import { ZoneCeilingDisplay } from './ZoneCeilingDisplay'
 import { buildWallGeometry, toWorldX, toWorldZ, WALL_HEIGHT } from './wallGeometry'
 import { createWallMaterial } from './wallMaterial'
 import { getFloorTileTexture } from './floorTexture'
+import { inferLayerFromDevice } from '../utils/layers'
+import { hasConfiguredSensors } from '../utils/ceilingDisplay'
 
 export { WALL_HEIGHT }
 
@@ -20,6 +22,7 @@ interface IsometricSceneProps {
   pendingDevices?: Record<string, boolean>
   onToggleDevice?: (entityId: string) => void
   activeLayer?: string
+  layers?: Layer[]
 }
 
 interface PlanBounds {
@@ -646,9 +649,51 @@ export function IsometricScene({
   pendingDevices = {},
   onToggleDevice = () => {},
   activeLayer,
+  layers = [],
 }: IsometricSceneProps) {
   const walls = plan?.walls || []
   const zones = plan?.zones || []
+
+  // Build a map of device_id -> layer for quick lookup
+  const placementLayerMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const p of placements) {
+      map[p.device_id] = p.layer || 'controls'
+    }
+    return map
+  }, [placements])
+
+  // Build a map of layer_name -> hide_gauges
+  const layerHideGaugesMap = useMemo(() => {
+    const map: Record<string, boolean> = {}
+    for (const layer of layers) {
+      map[layer.name] = layer.hide_gauges
+    }
+    return map
+  }, [layers])
+
+  // Determine which zones should have their gauges hidden
+  // A zone's gauges are hidden if its temp_sensor or humidity_sensor is on a layer with hide_gauges=true
+  const zoneGaugesHidden = useMemo(() => {
+    const hidden: Record<string, boolean> = {}
+    for (const zone of zones) {
+      let hiddenForZone = false
+      if (zone.temp_sensor) {
+        const sensorLayer = placementLayerMap[zone.temp_sensor] || inferLayerFromDevice(zone.temp_sensor, deviceMap)
+        if (sensorLayer && layerHideGaugesMap[sensorLayer]) {
+          hiddenForZone = true
+        }
+      }
+      if (!hiddenForZone && zone.humidity_sensor) {
+        const sensorLayer = placementLayerMap[zone.humidity_sensor] || inferLayerFromDevice(zone.humidity_sensor, deviceMap)
+        if (sensorLayer && layerHideGaugesMap[sensorLayer]) {
+          hiddenForZone = true
+        }
+      }
+      hidden[zone.id] = hiddenForZone
+    }
+    return hidden
+  }, [zones, placementLayerMap, layerHideGaugesMap, deviceMap])
 
   // Filter placements by active layer (if specified)
   const visiblePlacements = useMemo(() => {
@@ -729,13 +774,16 @@ export function IsometricScene({
         ))}
 
         {/* 3D Ceiling Displays at y = WALL_HEIGHT (always visible regardless of activeLayer) */}
-        {zones.map((zone) => (
-          <ZoneCeilingDisplay
-            key={`ceiling-${zone.id}`}
-            zone={zone}
-            deviceMap={deviceMap}
-          />
-        ))}
+        {zones.map((zone) => {
+          if (zoneGaugesHidden[zone.id] || !hasConfiguredSensors(zone)) return null
+          return (
+            <ZoneCeilingDisplay
+              key={`ceiling-${zone.id}`}
+              zone={zone}
+              deviceMap={deviceMap}
+            />
+          )
+        })}
 
         <MergedWalls walls={walls} bounds={planBounds} />
 

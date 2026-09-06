@@ -234,7 +234,7 @@ func TestApp_Devices(t *testing.T) {
 		application, levelsRepo, placementsRepo, _ := setupTestAppWithMocks()
 		levelObj := domain.Level{
 			ID:     "lvl-1",
-			Layers: []string{"controls", "sensors"},
+			Layers: []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "sensors", HideGauges: false}},
 		}
 		levelsRepo.FindByIDFunc = func(ctx context.Context, id string) (domain.Level, error) {
 			return levelObj, nil
@@ -257,7 +257,14 @@ func TestApp_Devices(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "hvac", saved.Layer)
-		assert.Contains(t, updatedLevel.Layers, "hvac")
+		hasLayer := false
+		for _, layer := range updatedLevel.Layers {
+			if layer.Name == "hvac" {
+				hasLayer = true
+				break
+			}
+		}
+		assert.True(t, hasLayer)
 	})
 
 	t.Run("DeletePlacement returns ErrPlacementNotFound when placement belongs to another level", func(t *testing.T) {

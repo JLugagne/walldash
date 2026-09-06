@@ -13,24 +13,24 @@ import (
 	"github.com/JLugagne/walldash/internal/pkg/logger"
 )
 
-func serializeLayers(layers []string) string {
+func serializeLayers(layers []domain.Layer) string {
 	if len(layers) == 0 {
 		layers = domain.DefaultLayers
 	}
 	b, err := json.Marshal(layers)
 	if err != nil {
-		return `["controls","sensors"]`
+		return `[{"name":"controls","hide_gauges":false},{"name":"sensors","hide_gauges":false}]`
 	}
 	return string(b)
 }
 
-func deserializeLayers(raw string) []string {
+func deserializeLayers(raw string) []domain.Layer {
 	if raw == "" {
-		return append([]string(nil), domain.DefaultLayers...)
+		return append([]domain.Layer(nil), domain.DefaultLayers...)
 	}
-	var layers []string
+	var layers []domain.Layer
 	if err := json.Unmarshal([]byte(raw), &layers); err != nil || len(layers) == 0 {
-		return append([]string(nil), domain.DefaultLayers...)
+		return append([]domain.Layer(nil), domain.DefaultLayers...)
 	}
 	return layers
 }
@@ -56,7 +56,7 @@ func (r *levelRepo) Create(ctx context.Context, level domain.Level) (domain.Leve
 	}
 
 	if len(level.Layers) == 0 {
-		level.Layers = append([]string(nil), domain.DefaultLayers...)
+		level.Layers = append([]domain.Layer(nil), domain.DefaultLayers...)
 	}
 	layersJSON := serializeLayers(level.Layers)
 
@@ -140,7 +140,7 @@ func (r *levelRepo) Update(ctx context.Context, level domain.Level) (domain.Leve
 	level.UpdatedAt = now
 
 	if len(level.Layers) == 0 {
-		level.Layers = append([]string(nil), domain.DefaultLayers...)
+		level.Layers = append([]domain.Layer(nil), domain.DefaultLayers...)
 	}
 	layersJSON := serializeLayers(level.Layers)
 

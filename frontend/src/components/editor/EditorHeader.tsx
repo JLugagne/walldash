@@ -13,6 +13,7 @@ import {
   Trees,
   Undo2,
   Upload,
+  Download,
 } from 'lucide-react'
 import type { Level } from '../../types'
 
@@ -31,6 +32,7 @@ interface EditorHeaderProps {
   onUndo: () => void
   onRedo: () => void
   onImport: () => void
+  onExport: () => void
   onReset: () => void
   onClear: () => void
   onSave: () => void
@@ -54,6 +56,7 @@ export function EditorHeader({
   onUndo,
   onRedo,
   onImport,
+  onExport,
   onReset,
   onClear,
   onSave,
@@ -153,11 +156,22 @@ export function EditorHeader({
           type="button"
           onClick={onImport}
           disabled={disabled}
-          title="Import a plan from AI-generated JSON"
+          title="Import a plan from AI-generated JSON or SweetHome3D file"
           className="h-8 px-2.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition-all cursor-pointer"
         >
           <Upload className="w-3.5 h-3.5" />
           <span className="hidden lg:inline">Import</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onExport}
+          disabled={disabled}
+          title="Download a full backup (levels, plans, placements, overviews)"
+          className="h-8 px-2.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition-all cursor-pointer"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span className="hidden lg:inline">Export</span>
         </button>
 
         <div ref={moreRef} className="relative">

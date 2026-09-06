@@ -6,18 +6,30 @@ import (
 	"github.com/JLugagne/walldash/domain"
 )
 
+// LayerRequest represents a layer in API requests.
+type LayerRequest struct {
+	Name       string `json:"name" validate:"required,min=1,max=50"`
+	HideGauges bool   `json:"hide_gauges"`
+}
+
+// LayerResponse represents a layer in API responses.
+type LayerResponse struct {
+	Name       string `json:"name"`
+	HideGauges bool   `json:"hide_gauges"`
+}
+
 // CreateLevelRequest contains payload for creating a new level.
 type CreateLevelRequest struct {
-	Name      string   `json:"name" validate:"required,min=1,max=100"`
-	IsOutdoor bool     `json:"is_outdoor"`
-	Layers    []string `json:"layers,omitempty"`
+	Name      string         `json:"name" validate:"required,min=1,max=100"`
+	IsOutdoor bool           `json:"is_outdoor"`
+	Layers    []LayerRequest `json:"layers,omitempty"`
 }
 
 // UpdateLevelRequest contains payload for updating an existing level.
 type UpdateLevelRequest struct {
-	Name      string   `json:"name" validate:"required,min=1,max=100"`
-	IsOutdoor bool     `json:"is_outdoor"`
-	Layers    []string `json:"layers,omitempty"`
+	Name      string         `json:"name" validate:"required,min=1,max=100"`
+	IsOutdoor bool           `json:"is_outdoor"`
+	Layers    []LayerRequest `json:"layers,omitempty"`
 }
 
 // ReorderLevelsRequest specifies the desired order of level IDs.
@@ -27,13 +39,13 @@ type ReorderLevelsRequest struct {
 
 // LevelResponse represents a level entity in API responses.
 type LevelResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Order     int       `json:"order"`
-	IsOutdoor bool      `json:"is_outdoor"`
-	Layers    []string  `json:"layers"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Order     int             `json:"order"`
+	IsOutdoor bool            `json:"is_outdoor"`
+	Layers    []LayerResponse `json:"layers"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
 }
 
 // Point2DDTO represents 2D coordinates in API requests and responses.

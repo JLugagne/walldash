@@ -76,13 +76,13 @@ func (a *App) SavePlacement(ctx context.Context, actor domain.Actor, placement d
 	// Ensure level layers include the placement layer
 	containsLayer := false
 	for _, l := range level.Layers {
-		if l == placement.Layer {
+		if l.Name == placement.Layer {
 			containsLayer = true
 			break
 		}
 	}
 	if !containsLayer && len(level.Layers) > 0 {
-		level.Layers = append(level.Layers, placement.Layer)
+		level.Layers = append(level.Layers, domain.Layer{Name: placement.Layer, HideGauges: false})
 		if _, err := a.levelsRepo.Update(ctx, level); err != nil {
 			log.WithError(err).WithField("level_id", level.ID).WithField("layer", placement.Layer).Warn("failed to update level with new layer")
 		}

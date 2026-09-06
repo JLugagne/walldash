@@ -89,7 +89,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
   const [placements, setPlacements] = useState<DevicePlacement[]>([])
   const [loadingDevices, setLoadingDevices] = useState(false)
   const [deviceToPlace, setDeviceToPlace] = useState<Device | null>(null)
-  const [activeLayer, setActiveLayer] = useState('controls')
+  const [activeLayer, setActiveLayer] = useState<string>('controls')
 
   const [tool, setToolState] = useState<ToolMode>('select')
   const [snapGrid, setSnapGrid] = useState(true)
@@ -264,7 +264,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
   // Keep activeLayer in sync with the level's available layers.
   useEffect(() => {
     if (!level) return
-    const available = level.layers && level.layers.length > 0 ? level.layers : ['controls', 'sensors']
+    const available = level.layers && level.layers.length > 0 ? level.layers.map((l) => l.name) : ['controls', 'sensors']
     setActiveLayer((prev) => (available.includes(prev) ? prev : available[0]))
   }, [level])
 
@@ -578,7 +578,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
     // Digit keys 1-9 switch layers (like Photoshop)
     const digit = parseInt(e.key, 10)
     if (digit >= 1 && digit <= 9) {
-      const available = level?.layers && level.layers.length > 0 ? level.layers : ['controls', 'sensors']
+      const available = level?.layers && level.layers.length > 0 ? level.layers.map((l) => l.name) : ['controls', 'sensors']
       const idx = digit - 1
       if (idx < available.length) {
         setActiveLayer(available[idx])
@@ -1049,6 +1049,23 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
     fitToBounds(imported.walls, imported.zones, placements)
   }
 
+  const handleExport = async () => {
+    try {
+      const res = await fetch('/api/export')
+      if (!res.ok) throw new Error('Export failed')
+      const payload = await res.json()
+      const blob = new Blob([JSON.stringify(payload.data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'walldash-export.json'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      // silently ignore
+    }
+  }
+
   const updateWall = (id: string, patch: Partial<WallSegment>) =>
     mutatePlan((p) => ({ ...p, walls: p.walls.map((w) => (w.id === id ? geo.withClampedOpenings({ ...w, ...patch }) : w)) }), `wall:${id}`)
 
@@ -1168,6 +1185,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
         onUndo={undo}
         onRedo={redo}
         onImport={() => setShowImport(true)}
+          onExport={handleExport}
         onReset={handleReset}
         onClear={handleClear}
         onSave={savePlan}

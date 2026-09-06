@@ -146,8 +146,29 @@ func (p Plan) Validate() error {
 	return nil
 }
 
+// Layer represents a display layer for devices and zones on a level.
+type Layer struct {
+	Name       string
+	HideGauges bool
+}
+
 // DefaultLayers defines the default display layers available for any level.
-var DefaultLayers = []string{"controls", "sensors"}
+var DefaultLayers = []Layer{{
+	Name:       "controls",
+	HideGauges: false,
+}, {
+	Name:       "sensors",
+	HideGauges: false,
+}}
+
+// DefaultLayerNames returns the default layer names for backward compatibility.
+func DefaultLayerNames() []string {
+	names := make([]string, len(DefaultLayers))
+	for i, l := range DefaultLayers {
+		names[i] = l.Name
+	}
+	return names
+}
 
 // Level represents an indoor story or outdoor space of the building.
 type Level struct {
@@ -155,7 +176,7 @@ type Level struct {
 	Name      string
 	Order     int
 	IsOutdoor bool
-	Layers    []string
+	Layers    []Layer
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -167,6 +188,16 @@ func (l Level) Validate() error {
 	}
 	if strings.TrimSpace(l.Name) == "" {
 		return errors.Join(ErrInvalidLevel, errors.New("level name cannot be empty"))
+	}
+	seen := make(map[string]bool, len(l.Layers))
+	for _, layer := range l.Layers {
+		if strings.TrimSpace(layer.Name) == "" {
+			return errors.Join(ErrInvalidLevel, errors.New("layer name cannot be empty"))
+		}
+		if seen[layer.Name] {
+			return errors.Join(ErrInvalidLevel, errors.New("duplicate layer name: "+layer.Name))
+		}
+		seen[layer.Name] = true
 	}
 	return nil
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// SetupRoutes registers all query HTTP handlers onto the provided router.
 func SetupRoutes(r *mux.Router, controller *inbound.Controller, queries svchealth.HealthQueries, tokenManager ...middleware.TokenManager) {
 	healthHandler := NewHealthHandler(controller, queries)
 	r.HandleFunc("/api/health", healthHandler.GetHealth).Methods(http.MethodGet)
@@ -31,5 +30,13 @@ func SetupRoutes(r *mux.Router, controller *inbound.Controller, queries svchealt
 
 	if overviewQueries, ok := queries.(svcoverviews.OverviewQueries); ok {
 		SetupOverviewRoutes(r, controller, overviewQueries)
+	}
+
+	levelQueries, lOk := queries.(svclevels.LevelQueries)
+	deviceQueries, dOk := queries.(svcdevices.DeviceQueries)
+	overviewQueries, oOk := queries.(svcoverviews.OverviewQueries)
+	if lOk && dOk && oOk {
+		exportHandler := NewExportHandler(controller, levelQueries, deviceQueries, overviewQueries)
+		r.HandleFunc("/api/export", exportHandler.Export).Methods(http.MethodGet)
 	}
 }

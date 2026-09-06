@@ -48,13 +48,13 @@ func TestLevelValidation(t *testing.T) {
 		level := domain.Level{
 			ID:        "level-1",
 			Name:      "Ground Floor",
-			Layers:    []string{"controls", "sensors", "hvac"},
+			Layers:    []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "sensors", HideGauges: false}, {Name: "hvac", HideGauges: false}},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
 		require.NoError(t, level.Validate())
-		assert.Equal(t, []string{"controls", "sensors", "hvac"}, level.Layers)
-		assert.Equal(t, []string{"controls", "sensors"}, domain.DefaultLayers)
+		assert.Equal(t, []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "sensors", HideGauges: false}, {Name: "hvac", HideGauges: false}}, level.Layers)
+		assert.Equal(t, []domain.Layer{{Name: "controls", HideGauges: false}, {Name: "sensors", HideGauges: false}}, domain.DefaultLayers)
 	})
 }
 

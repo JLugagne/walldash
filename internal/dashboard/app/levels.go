@@ -54,7 +54,7 @@ func (a *App) CreateLevel(ctx context.Context, actor domain.Actor, level domain.
 		level.ID = uuid.NewString()
 	}
 	if len(level.Layers) == 0 {
-		level.Layers = append([]string(nil), domain.DefaultLayers...)
+		level.Layers = append([]domain.Layer(nil), domain.DefaultLayers...)
 	}
 
 	// Auto-assign order if order is 0 and there are other levels
@@ -88,7 +88,7 @@ func (a *App) UpdateLevel(ctx context.Context, actor domain.Actor, level domain.
 	}
 
 	if len(level.Layers) == 0 {
-		level.Layers = append([]string(nil), domain.DefaultLayers...)
+		level.Layers = append([]domain.Layer(nil), domain.DefaultLayers...)
 	}
 
 	// Reassign placements to default layer if any layer was removed
@@ -97,12 +97,12 @@ func (a *App) UpdateLevel(ctx context.Context, actor domain.Actor, level domain.
 		if err == nil {
 			newLayersMap := make(map[string]bool, len(level.Layers))
 			for _, l := range level.Layers {
-				newLayersMap[l] = true
+				newLayersMap[l.Name] = true
 			}
 			for _, oldL := range existing.Layers {
-				if !newLayersMap[oldL] {
-					if err := a.placementsRepo.ReassignLayer(ctx, level.ID, oldL, domain.DefaultPlacementLayer); err != nil {
-						log.WithError(err).WithField("level_id", level.ID).WithField("old_layer", oldL).Error("failed to reassign placements layer")
+				if !newLayersMap[oldL.Name] {
+					if err := a.placementsRepo.ReassignLayer(ctx, level.ID, oldL.Name, domain.DefaultPlacementLayer); err != nil {
+						log.WithError(err).WithField("level_id", level.ID).WithField("old_layer", oldL.Name).Error("failed to reassign placements layer")
 						return domain.Level{}, errors.Join(domain.ErrDatabaseUnavailable, err)
 					}
 				}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Canvas } from '@react-three/fiber'
 import { Layers, Edit3, Maximize2, Minimize2 } from 'lucide-react'
@@ -8,7 +8,7 @@ import { LevelSelector } from './LevelSelector'
 import { LayerSelector } from './LayerSelector'
 import { ViewModeMenu } from './ViewModeMenu'
 import { useRealtimeDevices } from '../hooks/useRealtimeDevices'
-import { DEFAULT_LAYERS } from '../utils/layers'
+import { DEFAULT_LAYERS, resolveActiveLayer } from '../utils/layers'
 
 interface IsometricViewProps {
   level: Level | null
@@ -67,10 +67,9 @@ export function IsometricView({
       return null
     }
   })
-  const availableLayers = level?.layers && level.layers.length > 0 ? level.layers : DEFAULT_LAYERS
-  const activeLayer = selectedLayer && availableLayers.includes(selectedLayer)
-    ? selectedLayer
-    : availableLayers[0] || 'controls'
+  const availableLayers = useMemo(() => 
+    level?.layers && level.layers.length > 0 ? level.layers : DEFAULT_LAYERS, [level?.layers])
+  const activeLayer = resolveActiveLayer(selectedLayer, availableLayers)
 
   const handleSelectLayer = (layer: string) => {
     setSelectedLayer(layer)
@@ -149,6 +148,7 @@ export function IsometricView({
             pendingDevices={pendingDevices}
             onToggleDevice={toggleDevice}
             activeLayer={activeLayer}
+            layers={availableLayers}
           />
         </Canvas>
       </div>

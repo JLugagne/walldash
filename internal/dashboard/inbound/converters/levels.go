@@ -7,20 +7,28 @@ import (
 
 // ToDomainCreateLevel converts a public CreateLevelRequest to a domain Level.
 func ToDomainCreateLevel(req pkgdashboard.CreateLevelRequest) domain.Level {
+	layers := make([]domain.Layer, len(req.Layers))
+	for i, lr := range req.Layers {
+		layers[i] = domain.Layer{Name: lr.Name, HideGauges: lr.HideGauges}
+	}
 	return domain.Level{
 		Name:      req.Name,
 		IsOutdoor: req.IsOutdoor,
-		Layers:    req.Layers,
+		Layers:    layers,
 	}
 }
 
 // ToDomainUpdateLevel converts a public UpdateLevelRequest and id to a domain Level.
 func ToDomainUpdateLevel(id string, req pkgdashboard.UpdateLevelRequest) domain.Level {
+	layers := make([]domain.Layer, len(req.Layers))
+	for i, lr := range req.Layers {
+		layers[i] = domain.Layer{Name: lr.Name, HideGauges: lr.HideGauges}
+	}
 	return domain.Level{
 		ID:        id,
 		Name:      req.Name,
 		IsOutdoor: req.IsOutdoor,
-		Layers:    req.Layers,
+		Layers:    layers,
 	}
 }
 
@@ -28,14 +36,18 @@ func ToDomainUpdateLevel(id string, req pkgdashboard.UpdateLevelRequest) domain.
 func ToPublicLevel(l domain.Level) pkgdashboard.LevelResponse {
 	layers := l.Layers
 	if len(layers) == 0 {
-		layers = append([]string(nil), domain.DefaultLayers...)
+		layers = append([]domain.Layer(nil), domain.DefaultLayers...)
+	}
+	respLayers := make([]pkgdashboard.LayerResponse, len(layers))
+	for i, layer := range layers {
+		respLayers[i] = pkgdashboard.LayerResponse{Name: layer.Name, HideGauges: layer.HideGauges}
 	}
 	return pkgdashboard.LevelResponse{
 		ID:        l.ID,
 		Name:      l.Name,
 		Order:     l.Order,
 		IsOutdoor: l.IsOutdoor,
-		Layers:    layers,
+		Layers:    respLayers,
 		CreatedAt: l.CreatedAt,
 		UpdatedAt: l.UpdatedAt,
 	}

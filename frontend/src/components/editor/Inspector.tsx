@@ -771,7 +771,7 @@ function DevicePanel({ placement, devices, level, onUpdatePlacement, onDeleteSel
   const style = domainStyle(domain)
   const Icon = style.Icon
   const currentLayer = placement.layer || 'controls'
-  const levelLayers = level?.layers && level.layers.length > 0 ? level.layers : ['controls', 'sensors']
+  const levelLayers = level?.layers && level.layers.length > 0 ? level.layers.map((l) => l.name) : ['controls', 'sensors']
   const allLayers = Array.from(new Set([...levelLayers, currentLayer]))
 
   return (

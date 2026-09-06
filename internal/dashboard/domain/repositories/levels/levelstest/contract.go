@@ -83,7 +83,11 @@ func LevelRepositoryContractTesting(t *testing.T, repo levels.LevelRepository) {
 		assert.Equal(t, lvl.Name, created.Name)
 		assert.Equal(t, lvl.Order, created.Order)
 		assert.Equal(t, lvl.IsOutdoor, created.IsOutdoor)
-		assert.Equal(t, []string{"controls", "sensors"}, created.Layers)
+		require.Len(t, created.Layers, 2)
+		assert.Equal(t, "controls", created.Layers[0].Name)
+		assert.Equal(t, false, created.Layers[0].HideGauges)
+		assert.Equal(t, "sensors", created.Layers[1].Name)
+		assert.Equal(t, false, created.Layers[1].HideGauges)
 
 		found, err := repo.FindByID(ctx, lvl.ID)
 		require.NoError(t, err)
@@ -91,7 +95,11 @@ func LevelRepositoryContractTesting(t *testing.T, repo levels.LevelRepository) {
 		assert.Equal(t, lvl.Name, found.Name)
 		assert.Equal(t, lvl.Order, found.Order)
 		assert.Equal(t, lvl.IsOutdoor, found.IsOutdoor)
-		assert.Equal(t, []string{"controls", "sensors"}, found.Layers)
+		require.Len(t, found.Layers, 2)
+		assert.Equal(t, "controls", found.Layers[0].Name)
+		assert.Equal(t, false, found.Layers[0].HideGauges)
+		assert.Equal(t, "sensors", found.Layers[1].Name)
+		assert.Equal(t, false, found.Layers[1].HideGauges)
 	})
 
 	t.Run("Contract: FindByID returns ErrLevelNotFound for missing level", func(t *testing.T) {
@@ -148,18 +156,39 @@ func LevelRepositoryContractTesting(t *testing.T, repo levels.LevelRepository) {
 
 		lvl.Name = "Modified Garden"
 		lvl.IsOutdoor = true
-		lvl.Layers = []string{"controls", "plants", "lighting"}
+		lvl.Layers = []domain.Layer{{
+			Name:       "controls",
+			HideGauges: false,
+		}, {
+			Name:       "plants",
+			HideGauges: false,
+		}, {
+			Name:       "lighting",
+			HideGauges: true,
+		}}
 		lvl.UpdatedAt = time.Now().UTC().Truncate(time.Second)
 
 		updated, err := repo.Update(ctx, lvl)
 		require.NoError(t, err)
 		assert.Equal(t, "Modified Garden", updated.Name)
-		assert.Equal(t, []string{"controls", "plants", "lighting"}, updated.Layers)
+		require.Len(t, updated.Layers, 3)
+		assert.Equal(t, "controls", updated.Layers[0].Name)
+		assert.Equal(t, false, updated.Layers[0].HideGauges)
+		assert.Equal(t, "plants", updated.Layers[1].Name)
+		assert.Equal(t, false, updated.Layers[1].HideGauges)
+		assert.Equal(t, "lighting", updated.Layers[2].Name)
+		assert.Equal(t, true, updated.Layers[2].HideGauges)
 
 		found, err := repo.FindByID(ctx, lvl.ID)
 		require.NoError(t, err)
 		assert.Equal(t, "Modified Garden", found.Name)
-		assert.Equal(t, []string{"controls", "plants", "lighting"}, found.Layers)
+		require.Len(t, found.Layers, 3)
+		assert.Equal(t, "controls", found.Layers[0].Name)
+		assert.Equal(t, false, found.Layers[0].HideGauges)
+		assert.Equal(t, "plants", found.Layers[1].Name)
+		assert.Equal(t, false, found.Layers[1].HideGauges)
+		assert.Equal(t, "lighting", found.Layers[2].Name)
+		assert.Equal(t, true, found.Layers[2].HideGauges)
 	})
 
 	t.Run("Contract: Update returns ErrLevelNotFound for non-existent level", func(t *testing.T) {

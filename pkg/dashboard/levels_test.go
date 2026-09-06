@@ -22,7 +22,7 @@ func TestLevelRequestsValidation(t *testing.T) {
 
 		validWithLayers := pkgdashboard.CreateLevelRequest{
 			Name:   "Ground Floor",
-			Layers: []string{"controls", "sensors", "lighting"},
+			Layers: []pkgdashboard.LayerRequest{{Name: "controls", HideGauges: false}, {Name: "sensors", HideGauges: false}, {Name: "lighting", HideGauges: false}},
 		}
 		require.NoError(t, validate.Struct(validWithLayers))
 
