@@ -3,9 +3,9 @@ package queries
 import (
 	"net/http"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/converters"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/middleware"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/middleware"
 	"github.com/gorilla/mux"
 )
 

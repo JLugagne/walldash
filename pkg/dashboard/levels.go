@@ -3,7 +3,7 @@ package dashboard
 import (
 	"time"
 
-	"github.com/JLugagne/ha-dash/domain"
+	"github.com/JLugagne/walldash/domain"
 )
 
 // CreateLevelRequest contains payload for creating a new level.

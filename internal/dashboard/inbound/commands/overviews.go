@@ -5,11 +5,11 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	svcoverviews "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/overviews"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/converters"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	svcoverviews "github.com/JLugagne/walldash/internal/dashboard/domain/service/overviews"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 )

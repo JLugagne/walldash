@@ -1,8 +1,8 @@
 package converters
 
 import (
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 )
 
 // ToDomainAction converts a public ActionRequest to a domain ActionCommand.

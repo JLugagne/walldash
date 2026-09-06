@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	rootDomain "github.com/JLugagne/ha-dash/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/pkg/logger"
+	rootDomain "github.com/JLugagne/walldash/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/pkg/logger"
 )
 
 // ResponseSuccess represents the JSend success response payload.

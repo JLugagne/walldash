@@ -3,7 +3,7 @@ package health
 import (
 	"context"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 )
 
 // HealthQueries defines query operations for application health inspection.

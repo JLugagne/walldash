@@ -8,11 +8,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/service/devices/devicestest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/queries"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/service/devices/devicestest"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/queries"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,7 +27,7 @@ func TestDevicesQueryHandler(t *testing.T) {
 				return []domain.Device{
 					{
 						ID:     "light.salon",
-						Name:   "Plafonnier Salon",
+						Name:   "Living Room Ceiling Light",
 						Domain: "light",
 						State:  "on",
 					},
@@ -53,7 +53,7 @@ func TestDevicesQueryHandler(t *testing.T) {
 		assert.Equal(t, "success", resp.Status)
 		require.Len(t, resp.Data, 1)
 		assert.Equal(t, "light.salon", resp.Data[0].ID)
-		assert.Equal(t, "Plafonnier Salon", resp.Data[0].Name)
+		assert.Equal(t, "Living Room Ceiling Light", resp.Data[0].Name)
 	})
 
 	t.Run("GET /api/devices returns error when service fails", func(t *testing.T) {

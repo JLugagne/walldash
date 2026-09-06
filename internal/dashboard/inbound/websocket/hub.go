@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	svcactions "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/actions"
-	"github.com/JLugagne/ha-dash/internal/pkg/logger"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	svcactions "github.com/JLugagne/walldash/internal/dashboard/domain/service/actions"
+	"github.com/JLugagne/walldash/internal/pkg/logger"
 	"github.com/gorilla/websocket"
 )
 
@@ -197,7 +197,7 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	// Send initial connection confirmation
 	initMsg, _ := json.Marshal(map[string]string{
 		"type":    "connected",
-		"message": "Connected to ha-dash real-time WebSocket",
+		"message": "Connected to walldash real-time WebSocket",
 	})
 	client.sendMsg(initMsg)
 

@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/service/actions/actionstest"
-	ws "github.com/JLugagne/ha-dash/internal/dashboard/inbound/websocket"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/service/actions/actionstest"
+	ws "github.com/JLugagne/walldash/internal/dashboard/inbound/websocket"
 	gorilla_ws "github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,7 +55,7 @@ func TestWebSocketHub_ConnectionAndBroadcast(t *testing.T) {
 	// Broadcast device update
 	device := domain.Device{
 		ID:     "light.salon_plafond",
-		Name:   "Plafonnier Salon",
+		Name:   "Living Room Ceiling Light",
 		Domain: domain.DomainLight,
 		State:  "off",
 		Attributes: map[string]any{
@@ -76,7 +76,7 @@ func TestWebSocketHub_ConnectionAndBroadcast(t *testing.T) {
 		assert.Equal(t, "state_changed", event.Type)
 		assert.Equal(t, "light.salon_plafond", event.EntityID)
 		assert.Equal(t, "off", event.State)
-		assert.Equal(t, "Plafonnier Salon", event.Device.Name)
+		assert.Equal(t, "Living Room Ceiling Light", event.Device.Name)
 	}
 }
 

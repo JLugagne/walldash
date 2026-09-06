@@ -3,7 +3,7 @@ package converters_test
 import (
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/converters"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
 	"github.com/stretchr/testify/assert"
 )
 

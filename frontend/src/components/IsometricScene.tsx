@@ -179,7 +179,7 @@ function Door3DMesh({
 
   return (
     <group>
-      {/* Frame (Cadre de porte) */}
+      {/* Door Frame */}
       {/* Top header */}
       <mesh position={[0, height / 2 - fT / 2, 0]}>
         <boxGeometry args={[width, fT, fD]} />

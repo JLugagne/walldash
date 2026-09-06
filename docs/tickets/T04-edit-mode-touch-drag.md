@@ -8,9 +8,9 @@ Kind: bug. Depends on: T00 (edits `overview/WidgetGrid.tsx` and `overview/grid.t
    `pointercancel` and never `pointerup`. `handleUp` is only bound to `pointerup`, so `dragInfo`
    stays set and the grid is stuck in a drag until the next pointerup anywhere.
 2. **A plain tap shows a refusal toast.** On `pointerup` with no movement `previewRectsRef` is
-   null, so the code falls into the `else` branch and shows "Déplacement refusé…".
+   null, so the code falls into the `else` branch and shows "Move rejected…".
 3. **Resize ignores the Display Mode minimum.** `handleMove` clamps spans to ≥ 1; the server
-   then rejects with 4xx and the user sees "Le serveur a refusé cette disposition." ADR 0004
+   then rejects with 4xx and the user sees "The server rejected this layout." ADR 0004
    says the minimum is applied at resize time.
 4. **Handles are not touch-sized.** Resize handle is 16 × 16 px; edit/delete buttons are ~26 px
    and overlap the widget caption (verified in the edit-mode screenshot).
@@ -40,7 +40,7 @@ Kind: bug. Depends on: T00 (edits `overview/WidgetGrid.tsx` and `overview/grid.t
 The per-cell pill was replaced after the first render check showed it covering the whole body of
 1-row widgets (72 px cells). Final design: tap selects a widget (indigo ring, `z-20`), the resize
 handle (24 px visual, 44 px hit area) overhangs the selected widget's bottom-right corner into the
-grid gap, and Modifier / Supprimer / Désélectionner live in a floating `h-12` bar centred at the
+grid gap, and Edit / Delete / Deselect live in a floating `h-12` bar centred at the
 bottom of the grid (top when the selection touches the last row). The drag preview and refusal
 state are written to refs synchronously from the pointer handlers so a fast drop never persists a
 stale preview.

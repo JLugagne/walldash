@@ -18,9 +18,9 @@ const DISPLAY_OPTIONS_BY_TYPE: Record<WidgetType, DisplayMode[]> = {
 const ACTUATOR_ALLOWED_DOMAINS = ['light', 'switch', 'media_player', 'automation']
 
 const TYPE_LABELS: Record<WidgetType, string> = {
-  sensor: 'Capteur',
-  actuator: 'Actionneur',
-  automation_list: "Liste d'automatisations",
+  sensor: 'Sensor',
+  actuator: 'Actuator',
+  automation_list: 'Automation list',
 }
 
 function suggestUnit(devices: Device[], entityId: string | undefined): string {
@@ -29,11 +29,11 @@ function suggestUnit(devices: Device[], entityId: string | undefined): string {
 }
 
 const DISPLAY_LABELS: Record<DisplayMode, string> = {
-  number: 'Nombre',
-  arc: 'Cadran',
-  bar: 'Barre',
-  toggle: 'Interrupteur',
-  list: 'Liste',
+  number: 'Number',
+  arc: 'Gauge',
+  bar: 'Bar',
+  toggle: 'Toggle',
+  list: 'List',
 }
 
 export interface NewWidgetInput {
@@ -204,21 +204,21 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
 
   const noRoomReason =
     !isEditing && !placement
-      ? "Aucun emplacement disponible sur la grille pour ce widget. Libérez de la place ou choisissez un mode d'affichage plus compact."
+      ? "No space available on the grid for this widget. Free up space or choose a more compact display mode."
       : null
 
   const tooSmallForEditReason =
     isEditing && editingWidget && (minSize.cols > editingWidget.col_span || minSize.rows > editingWidget.row_span)
-      ? "Ce mode d'affichage nécessite un widget plus grand. Redimensionnez-le en mode édition avant de changer l'affichage."
+      ? "This display mode needs a larger widget. Resize it in edit mode before changing the display."
       : null
 
   const cardinalityReason = !cardinalityOk
     ? type === 'automation_list'
-      ? 'Sélectionnez au moins une automatisation.'
-      : "Sélectionnez exactement une entité pour ce widget."
+      ? 'Select at least one automation.'
+      : 'Select exactly one entity for this widget.'
     : null
 
-  const boundsReason = !boundsOk ? 'Renseignez un minimum strictement inférieur au maximum.' : null
+  const boundsReason = !boundsOk ? 'Enter a minimum strictly lower than the maximum.' : null
 
   const blockingReason = noRoomReason || tooSmallForEditReason || cardinalityReason || boundsReason
 
@@ -256,7 +256,7 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
       }
       onClose()
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Échec de l'enregistrement du widget.")
+      setSubmitError(err instanceof Error ? err.message : "Failed to save the widget.")
     } finally {
       setSaving(false)
     }
@@ -275,12 +275,12 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
         <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
           <div>
             <h2 className="text-base font-bold text-white">
-              {isEditing ? 'Modifier le Widget' : 'Ajouter un Widget'}
+              {isEditing ? 'Edit Widget' : 'Add Widget'}
             </h2>
             <p className="text-xs text-slate-400">
               {isEditing
-                ? 'Le type et la position du widget ne changent pas ici.'
-                : 'Choisissez ce que le widget affiche, sa taille est calculée automatiquement.'}
+                ? 'The widget type and position cannot be changed here.'
+                : 'Choose what the widget displays; its size is calculated automatically.'}
             </p>
           </div>
           <button
@@ -295,7 +295,7 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
           <div className="p-6 space-y-4 flex-1 overflow-y-auto">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Type de Widget</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Widget Type</label>
               {isEditing ? (
                 <div className="px-3.5 py-2 rounded-xl bg-slate-800/50 border border-slate-800 text-sm text-slate-300">
                   {TYPE_LABELS[type]}
@@ -321,7 +321,7 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Mode d'affichage</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Display mode</label>
               <div className="flex flex-wrap gap-2">
                 {availableDisplays.map((d) => (
                   <button
@@ -341,15 +341,15 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Titre du Widget <span className="text-slate-500 font-normal">(facultatif)</span>
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Utilise le libellé de l'entité, ou son nom Home Assistant, à défaut"
-                className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+<label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Widget Title <span className="text-slate-500 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Uses the entity label, or its Home Assistant name, otherwise"
+                  className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
               />
             </div>
 
@@ -374,7 +374,7 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Unité</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Unit</label>
                   <input
                     type="text"
                     value={unit}
@@ -389,7 +389,7 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
             {display === 'number' && (
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Unité <span className="text-slate-500 font-normal">(facultatif)</span>
+                  Unit <span className="text-slate-500 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -405,8 +405,8 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-semibold text-slate-300">
                   {type === 'automation_list'
-                    ? `Automatisations (${selectedEntityIds.length} sélectionnée${selectedEntityIds.length > 1 ? 's' : ''})`
-                    : 'Entité liée'}
+                    ? `Automations (${selectedEntityIds.length} selected${selectedEntityIds.length > 1 ? '' : ''})`
+                    : 'Linked Entity'}
                 </label>
               </div>
 
@@ -416,7 +416,7 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder={type === 'automation_list' ? 'Rechercher une automatisation...' : 'Rechercher un appareil...'}
+                  placeholder={type === 'automation_list' ? 'Search automation...' : 'Search device...'}
                   className="w-full bg-slate-800/50 border border-slate-700/80 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -424,7 +424,7 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
               <div className="space-y-2 max-h-48 overflow-y-auto border border-slate-800 rounded-xl p-2 bg-slate-950/40">
                 {type === 'automation_list' ? (
                   filteredAutomations.length === 0 ? (
-                    <div className="text-center py-6 text-xs text-slate-500">Aucune automatisation trouvée</div>
+                    <div className="text-center py-6 text-xs text-slate-500">No automations found</div>
                   ) : (
                     filteredAutomations.map((auto) => {
                       const isSelected = selectedEntityIds.includes(auto.id)
@@ -454,7 +454,7 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
                     })
                   )
                 ) : filteredDevices.length === 0 ? (
-                  <div className="text-center py-6 text-xs text-slate-500">Aucun appareil trouvé</div>
+                  <div className="text-center py-6 text-xs text-slate-500">No devices found</div>
                 ) : (
                   filteredDevices.map((device) => {
                     const isSelected = selectedEntityIds.includes(device.id)
@@ -491,7 +491,7 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
             {selectedEntityIds.length > 0 && (
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Libellés personnalisés <span className="text-slate-500 font-normal">(facultatif)</span>
+                  Custom labels <span className="text-slate-500 font-normal">(optional)</span>
                 </label>
                 <div className="space-y-2">
                   {selectedEntityIds.map((id) => (
@@ -533,7 +533,7 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
                 onClick={onClose}
                 className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-xl transition-colors"
               >
-                Annuler
+                Cancel
               </button>
               <button
                 type="submit"
@@ -541,7 +541,7 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
                 title={blockingReason || undefined}
                 className="px-5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-600/30 transition-all active:scale-95 disabled:opacity-50"
               >
-                {saving ? 'Enregistrement...' : isEditing ? 'Enregistrer' : 'Créer le Widget'}
+                {saving ? 'Saving...' : isEditing ? 'Save' : 'Create Widget'}
               </button>
             </div>
           </div>

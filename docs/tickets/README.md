@@ -46,7 +46,7 @@ rendered as `Cloudy`). Deviations recorded:
 - T00: `OverviewsView.tsx` ends at ~430 lines, above the 300 target. The remainder is the CRUD
   handlers, `renderWidgetBody` and the three onboarding states, which the ticket kept in place.
 - T04: instead of a per-cell edit/delete pill, Edit Mode uses tap-to-select (indigo ring), shows
-  the 44 px resize handle only on the selected widget, and hosts Modifier / Supprimer in one
+  the 44 px resize handle only on the selected widget, and hosts Edit / Delete in one
   floating bar at the bottom of the grid. Content of 1-row widgets stays readable while laying out.
 - Toast: a single banner is owned by `OverviewsView`; `WidgetGrid` reports through `onMessage` and
   `onPersistLayout` resolves to a message (or `null`) instead of a boolean.

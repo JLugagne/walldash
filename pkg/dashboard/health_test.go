@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/domain"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/domain"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/health"
 	"github.com/stretchr/testify/require"
 )
 

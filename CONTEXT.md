@@ -1,109 +1,109 @@
-# Home Assistant 3D Dashboard (ha-dash)
+# Walldash
 
-Manager et visualiseur de dashboard domotique 3D isométrique pour Home Assistant, optimisé pour tablette tactile.
+3D isometric smart home dashboard manager and viewer for Home Assistant, optimized for touch tablets.
 
 ## Language
 
-### Espaces & Plans
+### Spaces & Plans
 
 **Level**:
-Représente un étage physique du bâtiment ou une zone extérieure (ex: jardin avant, jardin arrière).
-_Avoid_: Floor (trop restrictif pour les extérieurs), Layer, Stage
+Represents a physical building floor or an outdoor area (e.g. front garden, back garden).
+_Avoid_: Floor (too restrictive for outdoor spaces), Layer, Stage
 
 **Plan**:
-Le tracé 2D vectoriel constitutif d'un Level, composé de murs, pièces, ouvertures et délimitations de zones extérieures.
+The 2D vector layout that makes up a Level, composed of walls, rooms, openings and outdoor area boundaries.
 _Avoid_: Blueprint, Map, Drawing
 
 **Zone**:
-Une subdivision délimitée au sein d'un Plan (pièce intérieure ou sous-zone de jardin).
-_Avoid_: Room (les jardins ne sont pas des pièces), Area
+A delimited subdivision within a Plan (interior room or garden sub-zone).
+_Avoid_: Room (gardens are not rooms), Area
 
-### Équipements & Entités
+### Equipment & Entities
 
 **Device Placement**:
-L'ancrage d'un équipement Home Assistant sur un Plan à des coordonnées 2D (x, y).
+The anchor point of a Home Assistant device on a Plan at 2D coordinates (x, y).
 _Avoid_: Device Mapping, Pin, Widget
 
 **Device**:
-Un équipement domotique physique ou virtuel rattaché à Home Assistant (ex: lampe, prise, TV, capteur, relais arrosage), filtré et normalisé par le backend.
-_Avoid_: Entity (terme interne HA), Item
+A physical or virtual smart home device attached to Home Assistant (e.g. lamp, plug, TV, sensor, irrigation relay), filtered and normalized by the backend.
+_Avoid_: Entity (internal HA term), Item
 
 **Sensor**:
-Un Device passif en lecture seule dont les mesures (température, humidité, etc.) sont affichées en permanence.
+A read-only passive Device whose measurements (temperature, humidity, etc.) are displayed permanently.
 _Avoid_: Meter, Gauge
 
 **Actuator**:
-Un Device pilotable en écriture (on/off, switch, relais, power) sans contrôle de nuanceur (dimmer/couleurs) dans la version actuelle.
+A controllable Device (on/off, switch, relay, power) without dimmer/color control in the current version.
 _Avoid_: Switch, Controller
 
 **Light Halo**:
-L'effet visuel lumineux affiché dans la vue 3D autour d'un Device de type lampe lorsqu'il est allumé.
+The visual light effect displayed in the 3D view around a lamp-type Device when it is on.
 _Avoid_: Glow, Flare
 
-### Interactions & Automatismes
+### Interactions & Automations
 
 **Automation**:
-Une automatisation définie dans Home Assistant pouvant être déclenchée à la demande et suivie (état d'exécution, heure de dernière exécution).
+An automation defined in Home Assistant that can be triggered on demand and monitored (execution status, last execution time).
 _Avoid_: Scenario, Script, Routine
 
 **Favorite Automation**:
-Une Automation sélectionnée par l'utilisateur pour figurer dans la vue rapide du dashboard.
+An Automation selected by the user to appear in the dashboard's quick view.
 _Avoid_: Quick Action, Shortcut
 
-### Vues & Rendu
+### Views & Rendering
 
 **Isometric View**:
-La vue 3D à projection isométrique fixe avec caméra orientée de sorte que le bas du Plan 2D corresponde à la façade avant de la maison (sans rotation libre).
+The fixed isometric projection 3D view with a camera oriented so that the bottom of the 2D Plan corresponds to the front facade of the house (no free rotation).
 _Avoid_: 3D Orbit, Free Cam, Perspective
 
 **Display Layer**:
-Une couche d'affichage logique exclusive propre à un Level, permettant de filtrer les Device Placements visibles dans la vue 3D (par défaut : `controls` et `sensors`, extensible par l'utilisateur).
-_Avoid_: Layer (sans qualificatif, pour éviter la confusion avec Level), Filter
+An exclusive logical display layer specific to a Level, allowing filtering of visible Device Placements in the 3D view (default: `controls` and `sensors`, extensible by the user).
+_Avoid_: Layer (without qualifier, to avoid confusion with Level), Filter
 
 **Ceiling Display**:
-Le marquage d'informations (mesures de capteurs ou nom de zone) projeté sur un plan horizontal 3D à hauteur de plafond (`y = WALL_HEIGHT`) au pôle d'inaccessibilité de chaque Zone, suivant fidèlement les fuyantes et la perspective 3D.
+Information marking (sensor measurements or zone name) projected on a 3D horizontal plane at ceiling height (`y = WALL_HEIGHT`) at the pole of inaccessibility of each Zone, faithfully following the vanishing lines and 3D perspective.
 _Avoid_: Floor Print, Ceiling HUD, Floating Tag
 
 **Zone Alert Pulse**:
-L'effet visuel de respiration sinusoïdale continue et d'interpolation chromatique progressive (bleu vers le froid, rouge vers le chaud) appliqué au texte du Ceiling Display lorsqu'une mesure franchit les seuils configurés pour la Zone.
+The continuous sinusoidal breathing visual effect and progressive color interpolation (blue for cold, red for heat) applied to the Ceiling Display text when a measurement crosses the configured thresholds for the Zone.
 _Avoid_: Blink, Flash, Glow
 
-### Sécurité & Opérations
+### Security & Operations
 
 **Action Whitelist**:
-L'ensemble restreint d'opérations exécutables par le dashboard vers Home Assistant (exclusivement commutations marche/arrêt et déclenchement d'automatisations).
+The restricted set of executable operations from the dashboard to Home Assistant (exclusively on/off toggles and automation triggering).
 _Avoid_: Command Pass-through, Generic Service Call
 
-### Tableaux de bord & Vues synthétiques
+### Dashboards & Overview Views
 
 **Overview Dashboard**:
-Une vue synthétique personnalisée composée d'une grille de widgets configurables (état des capteurs, interrupteurs d'appareils, listes d'automatisations sélectionnées).
+A customized summary view composed of a grid of configurable widgets (sensor states, device switches, selected automation lists).
 _Avoid_: Dashboard View, Summary Panel
 
 **Widget**:
-Un bloc unitaire ancré dans la Widget Grid d'un Overview Dashboard, lié à un ou plusieurs Devices ou Automations et rendu selon un Display Mode.
+A single unit block anchored in an Overview Dashboard's Widget Grid, linked to one or more Devices or Automations and rendered according to a Display Mode.
 _Avoid_: Tile, Card, Component
 
 **Widget Grid**:
-La trame fixe de colonnes et de lignes propre à un Overview Dashboard, qui occupe exactement la fenêtre et dans laquelle chaque Widget est ancré.
+The fixed column and row grid belonging to an Overview Dashboard, which occupies exactly the window and in which each Widget is anchored.
 _Avoid_: Canvas, Layout, Board
 
 **Display Mode**:
-La façon dont un Widget dessine la donnée à laquelle il est lié, indépendante de la nature de cette donnée.
+The way a Widget renders the data it is linked to, independent of the nature of that data.
 _Avoid_: Style, Skin, Renderer, Variant
 
 **Arc**:
-Le Display Mode en cadran ouvert vers le bas représentant une mesure située entre deux bornes saisies par l'administrateur.
-_Avoid_: Gauge, Jauge, Fer à cheval, Dial
+The downward-opening dial Display Mode representing a measurement between two bounds set by the administrator.
+_Avoid_: Gauge, Jauge, Horseshoe, Dial
 
 **Primary Action**:
-L'unique opération déclenchée par un appui sur un Widget lié à un Actuator. Un Widget lié à un Sensor n'en possède aucune.
+The single operation triggered by a tap on a Widget linked to an Actuator. A Widget linked to a Sensor has none.
 _Avoid_: Default Action, Main Command, Tap Action
 
 **Edit Mode**:
-L'état d'un Overview Dashboard dans lequel un administrateur compose la disposition de ses Widgets, par opposition à l'usage courant où un appui ne fait que déclencher une Primary Action.
+The state of an Overview Dashboard in which an administrator composes the layout of its Widgets, as opposed to normal use where a tap only triggers a Primary Action.
 _Avoid_: Admin Mode, Design Mode, Layout Mode
 
 **Stale Value**:
-Une mesure qu'un Widget continue d'afficher alors qu'elle n'est plus digne de confiance, soit parce que son entité est déclarée injoignable, soit parce qu'elle n'a pas été rafraîchie depuis plus de trente minutes.
+A measurement that a Widget continues to display even though it is no longer trustworthy, either because its entity is declared unreachable or because it has not been refreshed in over thirty minutes.
 _Avoid_: Outdated, Expired, Obsolete

@@ -3,7 +3,7 @@ package actions
 import (
 	"context"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 )
 
 // ActionCommands defines operations for executing permitted actions against devices.

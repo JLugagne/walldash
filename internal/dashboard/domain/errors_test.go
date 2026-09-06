@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

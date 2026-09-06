@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -77,7 +77,7 @@ func TestPlanRepository_ZoneSensorsAndAlertThresholds(t *testing.T) {
 			Zones: []domain.Zone{
 				{
 					ID:     "zone-legacy",
-					Name:   "Cuisine",
+					Name:   "Kitchen",
 					Color:  "#ef4444",
 					Points: []domain.Point2D{{X: 0, Y: 0}, {X: 20, Y: 0}, {X: 20, Y: 20}},
 				},

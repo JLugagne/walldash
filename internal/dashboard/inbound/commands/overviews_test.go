@@ -8,11 +8,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/service/overviews/overviewstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/commands"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/service/overviews/overviewstest"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/commands"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,7 +32,7 @@ func TestOverviewsCommandRoutes(t *testing.T) {
 		router := mux.NewRouter()
 		commands.SetupOverviewRoutes(router, controller, mockCommands)
 
-		payload, _ := json.Marshal(pkgdashboard.CreateOverviewRequest{Name: "Salon", Order: 1})
+		payload, _ := json.Marshal(pkgdashboard.CreateOverviewRequest{Name: "Living Room", Order: 1})
 		req := httptest.NewRequest(http.MethodPost, "/api/overviews", bytes.NewReader(payload))
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
@@ -45,7 +45,7 @@ func TestOverviewsCommandRoutes(t *testing.T) {
 		err := json.NewDecoder(rec.Body).Decode(&resp)
 		require.NoError(t, err)
 		assert.Equal(t, "ov-created-1", resp.Data.ID)
-		assert.Equal(t, "Salon", resp.Data.Name)
+		assert.Equal(t, "Living Room", resp.Data.Name)
 	})
 
 	t.Run("PUT /api/overviews/{id} updates overview", func(t *testing.T) {
@@ -58,7 +58,7 @@ func TestOverviewsCommandRoutes(t *testing.T) {
 		router := mux.NewRouter()
 		commands.SetupOverviewRoutes(router, controller, mockCommands)
 
-		payload, _ := json.Marshal(pkgdashboard.UpdateOverviewRequest{Name: "Salon Rénové", Order: 2})
+		payload, _ := json.Marshal(pkgdashboard.UpdateOverviewRequest{Name: "Renovated Living Room", Order: 2})
 		req := httptest.NewRequest(http.MethodPut, "/api/overviews/ov-1", bytes.NewReader(payload))
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
@@ -71,7 +71,7 @@ func TestOverviewsCommandRoutes(t *testing.T) {
 		err := json.NewDecoder(rec.Body).Decode(&resp)
 		require.NoError(t, err)
 		assert.Equal(t, "ov-1", resp.Data.ID)
-		assert.Equal(t, "Salon Rénové", resp.Data.Name)
+		assert.Equal(t, "Renovated Living Room", resp.Data.Name)
 	})
 
 	t.Run("DELETE /api/overviews/{id} deletes overview", func(t *testing.T) {
@@ -112,7 +112,7 @@ func TestOverviewsCommandRoutes(t *testing.T) {
 
 		payload, _ := json.Marshal(pkgdashboard.CreateWidgetRequest{
 			Type:    "automation_list",
-			Title:   "Scénarios",
+			Title:   "Scenes",
 			Order:   0,
 			Col:     0,
 			Row:     0,
@@ -136,7 +136,7 @@ func TestOverviewsCommandRoutes(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "w-new-1", resp.Data.ID)
 		assert.Equal(t, "ov-1", resp.Data.DashboardID)
-		assert.Equal(t, "Scénarios", resp.Data.Title)
+		assert.Equal(t, "Scenes", resp.Data.Title)
 	})
 
 	t.Run("DELETE /api/overviews/{id}/widgets/{widgetId} deletes widget", func(t *testing.T) {

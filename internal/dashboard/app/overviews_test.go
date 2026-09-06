@@ -6,16 +6,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/app"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	repoha "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/ha"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/ha/hatest"
-	repohealthtest "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health/healthtest"
-	repooverviews "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/overviews"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/overviews/overviewstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow/uowtest"
-	svcoverviewstest "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/overviews/overviewstest"
+	"github.com/JLugagne/walldash/internal/dashboard/app"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	repoha "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/ha"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/ha/hatest"
+	repohealthtest "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/health/healthtest"
+	repooverviews "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/overviews"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/overviews/overviewstest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow/uowtest"
+	svcoverviewstest "github.com/JLugagne/walldash/internal/dashboard/domain/service/overviews/overviewstest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -253,7 +253,7 @@ func TestOverviewService_Operations(t *testing.T) {
 				return []domain.Automation{
 					{
 						ID:            "automation.cinema",
-						Name:          "Mode Cinéma",
+						Name:          "Cinema Mode",
 						State:         "on",
 						Current:       0,
 						LastTriggered: &now,

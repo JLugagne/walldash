@@ -165,8 +165,8 @@ export const WidgetGrid: React.FC<WidgetGridProps> = ({
       if (refused) {
         onMessage(
           dragInfo.mode === 'resize'
-            ? 'Redimensionnement refusé : cette taille ferait sortir un widget de la grille.'
-            : 'Déplacement refusé : ce placement ferait sortir un widget de la grille.',
+            ? 'Resize refused: this size would push a widget outside the grid.'
+            : 'Move refused: this placement would push a widget outside the grid.',
         )
         return
       }
@@ -249,7 +249,7 @@ export const WidgetGrid: React.FC<WidgetGridProps> = ({
                     <div
                       className="absolute -bottom-[22px] -right-[22px] z-20 w-11 h-11 flex items-center justify-center cursor-se-resize touch-none select-none"
                       onPointerDown={(e) => startDrag(widget, 'resize', e)}
-                      title="Redimensionner"
+                      title="Resize"
                     >
                       <div className="w-6 h-6 rounded-md bg-indigo-500 border border-indigo-300 shadow-md" />
                     </div>
@@ -282,26 +282,26 @@ export const WidgetGrid: React.FC<WidgetGridProps> = ({
             type="button"
             onClick={() => onEditWidget(selectedWidget)}
             className="h-10 px-3 rounded-full flex items-center gap-1.5 text-xs font-semibold text-slate-200 hover:bg-indigo-500/30 active:bg-indigo-500/40 transition-colors"
-            title="Modifier le contenu du widget"
+            title="Edit widget content"
           >
             <PencilLine className="w-4 h-4" />
-            Modifier
+            Edit
           </button>
           <button
             type="button"
             onClick={() => onDeleteWidget(selectedWidget.id)}
             className="h-10 px-3 rounded-full flex items-center gap-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 active:bg-rose-500/30 transition-colors"
-            title="Supprimer le widget"
+            title="Delete widget"
           >
             <Trash2 className="w-4 h-4" />
-            Supprimer
+            Delete
           </button>
           <button
             type="button"
             onClick={() => setSelectedWidgetId(null)}
             className="h-10 w-10 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-            title="Désélectionner"
-            aria-label="Désélectionner"
+            title="Deselect"
+            aria-label="Deselect"
           >
             <X className="w-4 h-4" />
           </button>

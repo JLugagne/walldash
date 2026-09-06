@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/overviews"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/overviews"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -122,7 +122,7 @@ func OverviewRepositoryContractTesting(t *testing.T, repo overviews.OverviewRepo
 	t.Run("Contract: CreateOverview and FindOverviewByID retrieves stored overview", func(t *testing.T) {
 		ov := domain.OverviewDashboard{
 			ID:        "ov-contract-1",
-			Name:      "Tableau Général",
+			Name:      "General Dashboard",
 			Order:     1,
 			Cols:      domain.DefaultGridCols,
 			Rows:      domain.DefaultGridRows,
@@ -197,16 +197,16 @@ func OverviewRepositoryContractTesting(t *testing.T, repo overviews.OverviewRepo
 		_, err := repo.CreateOverview(ctx, ov)
 		require.NoError(t, err)
 
-		ov.Name = "Overview Modifié"
+		ov.Name = "Modified Overview"
 		ov.UpdatedAt = time.Now().UTC().Truncate(time.Second)
 
 		updated, err := repo.UpdateOverview(ctx, ov)
 		require.NoError(t, err)
-		assert.Equal(t, "Overview Modifié", updated.Name)
+		assert.Equal(t, "Modified Overview", updated.Name)
 
 		found, err := repo.FindOverviewByID(ctx, ov.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "Overview Modifié", found.Name)
+		assert.Equal(t, "Modified Overview", found.Name)
 	})
 
 	t.Run("Contract: UpdateOverview returns ErrOverviewNotFound for non-existent overview", func(t *testing.T) {
@@ -228,7 +228,7 @@ func OverviewRepositoryContractTesting(t *testing.T, repo overviews.OverviewRepo
 	t.Run("Contract: DeleteOverview removes an existing overview", func(t *testing.T) {
 		ov := domain.OverviewDashboard{
 			ID:        "ov-del-1",
-			Name:      "À Supprimer",
+			Name:      "To Delete",
 			Order:     50,
 			Cols:      domain.DefaultGridCols,
 			Rows:      domain.DefaultGridRows,
@@ -274,7 +274,7 @@ func WidgetRepositoryContractTesting(t *testing.T, repo overviews.WidgetReposito
 			ID:          "widget-contract-1",
 			DashboardID: parent.ID,
 			Type:        domain.WidgetTypeAutomationList,
-			Title:       "Automatisations Salon",
+			Title:       "Living Room Automations",
 			Order:       1,
 			ColSpan:     2,
 			RowSpan:     2,
@@ -412,7 +412,7 @@ func WidgetRepositoryContractTesting(t *testing.T, repo overviews.WidgetReposito
 			ID:          "widget-del-1",
 			DashboardID: parent.ID,
 			Type:        domain.WidgetTypeAutomationList,
-			Title:       "À détruire",
+			Title:       "To Destroy",
 			Order:       9,
 			ColSpan:     2,
 			RowSpan:     2,

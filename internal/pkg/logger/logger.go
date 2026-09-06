@@ -8,7 +8,7 @@ import (
 
 type contextKey string
 
-const loggerContextKey contextKey = "ha-dash-logger"
+const loggerContextKey contextKey = "walldash-logger"
 
 // LoggerFromContext retrieves the logger entry from the context, or returns a default logger entry.
 func LoggerFromContext(ctx context.Context) *logrus.Entry {

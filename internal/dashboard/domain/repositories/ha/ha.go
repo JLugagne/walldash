@@ -3,7 +3,7 @@ package ha
 import (
 	"context"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 )
 
 // HomeAssistantRepository defines operations for fetching states from Home Assistant and calling services.

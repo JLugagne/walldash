@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/converters"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,7 +15,7 @@ func TestDeviceConverters(t *testing.T) {
 		now := time.Now().UTC()
 		dev := domain.Device{
 			ID:     "light.kitchen",
-			Name:   "Cuisine",
+			Name:   "Kitchen",
 			Domain: "light",
 			State:  "on",
 			Attributes: map[string]any{
@@ -55,7 +55,7 @@ func TestDeviceConverters(t *testing.T) {
 			Y:            200.5,
 			Icon:         "lightbulb",
 			RenderDomain: "light",
-			CustomName:   "Lumière Cuisine",
+			CustomName:   "Kitchen Light",
 			Layer:        "sensors",
 		}
 
@@ -67,7 +67,7 @@ func TestDeviceConverters(t *testing.T) {
 		assert.Equal(t, 200.5, dom.Y)
 		assert.Equal(t, "lightbulb", dom.Icon)
 		assert.Equal(t, "light", dom.RenderDomain)
-		assert.Equal(t, "Lumière Cuisine", dom.CustomName)
+		assert.Equal(t, "Kitchen Light", dom.CustomName)
 		assert.Equal(t, "sensors", dom.Layer)
 	})
 
@@ -92,7 +92,7 @@ func TestDeviceConverters(t *testing.T) {
 			Y:            60.0,
 			Icon:         "thermometer",
 			RenderDomain: "sensor",
-			CustomName:   "Température",
+			CustomName:   "Temperature",
 			Layer:        "sensors",
 			CreatedAt:    now,
 			UpdatedAt:    now,

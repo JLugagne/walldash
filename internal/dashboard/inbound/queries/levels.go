@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	svclevels "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/levels"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/converters"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	svclevels "github.com/JLugagne/walldash/internal/dashboard/domain/service/levels"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
 	"github.com/gorilla/mux"
 )
 

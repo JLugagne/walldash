@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ func sensorNumberWidget() domain.Widget {
 		ID:          "widget-number",
 		DashboardID: "ov-1",
 		Type:        domain.WidgetTypeSensor,
-		Title:       "Température Salon",
+		Title:       "Living Room Temperature",
 		ColSpan:     1,
 		RowSpan:     1,
 		Config: domain.WidgetConfig{
@@ -58,7 +58,7 @@ func actuatorToggleWidget() domain.Widget {
 	w := sensorNumberWidget()
 	w.ID = "widget-toggle"
 	w.Type = domain.WidgetTypeActuator
-	w.Title = "Plafonnier"
+	w.Title = "Ceiling Light"
 	w.Config.Display = domain.DisplayToggle
 	w.Config.EntityIDs = []string{"light.salon_plafond"}
 	w.Config.Unit = ""
@@ -69,7 +69,7 @@ func automationListWidget() domain.Widget {
 	w := sensorNumberWidget()
 	w.ID = "widget-list"
 	w.Type = domain.WidgetTypeAutomationList
-	w.Title = "Automatisations Rapides"
+	w.Title = "Quick Automations"
 	w.ColSpan = 2
 	w.RowSpan = 2
 	w.Config.Display = domain.DisplayList
@@ -419,7 +419,7 @@ func TestOverviewDashboardValidate(t *testing.T) {
 		third.Col, third.Row = 0, 2
 		return domain.OverviewDashboard{
 			ID:        "ov-1",
-			Name:      "Salon & Séjour",
+			Name:      "Living Room & Den",
 			Order:     0,
 			Cols:      domain.DefaultGridCols,
 			Rows:      domain.DefaultGridRows,
@@ -512,7 +512,7 @@ func TestAutomationValidation(t *testing.T) {
 		now := time.Now().UTC()
 		auto := domain.Automation{
 			ID:            "automation.eteindre_tout",
-			Name:          "Éteindre Tout",
+			Name:          "Turn Off All",
 			State:         "on",
 			Current:       0,
 			LastTriggered: &now,

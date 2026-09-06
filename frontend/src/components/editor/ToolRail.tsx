@@ -47,7 +47,7 @@ export function ToolRail({ tool, onSelectTool, snapGrid, onToggleSnap, gridSize,
       <button
         type="button"
         onClick={onToggleSnap}
-        title={`Aimantation à la grille : ${snapGrid ? 'activée' : 'désactivée'} (G)`}
+        title={`Snap to grid: ${snapGrid ? 'enabled' : 'disabled'} (G)`}
         aria-pressed={snapGrid}
         className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
           snapGrid ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-white hover:bg-slate-800'
@@ -59,7 +59,7 @@ export function ToolRail({ tool, onSelectTool, snapGrid, onToggleSnap, gridSize,
       <button
         type="button"
         onClick={onCycleGrid}
-        title="Pas de la grille"
+        title="Grid step"
         className="w-10 h-10 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer"
       >
         <Grid3x3 className="w-4 h-4" />

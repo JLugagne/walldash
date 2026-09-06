@@ -3,9 +3,9 @@ package queries
 import (
 	"net/http"
 
-	svchealth "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/health"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/converters"
+	svchealth "github.com/JLugagne/walldash/internal/dashboard/domain/service/health"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
 )
 
 // HealthHandler handles health check query endpoints.

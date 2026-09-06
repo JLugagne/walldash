@@ -4,16 +4,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/converters"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLevelConverters(t *testing.T) {
 	t.Run("ToDomainCreateLevel converts request", func(t *testing.T) {
 		req := pkgdashboard.CreateLevelRequest{
-			Name:      "Rez-de-chaussée",
+			Name:      "Ground Floor",
 			IsOutdoor: false,
 			Layers:    []string{"controls", "sensors"},
 		}
@@ -25,7 +25,7 @@ func TestLevelConverters(t *testing.T) {
 
 	t.Run("ToDomainUpdateLevel converts request with ID", func(t *testing.T) {
 		req := pkgdashboard.UpdateLevelRequest{
-			Name:      "Étage 1",
+			Name:      "1st Floor",
 			IsOutdoor: true,
 			Layers:    []string{"controls", "hvac"},
 		}
@@ -40,7 +40,7 @@ func TestLevelConverters(t *testing.T) {
 		now := time.Now()
 		domainLevel := domain.Level{
 			ID:        "lvl-abc",
-			Name:      "Salon",
+			Name:      "Living Room",
 			Order:     2,
 			IsOutdoor: false,
 			Layers:    []string{"controls", "custom"},
@@ -61,7 +61,7 @@ func TestLevelConverters(t *testing.T) {
 		now := time.Now()
 		domainLevel := domain.Level{
 			ID:        "lvl-def",
-			Name:      "Salon",
+			Name:      "Living Room",
 			Order:     0,
 			CreatedAt: now,
 			UpdatedAt: now,
@@ -234,7 +234,7 @@ func TestZoneConverters(t *testing.T) {
 	t.Run("ToPublicZone converts domain to dto with sensors and thresholds", func(t *testing.T) {
 		zone := domain.Zone{
 			ID:             "zone-2",
-			Name:           "Salon",
+			Name:           "Living Room",
 			Color:          "#10b981",
 			Points:         []domain.Point2D{{X: 0, Y: 0}, {X: 20, Y: 0}, {X: 20, Y: 20}},
 			TempSensor:     "sensor.salon_temp",

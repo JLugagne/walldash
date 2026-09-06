@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,7 +13,7 @@ func TestLevelValidation(t *testing.T) {
 	t.Run("valid level passes validation", func(t *testing.T) {
 		level := domain.Level{
 			ID:        "level-1",
-			Name:      "Rez-de-chaussée",
+			Name:      "Ground Floor",
 			Order:     1,
 			IsOutdoor: false,
 			CreatedAt: time.Now(),
@@ -25,7 +25,7 @@ func TestLevelValidation(t *testing.T) {
 	t.Run("empty level ID fails validation", func(t *testing.T) {
 		level := domain.Level{
 			ID:   "",
-			Name: "Rez-de-chaussée",
+			Name: "Ground Floor",
 		}
 		err := level.Validate()
 		require.Error(t, err)
@@ -47,7 +47,7 @@ func TestLevelValidation(t *testing.T) {
 	t.Run("level supports custom layers", func(t *testing.T) {
 		level := domain.Level{
 			ID:        "level-1",
-			Name:      "Rez-de-chaussée",
+			Name:      "Ground Floor",
 			Layers:    []string{"controls", "sensors", "hvac"},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
@@ -70,7 +70,7 @@ func TestPlanValidation(t *testing.T) {
 
 	validZone := domain.Zone{
 		ID:    "zone-1",
-		Name:  "Salon",
+		Name:  "Living Room",
 		Color: "#3b82f6",
 		Points: []domain.Point2D{
 			{X: 0, Y: 0},
@@ -161,7 +161,7 @@ func TestPlanValidation(t *testing.T) {
 		maxTemp := 19.0
 		invalidTempZone := domain.Zone{
 			ID:      "z-temp-inv",
-			Name:    "Salon",
+			Name:    "Living Room",
 			Color:   "#3b82f6",
 			Points:  validZone.Points,
 			TempMin: &minTemp,
@@ -210,7 +210,7 @@ func TestPlanValidation(t *testing.T) {
 	t.Run("zone with malformed sensor entity ID fails validation", func(t *testing.T) {
 		badTempSensorZone := domain.Zone{
 			ID:         "z-bad-temp",
-			Name:       "Salon",
+			Name:       "Living Room",
 			Color:      "#3b82f6",
 			Points:     validZone.Points,
 			TempSensor: "not_a_valid_entity_id",
@@ -222,7 +222,7 @@ func TestPlanValidation(t *testing.T) {
 
 		badHumSensorZone := domain.Zone{
 			ID:             "z-bad-hum",
-			Name:           "Salon",
+			Name:           "Living Room",
 			Color:          "#3b82f6",
 			Points:         validZone.Points,
 			HumiditySensor: "no_dot",

@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/JLugagne/ha-dash/frontend"
-	dashboard "github.com/JLugagne/ha-dash/internal/dashboard"
+	"github.com/JLugagne/walldash/frontend"
+	dashboard "github.com/JLugagne/walldash/internal/dashboard"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
@@ -23,7 +23,7 @@ func main() {
 	logrus.SetLevel(logrus.InfoLevel)
 
 	port := getEnv("PORT", "8080")
-	dbPath := getEnv("DB_PATH", "ha-dash.db")
+	dbPath := getEnv("DB_PATH", "walldash.db")
 	haURL := getEnv("HA_URL", "http://homeassistant.local:8123")
 	haToken := getEnv("HA_TOKEN", "")
 	frontendDir := os.Getenv("FRONTEND_DIR")
@@ -75,7 +75,7 @@ func main() {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		logrus.WithField("port", port).Info("starting ha-dash server")
+		logrus.WithField("port", port).Info("starting walldash server")
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logrus.WithError(err).Fatal("server encountered fatal error")
 		}

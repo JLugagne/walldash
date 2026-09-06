@@ -9,14 +9,14 @@ import (
 	"io/fs"
 	"sort"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/overviews"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/placements"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow"
-	"github.com/JLugagne/ha-dash/internal/pkg/logger"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/health"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/levels"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/overviews"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/placements"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/plans"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow"
+	"github.com/JLugagne/walldash/internal/pkg/logger"
 	_ "modernc.org/sqlite"
 )
 

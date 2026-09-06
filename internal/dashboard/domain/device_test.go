@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,7 +36,7 @@ func TestDeviceValidation(t *testing.T) {
 	t.Run("valid device passes validation", func(t *testing.T) {
 		dev := domain.Device{
 			ID:     "light.living_room",
-			Name:   "Plafonnier Salon",
+			Name:   "Living Room Ceiling Light",
 			Domain: domain.DomainLight,
 			State:  "on",
 			Attributes: map[string]any{
@@ -49,7 +49,7 @@ func TestDeviceValidation(t *testing.T) {
 	t.Run("empty device id fails validation", func(t *testing.T) {
 		dev := domain.Device{
 			ID:     "",
-			Name:   "Plafonnier",
+			Name:   "Ceiling Light",
 			Domain: domain.DomainLight,
 		}
 		err := dev.Validate()
@@ -80,7 +80,7 @@ func TestDevicePlacementValidation(t *testing.T) {
 		X:          120.5,
 		Y:          250.0,
 		Icon:       "lightbulb",
-		CustomName: "Lumière principale",
+		CustomName: "Main Light",
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
@@ -159,7 +159,7 @@ func TestDeviceLastUpdated(t *testing.T) {
 		observed := time.Date(2026, 9, 4, 10, 30, 0, 0, time.UTC)
 		dev := domain.Device{
 			ID:          "sensor.temperature_salon",
-			Name:        "Température Salon",
+			Name:        "Living Room Temperature",
 			Domain:      domain.DomainSensor,
 			State:       "21.4",
 			LastUpdated: observed,
@@ -171,7 +171,7 @@ func TestDeviceLastUpdated(t *testing.T) {
 	t.Run("zero last updated means unknown and never blocks validation", func(t *testing.T) {
 		dev := domain.Device{
 			ID:     "sensor.humidite_sdb",
-			Name:   "Humidité Salle de Bain",
+			Name:   "Bathroom Humidity",
 			Domain: domain.DomainSensor,
 			State:  "62",
 		}

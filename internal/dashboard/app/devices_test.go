@@ -5,16 +5,16 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/app"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/ha/hatest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health/healthtest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels/levelstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/placements/placementstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans/planstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow/uowtest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/service/devices/devicestest"
+	"github.com/JLugagne/walldash/internal/dashboard/app"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/ha/hatest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/health/healthtest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/levels/levelstest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/placements/placementstest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/plans/planstest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow/uowtest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/service/devices/devicestest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,7 +63,7 @@ func TestDeviceServiceContract(t *testing.T) {
 	levelsStore := map[string]domain.Level{
 		"level-contract": {
 			ID:   "level-contract",
-			Name: "Rez-de-chaussée",
+			Name: "Ground Floor",
 		},
 	}
 	placementsStore := map[string]domain.DevicePlacement{}
@@ -111,7 +111,7 @@ func TestDeviceServiceContract(t *testing.T) {
 			return []domain.Device{
 				{
 					ID:     "light.salon",
-					Name:   "Plafonnier Salon",
+					Name:   "Living Room Ceiling Light",
 					Domain: domain.DomainLight,
 					State:  "on",
 				},
@@ -121,7 +121,7 @@ func TestDeviceServiceContract(t *testing.T) {
 			if entityID == "light.salon" {
 				return domain.Device{
 					ID:     "light.salon",
-					Name:   "Plafonnier Salon",
+					Name:   "Living Room Ceiling Light",
 					Domain: domain.DomainLight,
 					State:  "on",
 				}, nil

@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/app"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	repohealthtest "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health/healthtest"
-	repolevelstest "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels/levelstest"
-	repoplacementstest "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/placements/placementstest"
-	repoplanstest "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans/planstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow/uowtest"
-	svclevelstest "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/levels/levelstest"
+	"github.com/JLugagne/walldash/internal/dashboard/app"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	repohealthtest "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/health/healthtest"
+	repolevelstest "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/levels/levelstest"
+	repoplacementstest "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/placements/placementstest"
+	repoplanstest "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/plans/planstest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow/uowtest"
+	svclevelstest "github.com/JLugagne/walldash/internal/dashboard/domain/service/levels/levelstest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +49,7 @@ func TestLevelService_Operations(t *testing.T) {
 			},
 			CreateFunc: func(ctx context.Context, level domain.Level) (domain.Level, error) {
 				assert.NotEmpty(t, level.ID)
-				assert.Equal(t, "Étage 1", level.Name)
+				assert.Equal(t, "1st Floor", level.Name)
 				return level, nil
 			},
 		}
@@ -58,10 +58,10 @@ func TestLevelService_Operations(t *testing.T) {
 		mockUow := &uowtest.MockUnitOfWork{}
 
 		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
-		created, err := service.CreateLevel(ctx, actor, domain.Level{Name: "Étage 1"})
+		created, err := service.CreateLevel(ctx, actor, domain.Level{Name: "1st Floor"})
 		require.NoError(t, err)
 		assert.NotEmpty(t, created.ID)
-		assert.Equal(t, "Étage 1", created.Name)
+		assert.Equal(t, "1st Floor", created.Name)
 		assert.Equal(t, []string{"controls", "sensors"}, created.Layers)
 	})
 
@@ -81,7 +81,7 @@ func TestLevelService_Operations(t *testing.T) {
 
 		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
 		created, err := service.CreateLevel(ctx, actor, domain.Level{
-			Name:   "Étage 1",
+			Name:   "1st Floor",
 			Layers: []string{"controls", "custom_layer"},
 		})
 		require.NoError(t, err)
@@ -103,7 +103,7 @@ func TestLevelService_Operations(t *testing.T) {
 	t.Run("UpdateLevel validates and updates existing level", func(t *testing.T) {
 		mockLevels := &repolevelstest.MockLevelRepository{
 			FindByIDFunc: func(ctx context.Context, id string) (domain.Level, error) {
-				return domain.Level{ID: id, Name: "RDC", Layers: []string{"controls", "sensors"}}, nil
+				return domain.Level{ID: id, Name: "Ground Floor", Layers: []string{"controls", "sensors"}}, nil
 			},
 			UpdateFunc: func(ctx context.Context, level domain.Level) (domain.Level, error) {
 				return level, nil
@@ -116,13 +116,13 @@ func TestLevelService_Operations(t *testing.T) {
 		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
 		lvl := domain.Level{
 			ID:        "lvl-1",
-			Name:      "RDC Renommé",
+			Name:      "Renamed Ground Floor",
 			Order:     0,
 			CreatedAt: time.Now(),
 		}
 		updated, err := service.UpdateLevel(ctx, actor, lvl)
 		require.NoError(t, err)
-		assert.Equal(t, "RDC Renommé", updated.Name)
+		assert.Equal(t, "Renamed Ground Floor", updated.Name)
 	})
 
 	t.Run("UpdateLevel reassigns placements to controls when a layer is removed", func(t *testing.T) {
@@ -130,7 +130,7 @@ func TestLevelService_Operations(t *testing.T) {
 			FindByIDFunc: func(ctx context.Context, id string) (domain.Level, error) {
 				return domain.Level{
 					ID:     id,
-					Name:   "RDC",
+					Name:   "Ground Floor",
 					Layers: []string{"controls", "sensors", "security"},
 				}, nil
 			},
@@ -155,7 +155,7 @@ func TestLevelService_Operations(t *testing.T) {
 		service := app.New(mockHealth, mockLevels, mockPlans, mockPlacements, nil, nil, nil, mockUow, "0.1.0")
 		lvl := domain.Level{
 			ID:     "lvl-1",
-			Name:   "RDC",
+			Name:   "Ground Floor",
 			Layers: []string{"controls", "sensors"}, // "security" removed
 		}
 		updated, err := service.UpdateLevel(ctx, actor, lvl)
@@ -224,7 +224,7 @@ func TestLevelService_Operations(t *testing.T) {
 	t.Run("SavePlan saves valid plan when level exists", func(t *testing.T) {
 		mockLevels := &repolevelstest.MockLevelRepository{
 			FindByIDFunc: func(ctx context.Context, id string) (domain.Level, error) {
-				return domain.Level{ID: id, Name: "RDC"}, nil
+				return domain.Level{ID: id, Name: "Ground Floor"}, nil
 			},
 		}
 		mockPlans := &repoplanstest.MockPlanRepository{

@@ -181,8 +181,8 @@ export function IsometricView({
           <button
             type="button"
             onClick={toggleFullscreen}
-            title={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
-            aria-label={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
+            title={isFullscreen ? 'Exit full screen' : 'Full screen'}
+            aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
             className="w-12 h-12 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-800/80 shadow-2xl shadow-black/50 flex items-center justify-center text-indigo-400 hover:text-white hover:bg-slate-800/90 active:scale-95 transition-all cursor-pointer"
           >
             {isFullscreen ? (
@@ -207,9 +207,9 @@ export function IsometricView({
               <Layers className="w-6 h-6" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-base font-semibold text-white">Aucun niveau configuré</h3>
+              <h3 className="text-base font-semibold text-white">No levels configured</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Créez vos étages et espaces extérieurs dans l'éditeur pour afficher et naviguer dans la vue 3D.
+                Create your floors and outdoor spaces in the editor to view and navigate in 3D.
               </p>
             </div>
             <button
@@ -218,7 +218,7 @@ export function IsometricView({
               className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg shadow-indigo-500/30 transition-all flex items-center justify-center space-x-2"
             >
               <Edit3 className="w-4 h-4" />
-              <span>Ouvrir l'Éditeur 2D (Admin)</span>
+              <span>Open 2D Editor (Admin)</span>
             </button>
           </div>
         </div>
@@ -233,10 +233,10 @@ export function IsometricView({
             </div>
             <div className="space-y-0.5">
               <h4 className="text-xs font-semibold text-white">
-                Plan vide pour &laquo; {level.name} &raquo;
+                Empty plan for &laquo; {level.name} &raquo;
               </h4>
               <p className="text-[11px] text-slate-400">
-                Ce niveau ne contient pas encore de murs ni de zones.
+                This level has no walls or zones yet.
               </p>
             </div>
             <button
@@ -245,7 +245,7 @@ export function IsometricView({
               className="shrink-0 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-md transition-all flex items-center space-x-1.5"
             >
               <Edit3 className="w-3.5 h-3.5" />
-              <span>Dessiner</span>
+              <span>Draw</span>
             </button>
           </div>
         </div>

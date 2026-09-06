@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health/healthtest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels/levelstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/overviews/overviewstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/placements/placementstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans/planstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow/uowtest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/outbound/sqlite"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/health/healthtest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/levels/levelstest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/overviews/overviewstest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/placements/placementstest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/plans/planstest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow/uowtest"
+	"github.com/JLugagne/walldash/internal/dashboard/outbound/sqlite"
 	"github.com/stretchr/testify/require"
 )
 

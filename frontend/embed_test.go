@@ -4,7 +4,7 @@ import (
 	"io/fs"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/frontend"
+	"github.com/JLugagne/walldash/frontend"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

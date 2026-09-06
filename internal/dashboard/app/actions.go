@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/pkg/logger"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/pkg/logger"
 )
 
 // ExecuteAction validates that an incoming device action conforms to the Action Whitelist (ADR 0002)

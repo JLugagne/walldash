@@ -25,12 +25,12 @@ export interface ToolDef {
 }
 
 export const TOOLS: ToolDef[] = [
-  { key: 'select', label: 'Sélection', icon: MousePointer2, shortcut: 'V' },
-  { key: 'wall', label: 'Mur', icon: BrickWall, shortcut: 'W' },
-  { key: 'door', label: 'Porte', icon: DoorOpen, shortcut: 'D' },
-  { key: 'window', label: 'Fenêtre', icon: AppWindow, shortcut: 'F' },
+  { key: 'select', label: 'Selection', icon: MousePointer2, shortcut: 'V' },
+  { key: 'wall', label: 'Wall', icon: BrickWall, shortcut: 'W' },
+  { key: 'door', label: 'Door', icon: DoorOpen, shortcut: 'D' },
+  { key: 'window', label: 'Window', icon: AppWindow, shortcut: 'F' },
   { key: 'zone', label: 'Zone', icon: Hexagon, shortcut: 'Z' },
-  { key: 'pan', label: 'Déplacer la vue', icon: Hand, shortcut: 'H' },
+  { key: 'pan', label: 'Move view', icon: Hand, shortcut: 'H' },
 ]
 
 export const GRID_SIZES = [10, 20, 40]
@@ -41,11 +41,11 @@ export interface SizePreset {
 }
 
 export const WALL_THICKNESS_PRESETS: SizePreset[] = [
-  { label: 'Cloison', value: cmToUnits(15) },
-  { label: 'Intérieur', value: cmToUnits(20) },
-  { label: 'Porteur', value: cmToUnits(30) },
-  { label: 'Extérieur', value: cmToUnits(40) },
-  { label: 'Épais', value: cmToUnits(50) },
+  { label: 'Partition', value: cmToUnits(15) },
+  { label: 'Indoor', value: cmToUnits(20) },
+  { label: 'Load-bearing', value: cmToUnits(30) },
+  { label: 'Outdoor', value: cmToUnits(40) },
+  { label: 'Thick', value: cmToUnits(50) },
 ]
 
 export const DOOR_WIDTH_PRESETS: SizePreset[] = [
@@ -73,31 +73,31 @@ export const WALL_LENGTH_PRESETS: SizePreset[] = [
 ]
 
 export const ZONE_COLOR_PRESETS = [
-  { name: 'Salon', value: '#3b82f6' },
-  { name: 'Cuisine', value: '#f59e0b' },
-  { name: 'Chambre', value: '#8b5cf6' },
-  { name: 'Salle de bain', value: '#06b6d4' },
-  { name: 'Bureau', value: '#10b981' },
-  { name: 'Couloir', value: '#64748b' },
-  { name: 'Terrasse', value: '#059669' },
+  { name: 'Living room', value: '#3b82f6' },
+  { name: 'Kitchen', value: '#f59e0b' },
+  { name: 'Bedroom', value: '#8b5cf6' },
+  { name: 'Bathroom', value: '#06b6d4' },
+  { name: 'Office', value: '#10b981' },
+  { name: 'Hallway', value: '#64748b' },
+  { name: 'Terrace', value: '#059669' },
   { name: 'Garage', value: '#ec4899' },
 ]
 
 export const DOMAIN_CATEGORIES = [
-  { key: 'all', label: 'Tous' },
-  { key: 'light', label: 'Lumières' },
-  { key: 'switch', label: 'Prises' },
-  { key: 'sensor', label: 'Capteurs' },
-  { key: 'climate', label: 'Chauffage' },
-  { key: 'media_player', label: 'Médias' },
+  { key: 'all', label: 'All' },
+  { key: 'light', label: 'Lights' },
+  { key: 'switch', label: 'Outlets' },
+  { key: 'sensor', label: 'Sensors' },
+  { key: 'climate', label: 'Climate' },
+  { key: 'media_player', label: 'Media' },
 ]
 
 export const RENDER_DOMAIN_OPTIONS = [
-  { key: 'light', label: 'Lumière' },
-  { key: 'switch', label: 'Interrupteur' },
-  { key: 'media_player', label: 'Média' },
-  { key: 'climate', label: 'Chauffage' },
-  { key: 'sensor', label: 'Capteur' },
+  { key: 'light', label: 'Light' },
+  { key: 'switch', label: 'Switch' },
+  { key: 'media_player', label: 'Media' },
+  { key: 'climate', label: 'Climate' },
+  { key: 'sensor', label: 'Sensor' },
 ]
 
 export interface DomainStyle {

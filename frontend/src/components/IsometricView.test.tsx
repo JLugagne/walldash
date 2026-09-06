@@ -44,7 +44,7 @@ vi.mock('../hooks/useRealtimeDevices', () => ({
 describe('IsometricView Layer Selection and Filtering', () => {
   const level1: Level = {
     id: 'l1',
-    name: 'Rez-de-chaussée',
+    name: 'Ground Floor',
     order: 0,
     is_outdoor: false,
     layers: ['controls', 'sensors', 'security'],

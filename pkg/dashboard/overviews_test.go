@@ -3,8 +3,8 @@ package dashboard_test
 import (
 	"testing"
 
-	"github.com/JLugagne/ha-dash/domain"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/domain"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,7 +15,7 @@ func TestCreateOverviewRequestValidation(t *testing.T) {
 
 	t.Run("valid CreateOverviewRequest passes validation", func(t *testing.T) {
 		req := pkgdashboard.CreateOverviewRequest{
-			Name:  "Tableau Salon",
+			Name:  "Living Room Dashboard",
 			Order: 1,
 		}
 		require.NoError(t, validate.Struct(req))
@@ -23,7 +23,7 @@ func TestCreateOverviewRequestValidation(t *testing.T) {
 
 	t.Run("valid CreateOverviewRequest with explicit grid size passes validation", func(t *testing.T) {
 		req := pkgdashboard.CreateOverviewRequest{
-			Name: "Tableau Salon",
+			Name: "Living Room Dashboard",
 			Cols: 12,
 			Rows: 8,
 		}
@@ -67,7 +67,7 @@ func TestCreateWidgetRequestValidation(t *testing.T) {
 	t.Run("valid CreateWidgetRequest passes validation", func(t *testing.T) {
 		req := pkgdashboard.CreateWidgetRequest{
 			Type:    "automation_list",
-			Title:   "Mes Scénarios",
+			Title:   "My Scenes",
 			Order:   0,
 			Col:     0,
 			Row:     0,
@@ -110,7 +110,7 @@ func TestCreateWidgetRequestValidation(t *testing.T) {
 	t.Run("missing ColSpan fails validation", func(t *testing.T) {
 		req := pkgdashboard.CreateWidgetRequest{
 			Type:    "sensor",
-			Title:   "Température",
+			Title:   "Temperature",
 			ColSpan: 0,
 			RowSpan: 1,
 		}
@@ -121,7 +121,7 @@ func TestCreateWidgetRequestValidation(t *testing.T) {
 	t.Run("missing Display fails validation", func(t *testing.T) {
 		req := pkgdashboard.CreateWidgetRequest{
 			Type:    "sensor",
-			Title:   "Température",
+			Title:   "Temperature",
 			ColSpan: 1,
 			RowSpan: 1,
 			Config:  pkgdashboard.WidgetConfigDTO{EntityIDs: []string{"sensor.temp"}},

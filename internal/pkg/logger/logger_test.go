@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/pkg/logger"
+	"github.com/JLugagne/walldash/internal/pkg/logger"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )

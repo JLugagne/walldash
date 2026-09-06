@@ -91,18 +91,18 @@ export function Inspector(props: InspectorProps) {
       return <OpeningToolPanel {...props} />
     case 'zone':
       return <ZoneToolPanel {...props} />
-    case 'pan':
-      return (
-        <PanelShell icon={<MousePointer2 className="w-4 h-4" />} title="Déplacer la vue">
-          <Hint
-            items={[
-              'Glissez pour déplacer le plan.',
-              'Molette pour zoomer autour du curseur.',
-              'Espace, clic molette ou clic droit déplacent la vue depuis n’importe quel outil.',
-            ]}
-          />
-        </PanelShell>
-      )
+case 'pan':
+        return (
+          <PanelShell icon={<MousePointer2 className="w-4 h-4" />} title="Move view">
+            <Hint
+              items={[
+                'Drag to move the plan.',
+                'Scroll wheel to zoom around the cursor.',
+                'Space, middle-click or right-click moves the view from any tool.',
+              ]}
+            />
+          </PanelShell>
+        )
     default:
       return <SelectToolPanel {...props} />
   }
@@ -135,7 +135,7 @@ function PanelShell({
           <button
             type="button"
             onClick={onClose}
-            title="Désélectionner (Échap)"
+            title="Deselect (Escape)"
             className="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -308,8 +308,8 @@ function WallPanel({ wall, onUpdateWall, onSetWallLength, onSplitWall, onDeleteS
   const openings = wall.openings ?? []
 
   return (
-    <PanelShell icon={<BrickWall className="w-4 h-4" />} title="Mur" subtitle={shortId(wall.id)} onClose={() => onSelect(null)}>
-      <Field label="Longueur" trailing={<span className="text-[11px] font-mono text-indigo-300">{formatMeters(len)}</span>}>
+    <PanelShell icon={<BrickWall className="w-4 h-4" />} title="Wall" subtitle={shortId(wall.id)} onClose={() => onSelect(null)}>
+      <Field label="Length" trailing={<span className="text-[11px] font-mono text-indigo-300">{formatMeters(len)}</span>}>
         <Stepper value={unitsToCm(len)} onChange={(cm) => onSetWallLength(wall.id, cmToUnits(cm))} step={10} min={20} unit="cm" />
         <div className="grid grid-cols-5 gap-1">
           {WALL_LENGTH_PRESETS.map((p) => (
@@ -327,7 +327,7 @@ function WallPanel({ wall, onUpdateWall, onSetWallLength, onSplitWall, onDeleteS
         </div>
       </Field>
 
-      <Field label="Épaisseur" trailing={<span className="text-[11px] font-mono text-slate-400">{unitsToCm(thickness)} cm</span>}>
+      <Field label="Thickness" trailing={<span className="text-[11px] font-mono text-slate-400">{unitsToCm(thickness)} cm</span>}>
         <Segmented
           options={WALL_THICKNESS_PRESETS.map((p) => ({ label: p.label, value: p.value, hint: `${unitsToCm(p.value)} cm` }))}
           value={thicknessKnown ? thickness : -1}
@@ -338,9 +338,9 @@ function WallPanel({ wall, onUpdateWall, onSetWallLength, onSplitWall, onDeleteS
         )}
       </Field>
 
-      <Field label={`Ouvertures (${openings.length})`}>
+      <Field label={`Openings (${openings.length})`}>
         {openings.length === 0 ? (
-          <p className="text-[11px] text-slate-500">Aucune porte ni fenêtre. Utilisez les outils Porte (D) ou Fenêtre (F).</p>
+          <p className="text-[11px] text-slate-500">No doors or windows. Use the Door (D) or Window (F) tools.</p>
         ) : (
           <div className="space-y-1">
             {openings.map((op) => {
@@ -354,7 +354,7 @@ function WallPanel({ wall, onUpdateWall, onSetWallLength, onSplitWall, onDeleteS
                 >
                   <Icon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                   <span className="text-xs text-slate-200 flex-1">
-                    {op.type === 'window' ? 'Fenêtre' : op.hide_door ? 'Passage' : 'Porte'}
+                    {op.type === 'window' ? 'Window' : op.hide_door ? 'Passage' : 'Door'}
                   </span>
                   <span className="text-[10px] font-mono text-slate-500">
                     {unitsToCm(op.width)} cm · {formatMeters(op.offset)}
@@ -373,16 +373,16 @@ function WallPanel({ wall, onUpdateWall, onSetWallLength, onSplitWall, onDeleteS
           className="w-full h-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center justify-center gap-2 cursor-pointer"
         >
           <Scissors className="w-3.5 h-3.5" />
-          Scinder au milieu
+          Split at midpoint
         </button>
-        <DangerButton onClick={onDeleteSelection}>Supprimer le mur</DangerButton>
+        <DangerButton onClick={onDeleteSelection}>Delete wall</DangerButton>
       </Field>
 
       <Hint
         items={[
-          'Glissez le mur pour le déplacer : les murs raccordés suivent.',
-          'Maintenez Alt pendant le déplacement pour détacher le mur de ses jonctions.',
-          'Glissez une poignée d’extrémité pour étirer ou réorienter le mur.',
+          'Drag the wall to move it: connected walls follow.',
+          'Hold Alt while dragging to detach the wall from its joints.',
+          'Drag an endpoint handle to stretch or reorient the wall.',
         ]}
       />
     </PanelShell>
@@ -397,7 +397,7 @@ function OpeningPanel({ wall, opening, onUpdateOpening, onDeleteSelection, onSel
   const maxOffset = Math.max(minOffset, Math.round(len - half))
   const presets = isWindow ? WINDOW_WIDTH_PRESETS : DOOR_WIDTH_PRESETS
   const update = (patch: Partial<WallOpening>) => onUpdateOpening(wall.id, opening.id, patch)
-  const title = isWindow ? 'Fenêtre' : opening.hide_door ? 'Passage' : 'Porte'
+  const title = isWindow ? 'Window' : opening.hide_door ? 'Passage' : 'Door'
 
   return (
     <PanelShell
@@ -409,15 +409,15 @@ function OpeningPanel({ wall, opening, onUpdateOpening, onDeleteSelection, onSel
       <Field label="Type">
         <Segmented
           options={[
-            { label: 'Porte', value: 'door' },
-            { label: 'Fenêtre', value: 'window' },
+            { label: 'Door', value: 'door' },
+            { label: 'Window', value: 'window' },
           ]}
           value={opening.type}
           onChange={(type) => update({ type: type as WallOpening['type'] })}
         />
       </Field>
 
-      <Field label="Largeur">
+      <Field label="Width">
         <Stepper
           value={unitsToCm(opening.width)}
           onChange={(cm) => update({ width: Math.max(MIN_OPENING_WIDTH, cmToUnits(cm)) })}
@@ -442,7 +442,7 @@ function OpeningPanel({ wall, opening, onUpdateOpening, onDeleteSelection, onSel
         </div>
       </Field>
 
-      <Field label="Position sur le mur" trailing={<span className="text-[11px] font-mono text-slate-400">{formatMeters(opening.offset)}</span>}>
+      <Field label="Position on wall" trailing={<span className="text-[11px] font-mono text-slate-400">{formatMeters(opening.offset)}</span>}>
         <input
           type="range"
           min={minOffset}
@@ -453,30 +453,30 @@ function OpeningPanel({ wall, opening, onUpdateOpening, onDeleteSelection, onSel
         />
         <div className="grid grid-cols-3 gap-1">
           <button type="button" onClick={() => update({ offset: minOffset })} className="py-1 rounded-md text-[10px] bg-slate-800/80 text-slate-400 hover:text-white cursor-pointer">
-            Début
+            Start
           </button>
           <button type="button" onClick={() => update({ offset: Math.round(len / 2) })} className="py-1 rounded-md text-[10px] bg-slate-800/80 text-slate-400 hover:text-white cursor-pointer">
-            Centre
+            Center
           </button>
           <button type="button" onClick={() => update({ offset: maxOffset })} className="py-1 rounded-md text-[10px] bg-slate-800/80 text-slate-400 hover:text-white cursor-pointer">
-            Fin
+            End
           </button>
         </div>
       </Field>
 
       {!isWindow && (
-        <Field label="Rendu">
+        <Field label="Render">
           <div className="space-y-1.5">
             <Toggle
               checked={!!opening.hide_door}
               onChange={(v) => update({ hide_door: v })}
-              label="Passage sans porte"
-              description="Garde l’ouverture dans le mur mais n’affiche ni porte ni cadre, en 2D comme en 3D."
+              label="Passage without door"
+              description="Keeps the wall opening but hides the door and frame, in both 2D and 3D."
             />
             {!opening.hide_door && (
               <>
-                <Toggle checked={!!opening.flip_side} onChange={(v) => update({ flip_side: v })} label="Ouvre de l’autre côté du mur" />
-                <Toggle checked={!!opening.flip_hinge} onChange={(v) => update({ flip_hinge: v })} label="Gonds à l’autre extrémité" />
+                <Toggle checked={!!opening.flip_side} onChange={(v) => update({ flip_side: v })} label="Opens on the other side of the wall" />
+                <Toggle checked={!!opening.flip_hinge} onChange={(v) => update({ flip_hinge: v })} label="Hinge at the other end" />
               </>
             )}
           </div>
@@ -490,12 +490,12 @@ function OpeningPanel({ wall, opening, onUpdateOpening, onDeleteSelection, onSel
           className="w-full h-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center justify-center gap-2 cursor-pointer"
         >
           <BrickWall className="w-3.5 h-3.5" />
-          Voir le mur porteur
+          View the parent wall
         </button>
-        <DangerButton onClick={onDeleteSelection}>Supprimer {isWindow ? 'la fenêtre' : 'l’ouverture'}</DangerButton>
+        <DangerButton onClick={onDeleteSelection}>Delete {isWindow ? 'window' : 'opening'}</DangerButton>
       </Field>
 
-      <Hint items={['Glissez l’ouverture le long du mur pour la repositionner.', 'Glissez ses poignées pour ajuster la largeur.']} />
+      <Hint items={['Drag the opening along the wall to reposition it.', 'Drag its handles to adjust the width.']} />
     </PanelShell>
   )
 }
@@ -544,8 +544,8 @@ function ZonePanel({ zone, devices, onUpdateZone, onDeleteSelection, onSelect }:
   const hasThresholds = zone.temp_min !== undefined || zone.temp_max !== undefined
 
   return (
-    <PanelShell icon={<Hexagon className="w-4 h-4" />} title={zone.name || 'Zone'} subtitle={`${zone.points.length} sommets`} onClose={() => onSelect(null)}>
-      <Field label="Nom">
+    <PanelShell icon={<Hexagon className="w-4 h-4" />} title={zone.name || 'Zone'} subtitle={`${zone.points.length} vertices`} onClose={() => onSelect(null)}>
+      <Field label="Name">
         <input
           type="text"
           value={zone.name}
@@ -553,24 +553,24 @@ function ZonePanel({ zone, devices, onUpdateZone, onDeleteSelection, onSelect }:
           className="w-full h-9 bg-slate-950 border border-slate-800 rounded-lg px-3 text-xs text-white focus:outline-none focus:border-indigo-500"
         />
       </Field>
-      <Field label="Couleur">
+      <Field label="Color">
         <ColorPicker value={zone.color} onChange={(color) => onUpdateZone(zone.id, { color })} />
       </Field>
 
       <div className="pt-2 border-t border-slate-800/80 space-y-3">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
           <Thermometer className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Capteurs d'ambiance</span>
+          <span>Ambient sensors</span>
         </div>
 
-        <Field label="Capteur de température">
+        <Field label="Temperature sensor">
           <div className="flex items-center gap-1.5">
             <select
               value={zone.temp_sensor || ''}
               onChange={(e) => onUpdateZone(zone.id, { temp_sensor: e.target.value || undefined })}
               className="flex-1 min-w-0 h-9 bg-slate-950 border border-slate-800 rounded-lg px-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 truncate"
             >
-              <option value="">Aucun capteur</option>
+              <option value="">No sensor</option>
               {tempOptions.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name ? `${d.name} (${d.id})` : d.id}
@@ -581,7 +581,7 @@ function ZonePanel({ zone, devices, onUpdateZone, onDeleteSelection, onSelect }:
               <button
                 type="button"
                 onClick={() => onUpdateZone(zone.id, { temp_sensor: undefined })}
-                title="Supprimer le capteur de température"
+                title="Remove temperature sensor"
                 className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer shrink-0"
               >
                 <X className="w-3.5 h-3.5" />
@@ -592,20 +592,20 @@ function ZonePanel({ zone, devices, onUpdateZone, onDeleteSelection, onSelect }:
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Seuils d'alerte température</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Temperature alert thresholds</span>
             {hasThresholds && (
               <button
                 type="button"
                 onClick={() => onUpdateZone(zone.id, { temp_min: undefined, temp_max: undefined })}
                 className="text-[10px] text-slate-500 hover:text-slate-300 underline cursor-pointer"
               >
-                Effacer les seuils
+                Clear thresholds
               </button>
             )}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="block text-[10px] text-slate-400">Alerte froid &lt;</label>
+              <label className="block text-[10px] text-slate-400">Cold alert &lt;</label>
               <div className="relative">
                 <input
                   type="number"
@@ -622,7 +622,7 @@ function ZonePanel({ zone, devices, onUpdateZone, onDeleteSelection, onSelect }:
               </div>
             </div>
             <div className="space-y-1">
-              <label className="block text-[10px] text-slate-400">Alerte chaud &gt;</label>
+              <label className="block text-[10px] text-slate-400">Hot alert &gt;</label>
               <div className="relative">
                 <input
                   type="number"
@@ -641,19 +641,19 @@ function ZonePanel({ zone, devices, onUpdateZone, onDeleteSelection, onSelect }:
           </div>
           {zone.temp_min !== undefined && zone.temp_max !== undefined && zone.temp_min > zone.temp_max && (
             <p className="text-[11px] text-rose-400 font-medium pt-0.5">
-              Attention : le seuil froid ({zone.temp_min}°C) est supérieur au seuil chaud ({zone.temp_max}°C).
+              Warning: the cold threshold ({zone.temp_min}°C) is higher than the hot threshold ({zone.temp_max}°C).
             </p>
           )}
         </div>
 
-        <Field label="Capteur d'humidité">
+        <Field label="Humidity sensor">
           <div className="flex items-center gap-1.5">
             <select
               value={zone.humidity_sensor || ''}
               onChange={(e) => onUpdateZone(zone.id, { humidity_sensor: e.target.value || undefined })}
               className="flex-1 min-w-0 h-9 bg-slate-950 border border-slate-800 rounded-lg px-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 truncate"
             >
-              <option value="">Aucun capteur</option>
+              <option value="">No sensor</option>
               {humOptions.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name ? `${d.name} (${d.id})` : d.id}
@@ -664,7 +664,7 @@ function ZonePanel({ zone, devices, onUpdateZone, onDeleteSelection, onSelect }:
               <button
                 type="button"
                 onClick={() => onUpdateZone(zone.id, { humidity_sensor: undefined })}
-                title="Supprimer le capteur d'humidité"
+                title="Remove humidity sensor"
                 className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer shrink-0"
               >
                 <X className="w-3.5 h-3.5" />
@@ -675,9 +675,9 @@ function ZonePanel({ zone, devices, onUpdateZone, onDeleteSelection, onSelect }:
       </div>
 
       <Field label="Actions">
-        <DangerButton onClick={onDeleteSelection}>Supprimer la zone</DangerButton>
+        <DangerButton onClick={onDeleteSelection}>Delete zone</DangerButton>
       </Field>
-      <Hint items={['Glissez la zone pour la déplacer.', 'Glissez un sommet pour ajuster le contour.']} />
+      <Hint items={['Drag the zone to move it.', 'Drag a vertex to adjust the outline.']} />
     </PanelShell>
   )
 }
@@ -700,7 +700,7 @@ function ColorPicker({ value, onChange, onPickName }: { value: string; onChange:
           style={{ backgroundColor: preset.value }}
         />
       ))}
-      <label className="relative w-6 h-6 rounded-full border-2 border-dashed border-slate-600 hover:border-slate-400 flex items-center justify-center cursor-pointer overflow-hidden" title="Couleur personnalisée">
+      <label className="relative w-6 h-6 rounded-full border-2 border-dashed border-slate-600 hover:border-slate-400 flex items-center justify-center cursor-pointer overflow-hidden" title="Custom color">
         <Palette className="w-3 h-3 text-slate-400" />
         <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" />
       </label>
@@ -719,7 +719,7 @@ function DevicePanel({ placement, devices, level, onUpdatePlacement, onDeleteSel
 
   return (
     <PanelShell icon={<Icon className="w-4 h-4" />} title={placement.custom_name || device?.name || placement.device_id} subtitle={placement.device_id} onClose={() => onSelect(null)}>
-      <Field label="Nom affiché">
+      <Field label="Display name">
         <input
           type="text"
           defaultValue={placement.custom_name || device?.name || ''}
@@ -744,7 +744,7 @@ function DevicePanel({ placement, devices, level, onUpdatePlacement, onDeleteSel
           >
             {allLayers.map((l) => (
               <option key={l} value={l}>
-                {l} {l === 'controls' ? '(défaut)' : ''}
+                {l} {l === 'controls' ? '(default)' : ''}
               </option>
             ))}
           </select>
@@ -752,7 +752,7 @@ function DevicePanel({ placement, devices, level, onUpdatePlacement, onDeleteSel
           <div className="flex items-center gap-1.5">
             <input
               type="text"
-              placeholder="Nouveau layer…"
+              placeholder="New layer…"
               key={`layer-input-${placement.id}`}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -778,41 +778,40 @@ function DevicePanel({ placement, devices, level, onUpdatePlacement, onDeleteSel
               className="h-8 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1 cursor-pointer shrink-0"
             >
               <Plus className="w-3 h-3" />
-              Affecter
+              Assign
             </button>
           </div>
           <p className="text-[11px] text-slate-500 leading-snug">
-            Assigne l’équipement à un Display Layer pour filtrer l'affichage par niveau.
+            Assigns the device to a Display Layer to filter the view per level.
           </p>
         </div>
       </Field>
 
-      <Field label="Affiché comme" trailing={<span className="text-[11px] text-slate-500">réel : {device?.domain ?? '—'}</span>}>
+      <Field label="Displayed as" trailing={<span className="text-[11px] text-slate-500">actual: {device?.domain ?? '—'}</span>}>
         <select
           value={placement.render_domain || ''}
           onChange={(e) => onUpdatePlacement(placement, { render_domain: e.target.value || undefined })}
           className="w-full h-9 bg-slate-950 border border-slate-800 rounded-lg px-2 text-xs text-white focus:outline-none focus:border-indigo-500"
         >
-          <option value="">Automatique</option>
-          {RENDER_DOMAIN_OPTIONS.map((opt) => (
+          <option value="">Automatic</option>{RENDER_DOMAIN_OPTIONS.map((opt) => (
             <option key={opt.key} value={opt.key}>
               {opt.label}
             </option>
           ))}
         </select>
         <p className="text-[11px] text-slate-500 leading-snug">
-          Utile pour une prise qui pilote une lampe : elle s’affichera comme une lumière dans les vues.
+          Useful for an outlet controlling a lamp: it will display as a light in the views.
         </p>
       </Field>
 
-      <Field label="État" trailing={<span className="text-[11px] font-mono text-slate-400">{device?.state ?? 'inconnu'}</span>}>
+      <Field label="State" trailing={<span className="text-[11px] font-mono text-slate-400">{device?.state ?? 'unknown'}</span>}>
         <div className="text-[11px] font-mono text-slate-500">
           x {Math.round(placement.x)} · y {Math.round(placement.y)}
         </div>
       </Field>
 
       <Field label="Actions">
-        <DangerButton onClick={onDeleteSelection}>Retirer du plan</DangerButton>
+        <DangerButton onClick={onDeleteSelection}>Remove from plan</DangerButton>
       </Field>
     </PanelShell>
   )
@@ -820,8 +819,8 @@ function DevicePanel({ placement, devices, level, onUpdatePlacement, onDeleteSel
 
 function WallToolPanel({ settings, onSettings, wallDrafting, onCancelWall }: InspectorProps) {
   return (
-    <PanelShell icon={<BrickWall className="w-4 h-4" />} title="Tracer des murs" subtitle="Raccourci W">
-      <Field label="Épaisseur des nouveaux murs" trailing={<span className="text-[11px] font-mono text-slate-400">{unitsToCm(settings.wallThickness)} cm</span>}>
+    <PanelShell icon={<BrickWall className="w-4 h-4" />} title="Draw walls" subtitle="Shortcut W">
+      <Field label="New wall thickness" trailing={<span className="text-[11px] font-mono text-slate-400">{unitsToCm(settings.wallThickness)} cm</span>}>
         <Segmented
           options={WALL_THICKNESS_PRESETS.map((p) => ({ label: p.label, value: p.value, hint: `${unitsToCm(p.value)} cm` }))}
           value={settings.wallThickness}
@@ -836,16 +835,16 @@ function WallToolPanel({ settings, onSettings, wallDrafting, onCancelWall }: Ins
           className="w-full h-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center justify-center gap-2 cursor-pointer"
         >
           <X className="w-3.5 h-3.5" />
-          Terminer le tracé (Échap)
+          Finish drawing (Escape)
         </button>
       )}
 
       <Hint
         items={[
-          'Cliquez pour poser le départ, puis chaque coin : les murs s’enchaînent.',
-          'Le curseur s’aimante aux extrémités existantes pour fermer les pièces proprement.',
-          'Maj : verrouille horizontal / vertical.',
-          'Échap, Entrée ou double-clic : termine la chaîne.',
+          'Click to place the start point, then each corner: walls chain together.',
+          'Cursor snaps to existing endpoints for clean room closure.',
+          'Shift: lock to horizontal / vertical.',
+          'Escape, Enter or double-click: finish the chain.',
         ]}
       />
     </PanelShell>
@@ -861,10 +860,10 @@ function OpeningToolPanel({ tool, settings, onSettings }: InspectorProps) {
   return (
     <PanelShell
       icon={isDoor ? <DoorOpen className="w-4 h-4" /> : <AppWindow className="w-4 h-4" />}
-      title={isDoor ? 'Poser une porte' : 'Poser une fenêtre'}
-      subtitle={isDoor ? 'Raccourci D' : 'Raccourci F'}
+      title={isDoor ? 'Place a door' : 'Place a window'}
+      subtitle={isDoor ? 'Shortcut D' : 'Shortcut F'}
     >
-      <Field label="Largeur par défaut">
+      <Field label="Default width">
         <Stepper value={unitsToCm(width)} onChange={(cm) => setWidth(Math.max(MIN_OPENING_WIDTH, cmToUnits(cm)))} step={5} min={unitsToCm(MIN_OPENING_WIDTH)} unit="cm" />
         <div className="grid grid-cols-5 gap-1">
           {presets.map((p) => (
@@ -883,38 +882,38 @@ function OpeningToolPanel({ tool, settings, onSettings }: InspectorProps) {
       </Field>
 
       {isDoor && (
-        <Field label="Rendu">
+        <Field label="Render">
           <Toggle
             checked={settings.doorAsPassage}
             onChange={(v) => onSettings({ doorAsPassage: v })}
-            label="Créer des passages sans porte"
-            description="Les nouvelles ouvertures percent le mur sans afficher de porte."
+            label="Create passages without doors"
+            description="New openings cut through the wall without showing a door."
           />
         </Field>
       )}
 
-      <Hint items={['Survolez un mur : un aperçu se cale dessus.', 'Cliquez pour poser l’ouverture, puis ajustez-la depuis l’outil Sélection.']} />
+      <Hint items={['Hover over a wall: a preview snaps onto it.', 'Click to place the opening, then adjust it from the Selection tool.']} />
     </PanelShell>
   )
 }
 
 function ZoneToolPanel({ settings, onSettings, zoneDraftCount, onCompleteZone, onCancelZone }: InspectorProps) {
   return (
-    <PanelShell icon={<Hexagon className="w-4 h-4" />} title="Dessiner une zone" subtitle="Raccourci Z">
-      <Field label="Nom">
+    <PanelShell icon={<Hexagon className="w-4 h-4" />} title="Draw a zone" subtitle="Shortcut Z">
+      <Field label="Name">
         <input
           type="text"
           value={settings.zoneName}
           onChange={(e) => onSettings({ zoneName: e.target.value })}
-          placeholder="Salon, Cuisine…"
+          placeholder="Living room, Kitchen…"
           className="w-full h-9 bg-slate-950 border border-slate-800 rounded-lg px-3 text-xs text-white focus:outline-none focus:border-indigo-500 placeholder:text-slate-600"
         />
       </Field>
-      <Field label="Couleur">
+      <Field label="Color">
         <ColorPicker value={settings.zoneColor} onChange={(zoneColor) => onSettings({ zoneColor })} onPickName={(zoneName) => onSettings({ zoneName })} />
       </Field>
 
-      <Field label="Tracé en cours" trailing={<span className="text-[11px] font-mono text-slate-400">{zoneDraftCount} points</span>}>
+      <Field label="Ongoing outline" trailing={<span className="text-[11px] font-mono text-slate-400">{zoneDraftCount} points</span>}>
         <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
@@ -923,7 +922,7 @@ function ZoneToolPanel({ settings, onSettings, zoneDraftCount, onCompleteZone, o
             className="h-9 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Check className="w-3.5 h-3.5" />
-            Fermer
+            Close
           </button>
           <button
             type="button"
@@ -932,12 +931,12 @@ function ZoneToolPanel({ settings, onSettings, zoneDraftCount, onCompleteZone, o
             className="h-9 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
-            Abandonner
+            Cancel
           </button>
         </div>
       </Field>
 
-      <Hint items={['Cliquez pour poser chaque sommet.', 'Cliquez sur le premier point, appuyez sur Entrée ou double-cliquez pour fermer la zone.']} />
+      <Hint items={['Click to place each vertex.', 'Click the first point, press Enter or double-click to close the zone.']} />
     </PanelShell>
   )
 }
@@ -945,13 +944,13 @@ function ZoneToolPanel({ settings, onSettings, zoneDraftCount, onCompleteZone, o
 function SelectToolPanel({ plan, placements }: InspectorProps) {
   const openings = plan.walls.reduce((acc, w) => acc + (w.openings?.length ?? 0), 0)
   const stats = [
-    { label: 'Murs', value: plan.walls.length },
-    { label: 'Ouvertures', value: openings },
+    { label: 'Walls', value: plan.walls.length },
+    { label: 'Openings', value: openings },
     { label: 'Zones', value: plan.zones.length },
-    { label: 'Appareils', value: placements.length },
+    { label: 'Devices', value: placements.length },
   ]
   return (
-    <PanelShell icon={<MousePointer2 className="w-4 h-4" />} title="Sélection" subtitle="Raccourci V">
+    <PanelShell icon={<MousePointer2 className="w-4 h-4" />} title="Selection" subtitle="Shortcut V">
       <div className="grid grid-cols-2 gap-2">
         {stats.map((s) => (
           <div key={s.label} className="rounded-lg bg-slate-800/50 border border-slate-800 p-3">
@@ -962,22 +961,22 @@ function SelectToolPanel({ plan, placements }: InspectorProps) {
       </div>
       <Hint
         items={[
-          'Cliquez un mur, une ouverture, une zone ou un appareil pour l’éditer ici.',
-          'Glissez pour déplacer. Les murs entraînent leurs jonctions (Alt pour détacher).',
-          'Suppr efface la sélection, Ctrl+Z annule, Ctrl+S enregistre.',
+          'Click a wall, opening, zone or device to edit it here.',
+          'Drag to move. Walls pull their joints (Alt to detach).',
+          'Delete clears the selection, Ctrl+Z undoes, Ctrl+S saves.',
         ]}
       />
       <div className="rounded-lg border border-slate-800 p-3 space-y-1.5">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Raccourcis</div>
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Shortcuts</div>
         {[
-          ['V', 'Sélection'],
-          ['W', 'Mur'],
-          ['D', 'Porte'],
-          ['F', 'Fenêtre'],
+          ['V', 'Selection'],
+          ['W', 'Wall'],
+          ['D', 'Door'],
+          ['F', 'Window'],
           ['Z', 'Zone'],
-          ['H', 'Déplacer la vue'],
-          ['G', 'Aimantation'],
-          ['Espace', 'Déplacer (maintenu)'],
+          ['H', 'Move view'],
+          ['G', 'Snap'],
+          ['Space', 'Move (hold)'],
         ].map(([key, label]) => (
           <div key={key} className="flex items-center justify-between text-[11px]">
             <span className="text-slate-400">{label}</span>

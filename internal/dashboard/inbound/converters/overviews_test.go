@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/converters"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,11 +15,11 @@ func TestOverviewConverters(t *testing.T) {
 
 	t.Run("ToDomainOverview converts CreateOverviewRequest and defaults grid size", func(t *testing.T) {
 		req := pkgdashboard.CreateOverviewRequest{
-			Name:  "Tableau Salon",
+			Name:  "Living Room Dashboard",
 			Order: 2,
 		}
 		res := converters.ToDomainOverview(req)
-		assert.Equal(t, "Tableau Salon", res.Name)
+		assert.Equal(t, "Living Room Dashboard", res.Name)
 		assert.Equal(t, 2, res.Order)
 		assert.Equal(t, domain.DefaultGridCols, res.Cols)
 		assert.Equal(t, domain.DefaultGridRows, res.Rows)
@@ -27,7 +27,7 @@ func TestOverviewConverters(t *testing.T) {
 
 	t.Run("ToDomainOverview preserves an explicit grid size", func(t *testing.T) {
 		req := pkgdashboard.CreateOverviewRequest{
-			Name: "Tableau Salon",
+			Name: "Living Room Dashboard",
 			Cols: 6,
 			Rows: 4,
 		}
@@ -38,14 +38,14 @@ func TestOverviewConverters(t *testing.T) {
 
 	t.Run("ToDomainUpdateOverview converts UpdateOverviewRequest", func(t *testing.T) {
 		req := pkgdashboard.UpdateOverviewRequest{
-			Name:  "Tableau Mis à Jour",
+			Name:  "Updated Dashboard",
 			Order: 3,
 			Cols:  10,
 			Rows:  6,
 		}
 		res := converters.ToDomainUpdateOverview("ov-1", req)
 		assert.Equal(t, "ov-1", res.ID)
-		assert.Equal(t, "Tableau Mis à Jour", res.Name)
+		assert.Equal(t, "Updated Dashboard", res.Name)
 		assert.Equal(t, 3, res.Order)
 		assert.Equal(t, 10, res.Cols)
 		assert.Equal(t, 6, res.Rows)
@@ -54,7 +54,7 @@ func TestOverviewConverters(t *testing.T) {
 	t.Run("ToDomainWidget converts CreateWidgetRequest", func(t *testing.T) {
 		req := pkgdashboard.CreateWidgetRequest{
 			Type:    "automation_list",
-			Title:   "Scénarios Rapides",
+			Title:   "Quick Scenes",
 			Order:   1,
 			Col:     2,
 			Row:     3,
@@ -68,7 +68,7 @@ func TestOverviewConverters(t *testing.T) {
 		res := converters.ToDomainWidget("ov-1", req)
 		assert.Equal(t, "ov-1", res.DashboardID)
 		assert.Equal(t, "automation_list", res.Type)
-		assert.Equal(t, "Scénarios Rapides", res.Title)
+		assert.Equal(t, "Quick Scenes", res.Title)
 		assert.Equal(t, 2, res.Col)
 		assert.Equal(t, 3, res.Row)
 		assert.Equal(t, 2, res.ColSpan)
@@ -166,14 +166,14 @@ func TestOverviewConverters(t *testing.T) {
 	t.Run("ToPublicAutomation converts domain Automation", func(t *testing.T) {
 		auto := domain.Automation{
 			ID:            "automation.cinema",
-			Name:          "Mode Cinéma",
+			Name:          "Cinema Mode",
 			State:         "on",
 			Current:       1,
 			LastTriggered: &now,
 		}
 		pub := converters.ToPublicAutomation(auto)
 		assert.Equal(t, "automation.cinema", pub.ID)
-		assert.Equal(t, "Mode Cinéma", pub.Name)
+		assert.Equal(t, "Cinema Mode", pub.Name)
 		assert.Equal(t, "on", pub.State)
 		assert.Equal(t, 1, pub.Current)
 		assert.Equal(t, &now, pub.LastTriggered)

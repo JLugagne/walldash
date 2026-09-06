@@ -14,7 +14,7 @@ describe('ceilingDisplay utils', () => {
   const mockDevices: Record<string, Device> = {
     'sensor.salon_temp': {
       id: 'sensor.salon_temp',
-      name: 'Température Salon',
+      name: 'Living Room Temperature',
       domain: 'sensor',
       state: '21.4',
       attributes: { unit_of_measurement: '°C' },
@@ -22,7 +22,7 @@ describe('ceilingDisplay utils', () => {
     },
     'sensor.salon_humidity': {
       id: 'sensor.salon_humidity',
-      name: 'Humidité Salon',
+      name: 'Living Room Humidity',
       domain: 'sensor',
       state: '48',
       attributes: { unit_of_measurement: '%' },
@@ -38,7 +38,7 @@ describe('ceilingDisplay utils', () => {
     },
     'sensor.unavailable_temp': {
       id: 'sensor.unavailable_temp',
-      name: 'Temp Inconnue',
+      name: 'Unknown Temp',
       domain: 'sensor',
       state: 'unavailable',
       attributes: {},
@@ -50,7 +50,7 @@ describe('ceilingDisplay utils', () => {
     it('returns false when neither temp_sensor nor humidity_sensor is set', () => {
       const zone: Zone = {
         id: 'z1',
-        name: 'Cuisine',
+        name: 'Kitchen',
         color: '#ff0000',
         points: [],
       }
@@ -60,7 +60,7 @@ describe('ceilingDisplay utils', () => {
     it('returns true when temp_sensor is configured', () => {
       const zone: Zone = {
         id: 'z1',
-        name: 'Salon',
+        name: 'Living Room',
         color: '#ff0000',
         points: [],
         temp_sensor: 'sensor.salon_temp',
@@ -71,7 +71,7 @@ describe('ceilingDisplay utils', () => {
     it('returns true when humidity_sensor is configured', () => {
       const zone: Zone = {
         id: 'z1',
-        name: 'SDB',
+        name: 'Bathroom',
         color: '#ff0000',
         points: [],
         humidity_sensor: 'sensor.salon_humidity',
@@ -84,7 +84,7 @@ describe('ceilingDisplay utils', () => {
     it('returns null when no sensors configured for the zone', () => {
       const zone: Zone = {
         id: 'z1',
-        name: 'Couloir',
+        name: 'Hallway',
         color: '#ffffff',
         points: [],
       }
@@ -94,7 +94,7 @@ describe('ceilingDisplay utils', () => {
     it('formats temperature alone when only temp_sensor is configured', () => {
       const zone: Zone = {
         id: 'z1',
-        name: 'Salon',
+        name: 'Living Room',
         color: '#ffffff',
         points: [],
         temp_sensor: 'sensor.salon_temp',
@@ -105,7 +105,7 @@ describe('ceilingDisplay utils', () => {
     it('formats humidity alone when only humidity_sensor is configured', () => {
       const zone: Zone = {
         id: 'z1',
-        name: 'Salon',
+        name: 'Living Room',
         color: '#ffffff',
         points: [],
         humidity_sensor: 'sensor.salon_humidity',
@@ -116,7 +116,7 @@ describe('ceilingDisplay utils', () => {
     it('formats combined metrics "21.4°C · 48%" when both are present', () => {
       const zone: Zone = {
         id: 'z1',
-        name: 'Salon',
+        name: 'Living Room',
         color: '#ffffff',
         points: [],
         temp_sensor: 'sensor.salon_temp',
@@ -128,7 +128,7 @@ describe('ceilingDisplay utils', () => {
     it('extracts temperature from climate current_temperature', () => {
       const zone: Zone = {
         id: 'z1',
-        name: 'Chambre',
+        name: 'Bedroom',
         color: '#ffffff',
         points: [],
         temp_sensor: 'climate.thermostat',
@@ -175,14 +175,14 @@ describe('ceilingDisplay utils', () => {
 
   describe('getZoneCeilingText', () => {
     it('returns uppercase zone name when no sensors are configured', () => {
-      const zone: Zone = { id: 'z1', name: 'Salon de Thé', color: '#fff', points: [] }
-      expect(getZoneCeilingText(zone, mockDevices)).toBe('SALON DE THÉ')
+      const zone: Zone = { id: 'z1', name: 'Tea Room', color: '#fff', points: [] }
+      expect(getZoneCeilingText(zone, mockDevices)).toBe('TEA ROOM')
     })
 
     it('returns formatted metrics and hides zone name when sensors are configured', () => {
       const zone: Zone = {
         id: 'z1',
-        name: 'Salon',
+        name: 'Living Room',
         color: '#fff',
         points: [],
         temp_sensor: 'sensor.salon_temp',
@@ -261,7 +261,7 @@ describe('ceilingDisplay utils', () => {
     it('returns minimal metrics when no sensors configured on zone', () => {
       const zone: Zone = {
         id: 'z-empty',
-        name: 'Couloir',
+        name: 'Hallway',
         color: '#ff0000',
         points: [],
       }
@@ -300,7 +300,7 @@ describe('ceilingDisplay utils', () => {
     it('returns cold alert state when temp < temp_min', () => {
       const zone: Zone = {
         id: 'z-cold',
-        name: 'Bureau',
+        name: 'Office',
         color: '#3b82f6',
         points: [],
         temp_sensor: 'sensor.salon_temp', // 21.4
@@ -317,7 +317,7 @@ describe('ceilingDisplay utils', () => {
     it('returns hot alert state when temp > temp_max', () => {
       const zone: Zone = {
         id: 'z-hot',
-        name: 'Cuisine',
+        name: 'Kitchen',
         color: '#3b82f6',
         points: [],
         temp_sensor: 'sensor.salon_temp', // 21.4

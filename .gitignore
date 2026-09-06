@@ -6,6 +6,7 @@
 *.dylib
 bin/
 ha-dash
+walldash
 
 # Test binary, artifacts, coverage
 *.test

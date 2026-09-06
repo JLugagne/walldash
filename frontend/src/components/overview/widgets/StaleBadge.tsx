@@ -12,8 +12,8 @@ interface StaleBadgeProps {
 export const StaleBadge: React.FC<StaleBadgeProps> = ({ className = '' }) => (
   <span
     role="img"
-    aria-label="Valeur non fraîche"
-    title="Dernière valeur connue, non rafraîchie récemment"
+    aria-label="Stale value"
+    title="Last known value, not recently refreshed"
     className={`inline-flex items-center justify-center w-4 h-4 shrink-0 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-400 ${className}`}
   >
     <AlertTriangle className="w-2.5 h-2.5" />

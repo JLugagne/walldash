@@ -5,12 +5,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/app"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	repohealthtest "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health/healthtest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow/uowtest"
-	svchealthtest "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/health/healthtest"
+	"github.com/JLugagne/walldash/internal/dashboard/app"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	repohealthtest "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/health/healthtest"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow/uowtest"
+	svchealthtest "github.com/JLugagne/walldash/internal/dashboard/domain/service/health/healthtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

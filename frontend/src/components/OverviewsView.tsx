@@ -23,7 +23,7 @@ interface OverviewsViewProps {
 
 const STALE_MS = 30 * 60 * 1000
 const TOAST_MS = 3000
-const NETWORK_ERROR_MESSAGE = 'Connexion au serveur impossible, modification non enregistrée.'
+const NETWORK_ERROR_MESSAGE = 'Unable to reach the server, change not saved.'
 
 function parseNumericState(state: string | undefined): number | null {
   if (state === undefined) return null
@@ -132,7 +132,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
       const res = await apiFetch('/api/overviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Vue Synthétique', order: 0 }),
+        body: JSON.stringify({ name: 'Overview', order: 0 }),
       })
       if (res.ok) {
         const payload = await res.json()
@@ -142,7 +142,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               type: 'automation_list',
-              title: 'Automatisations Rapides',
+              title: 'Quick Automations',
               order: 0,
               config: {
                 entity_ids: automations.slice(0, 3).map((a) => a.id),
@@ -196,7 +196,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
   }
 
   const handleDeleteOverview = async (id: string) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce tableau de bord ?')) return
+    if (!window.confirm('Are you sure you want to delete this dashboard?')) return
 
     try {
       const res = await apiFetch(`/api/overviews/${id}`, {
@@ -241,7 +241,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
 
   const handleDeleteWidget = async (widgetId: string) => {
     if (!activeOverviewId) return
-    if (!window.confirm('Supprimer ce widget ?')) return
+    if (!window.confirm('Delete this widget?')) return
 
     try {
       const res = await apiFetch(`/api/overviews/${activeOverviewId}/widgets/${widgetId}`, {
@@ -348,17 +348,17 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
         {loading ? (
           <div className="h-full flex items-center justify-center text-slate-400">
             <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-            <span>Chargement des Overviews...</span>
+            <span>Loading Overviews...</span>
           </div>
         ) : overviews.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8">
             <div className="p-4 rounded-2xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 mb-4 shadow-xl">
               <LayoutDashboard className="w-10 h-10" />
             </div>
-            <h2 className="text-lg font-bold text-white mb-2">Aucun Overview Dashboard</h2>
+            <h2 className="text-lg font-bold text-white mb-2">No Overview Dashboard</h2>
             <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
-              Les Overview Dashboards regroupent vos widgets d'automatisations et capteurs
-              pour un pilotage tactile rapide.
+              Overview Dashboards group your automation and sensor widgets
+              for quick touch-based control.
             </p>
             <button
               type="button"
@@ -366,12 +366,12 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
               className="flex items-center space-x-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xl shadow-indigo-600/30 transition-all"
             >
               <Plus className="w-4 h-4" />
-              <span>Créer mon premier Overview</span>
+              <span>Create my first Overview</span>
             </button>
           </div>
         ) : !activeOverview ? (
           <div className="text-center py-12 text-slate-500 text-sm">
-            Sélectionnez un Overview ci-dessus.
+            Select an Overview above.
           </div>
         ) : activeOverview.widgets.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8">
@@ -379,11 +379,11 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
               <Settings className="w-8 h-8" />
             </div>
             <h3 className="text-base font-bold text-white mb-1">
-              Tableau "{activeOverview.name}" vide
+              Dashboard "{activeOverview.name}" is empty
             </h3>
             <p className="text-xs text-slate-400 max-w-sm mb-5">
-              Ajoutez votre premier widget pour afficher vos capteurs, piloter vos appareils ou
-              déclencher vos automatisations Home Assistant préférées.
+              Add your first widget to display your sensors, control your devices or
+              trigger your favorite Home Assistant automations.
             </p>
             {isAdmin && (
               <button
@@ -392,7 +392,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
                 className="flex items-center space-x-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all"
               >
                 <Plus className="w-4 h-4" />
-                <span>Ajouter un Widget</span>
+                <span>Add a Widget</span>
               </button>
             )}
           </div>

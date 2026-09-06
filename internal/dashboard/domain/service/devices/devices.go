@@ -3,7 +3,7 @@ package devices
 import (
 	"context"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 )
 
 // DeviceQueries defines read-only operations for Home Assistant devices and level placements.

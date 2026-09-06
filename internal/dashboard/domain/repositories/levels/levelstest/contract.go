@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/levels"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -70,7 +70,7 @@ func LevelRepositoryContractTesting(t *testing.T, repo levels.LevelRepository) {
 	t.Run("Contract: Create and FindByID retrieves stored level", func(t *testing.T) {
 		lvl := domain.Level{
 			ID:        "lvl-contract-1",
-			Name:      "Rez-de-chaussée",
+			Name:      "Ground Floor",
 			Order:     1,
 			IsOutdoor: false,
 			CreatedAt: time.Now().UTC().Truncate(time.Second),
@@ -104,7 +104,7 @@ func LevelRepositoryContractTesting(t *testing.T, repo levels.LevelRepository) {
 	t.Run("Contract: FindAll returns levels in ascending order", func(t *testing.T) {
 		l1 := domain.Level{
 			ID:        "lvl-sort-2",
-			Name:      "Étage 1",
+			Name:      "1st Floor",
 			Order:     2,
 			IsOutdoor: false,
 			CreatedAt: time.Now().UTC(),
@@ -137,7 +137,7 @@ func LevelRepositoryContractTesting(t *testing.T, repo levels.LevelRepository) {
 	t.Run("Contract: Update modifies level details", func(t *testing.T) {
 		lvl := domain.Level{
 			ID:        "lvl-update-1",
-			Name:      "Jardin Original",
+			Name:      "Original Garden",
 			Order:     3,
 			IsOutdoor: true,
 			CreatedAt: time.Now().UTC().Truncate(time.Second),
@@ -146,19 +146,19 @@ func LevelRepositoryContractTesting(t *testing.T, repo levels.LevelRepository) {
 		_, err := repo.Create(ctx, lvl)
 		require.NoError(t, err)
 
-		lvl.Name = "Jardin Modifié"
+		lvl.Name = "Modified Garden"
 		lvl.IsOutdoor = true
 		lvl.Layers = []string{"controls", "plants", "lighting"}
 		lvl.UpdatedAt = time.Now().UTC().Truncate(time.Second)
 
 		updated, err := repo.Update(ctx, lvl)
 		require.NoError(t, err)
-		assert.Equal(t, "Jardin Modifié", updated.Name)
+		assert.Equal(t, "Modified Garden", updated.Name)
 		assert.Equal(t, []string{"controls", "plants", "lighting"}, updated.Layers)
 
 		found, err := repo.FindByID(ctx, lvl.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "Jardin Modifié", found.Name)
+		assert.Equal(t, "Modified Garden", found.Name)
 		assert.Equal(t, []string{"controls", "plants", "lighting"}, found.Layers)
 	})
 
@@ -211,7 +211,7 @@ func LevelRepositoryContractTesting(t *testing.T, repo levels.LevelRepository) {
 	t.Run("Contract: Delete removes an existing level", func(t *testing.T) {
 		lvl := domain.Level{
 			ID:        "lvl-del-1",
-			Name:      "À Supprimer",
+			Name:      "To Delete",
 			Order:     50,
 			CreatedAt: time.Now().UTC(),
 			UpdatedAt: time.Now().UTC(),

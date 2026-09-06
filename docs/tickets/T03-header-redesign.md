@@ -4,7 +4,7 @@ Kind: design. Depends on: T00 (edits `overview/OverviewHeader.tsx`).
 
 ## Problem (verified)
 The sub-header is `flex-wrap px-6 py-3`: 81 px tall in user mode and it grows when admin
-controls appear (rename, delete, Mode Édition, Ajouter un Widget, Mode Admin Actif). Tabs are
+controls appear (rename, delete, Edit Mode, Add Widget, Active Admin Mode). Tabs are
 32 px tall and icon buttons 30 px, below the 44 px touch target the rest of the app uses
 (`LevelSelector` 40 px rows, `NavigationControls` 44 px). The 2D editor already has a fixed
 `h-14` header (`components/editor/EditorHeader.tsx`); the 3D view uses floating 48 px FABs.
@@ -19,9 +19,9 @@ File: `frontend/src/components/overview/OverviewHeader.tsx`. Mirror `EditorHeade
   (`overflow-x-auto [scrollbar-width:none]`), each tab `h-10 px-4 rounded-xl`. Active tab
   indigo, others slate as today.
 - Right, user mode: only the admin toggle (icon + short label, `h-10`).
-- Right, admin mode: `Ajouter` (primary, `h-10`), `Disposition` toggle (`h-10`, cyan when active,
+- Right, admin mode: `Add` (primary, `h-10`), `Disposition` toggle (`h-10`, cyan when active,
   same styling as today), and a `MoreHorizontal` overflow menu (`h-10 w-10`) containing
-  `Nouvel Overview`, `Renommer`, `Supprimer` (red). Click-outside closes it (same pattern as
+  `New Overview`, `Rename`, `Delete` (red). Click-outside closes it (same pattern as
   `EditorHeader`/`ViewModeMenu`).
 - Create and rename become a small popover/inline form anchored under the header
   (`absolute top-full`), not inline in the tab strip, so the header height never changes.

@@ -3,7 +3,7 @@ package overviews
 import (
 	"context"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 )
 
 // OverviewQueries defines read-only operations for overview dashboards and automations.

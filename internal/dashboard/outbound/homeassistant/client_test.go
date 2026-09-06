@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/ha/hatest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/outbound/homeassistant"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/ha/hatest"
+	"github.com/JLugagne/walldash/internal/dashboard/outbound/homeassistant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +28,7 @@ func TestHomeAssistantClient_RealServer(t *testing.T) {
 			"entity_id": "light.living_room",
 			"state":     "on",
 			"attributes": map[string]any{
-				"friendly_name": "Salon Plafonnier",
+				"friendly_name": "Living Room Ceiling Light",
 				"brightness":    255,
 			},
 		},
@@ -36,14 +36,14 @@ func TestHomeAssistantClient_RealServer(t *testing.T) {
 			"entity_id": "switch.kitchen_plug",
 			"state":     "off",
 			"attributes": map[string]any{
-				"friendly_name": "Prise Cuisine",
+				"friendly_name": "Kitchen Plug",
 			},
 		},
 		{
 			"entity_id": "sensor.living_temp",
 			"state":     "21.5",
 			"attributes": map[string]any{
-				"friendly_name":       "Température Salon",
+				"friendly_name":       "Living Room Temperature",
 				"unit_of_measurement": "°C",
 			},
 		},
@@ -52,7 +52,7 @@ func TestHomeAssistantClient_RealServer(t *testing.T) {
 			"entity_id": "camera.front_door",
 			"state":     "idle",
 			"attributes": map[string]any{
-				"friendly_name": "Caméra Entrée",
+				"friendly_name": "Entrance Camera",
 			},
 		},
 		{
@@ -116,7 +116,7 @@ func TestHomeAssistantClient_RealServer(t *testing.T) {
 		dev, err := client.GetState(ctx, "light.living_room")
 		require.NoError(t, err)
 		assert.Equal(t, "light.living_room", dev.ID)
-		assert.Equal(t, "Salon Plafonnier", dev.Name)
+		assert.Equal(t, "Living Room Ceiling Light", dev.Name)
 		assert.Equal(t, "on", dev.State)
 	})
 

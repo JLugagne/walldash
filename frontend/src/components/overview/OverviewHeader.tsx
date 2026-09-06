@@ -151,11 +151,11 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
           <button
             type="button"
             onClick={onAddWidget}
-            title="Ajouter un widget"
+            title="Add widget"
             className="h-10 px-3.5 rounded-xl text-xs font-bold flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Ajouter</span>
+            <span>Add</span>
           </button>
         )}
 
@@ -164,7 +164,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
             type="button"
             onClick={onToggleEditMode}
             aria-pressed={isEditMode}
-            title={isEditMode ? 'Terminer la disposition' : 'Modifier la disposition'}
+            title={isEditMode ? 'Finish layout' : 'Edit layout'}
             className={`h-10 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
               isEditMode
                 ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-sm shadow-cyan-500/20'
@@ -172,7 +172,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
             }`}
           >
             <LayoutGrid className="w-4 h-4" />
-            <span>Disposition</span>
+            <span>Layout</span>
           </button>
         )}
 
@@ -184,7 +184,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
                 closeForm()
                 setMoreOpen((v) => !v)
               }}
-              title="Plus d'actions"
+              title="More actions"
               aria-haspopup="menu"
               aria-expanded={moreOpen}
               className={`h-10 w-10 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
@@ -205,7 +205,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
                   className="h-10 flex items-center gap-2 px-3 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-slate-800 text-left cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Nouvel Overview</span>
+                  <span>New Overview</span>
                 </button>
                 {activeOverview && (
                   <button
@@ -215,7 +215,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
                     className="h-10 flex items-center gap-2 px-3 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-slate-800 text-left cursor-pointer"
                   >
                     <Edit2 className="w-4 h-4" />
-                    <span>Renommer</span>
+                    <span>Rename</span>
                   </button>
                 )}
                 {activeOverview && (
@@ -229,7 +229,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
                     className="h-10 flex items-center gap-2 px-3 rounded-lg text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-left cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span>Supprimer</span>
+                    <span>Delete</span>
                   </button>
                 )}
               </div>
@@ -241,7 +241,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
           type="button"
           onClick={handleToggleAdmin}
           aria-pressed={isAdmin}
-          title={isAdmin ? 'Quitter le mode admin' : 'Passer en mode admin'}
+          title={isAdmin ? 'Exit admin mode' : 'Enter admin mode'}
           className={`h-10 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
             isAdmin
               ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/20'
@@ -249,7 +249,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
           }`}
         >
           <SlidersHorizontal className="w-4 h-4" />
-          <span>{isAdmin ? 'Admin' : 'Utilisateur'}</span>
+          <span>{isAdmin ? 'Admin' : 'User'}</span>
         </button>
       </div>
 
@@ -259,7 +259,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
           className="absolute right-3 top-full mt-2 z-40 w-80 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl shadow-black/60 p-3 flex flex-col gap-2"
         >
           <label htmlFor="overview-name-input" className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            {openForm === 'create' ? 'Nouvel Overview' : `Renommer « ${activeOverview?.name ?? ''} »`}
+            {openForm === 'create' ? 'New Overview' : `Rename "${activeOverview?.name ?? ''}"`}
           </label>
           <div className="flex items-center gap-2">
             <input
@@ -273,7 +273,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
               onKeyDown={(e) => {
                 if (e.key === 'Escape') closeForm()
               }}
-              placeholder="Nom de l'overview..."
+              placeholder="Overview name..."
               autoFocus
               disabled={submitting}
               className="h-10 flex-1 min-w-0 bg-slate-800 border border-indigo-500 rounded-lg px-3 text-sm text-white placeholder-slate-500 focus:outline-none disabled:opacity-60"
@@ -281,7 +281,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
             <button
               type="submit"
               disabled={submitting || !formValue.trim()}
-              title="Valider"
+              title="Confirm"
               className="h-10 w-10 shrink-0 rounded-lg flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
             >
               <Check className="w-4 h-4" />
@@ -289,7 +289,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
             <button
               type="button"
               onClick={closeForm}
-              title="Annuler"
+              title="Cancel"
               className="h-10 w-10 shrink-0 rounded-lg flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
             >
               <X className="w-4 h-4" />

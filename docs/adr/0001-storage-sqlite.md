@@ -1,4 +1,4 @@
-# 1. Utilisation de SQLite pour le stockage local
+# 1. Use of SQLite for local storage
 
 Date: 2026-09-02
 
@@ -8,15 +8,15 @@ Accepted
 
 ## Context
 
-L'application doit persister la définition des niveaux (niveaux intérieurs, jardins extérieurs, ordonnancement), le tracé des plans (murs, zones vectorielles), les placements de devices et la liste des automatisations favorites.
-Une base de données PostgreSQL a été envisagée mais ajouterait une dépendance externe lourde non requise pour un dashboard local embarqué.
+The application must persist level definitions (interior levels, outdoor gardens, ordering), plan layouts (walls, vector zones), device placements, and the list of favorite automations.
+A PostgreSQL database was considered but would add a heavy external dependency not required for an embedded local dashboard.
 
 ## Decision
 
-Utiliser SQLite pour la persistance locale via un adaptateur outbound dédié. Les schémas et migrations seront appliqués automatiquement au démarrage du backend.
+Use SQLite for local persistence via a dedicated outbound adapter. Schemas and migrations will be applied automatically at backend startup.
 
 ## Consequences
 
-- Déploiement mono-binaire ou conteneur autonome sans service PostgreSQL additionnel.
-- Sauvegarde et restauration simplifiées (simple fichier de base de données).
-- Concurrence en écriture limitée mais largement suffisante pour un usage de configuration de dashboard domestique.
+- Single-binary deployment or standalone container without an additional PostgreSQL service.
+- Simplified backup and restore (a single database file).
+- Limited write concurrency but more than sufficient for home dashboard configuration usage.

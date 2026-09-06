@@ -1,7 +1,7 @@
 package dashboard
 
 import (
-	"github.com/JLugagne/ha-dash/domain"
+	"github.com/JLugagne/walldash/domain"
 )
 
 // ActionRequest specifies an action execution request on an entity.

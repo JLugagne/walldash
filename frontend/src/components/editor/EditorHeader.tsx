@@ -82,12 +82,12 @@ export function EditorHeader({
 
   const saveLabel =
     saveState === 'saving'
-      ? 'Enregistrement…'
+      ? 'Saving…'
       : saveState === 'saved' && !isDirty
-        ? 'Enregistré'
+        ? 'Saved'
         : isDirty
-          ? 'Enregistrer'
-          : 'À jour'
+          ? 'Save'
+          : 'Up to date'
 
   return (
     <header className="relative z-30 h-14 shrink-0 bg-slate-900/90 border-b border-slate-800 flex items-center px-3 gap-3 select-none">
@@ -98,7 +98,7 @@ export function EditorHeader({
       <div ref={levelsRef} className="relative flex items-center gap-1 min-w-0 flex-1">
         <div className="flex items-center gap-1 overflow-x-auto min-w-0 py-1 [scrollbar-width:none]">
           {sortedLevels.length === 0 && (
-            <span className="text-xs text-slate-500 px-2 whitespace-nowrap">Aucun niveau</span>
+            <span className="text-xs text-slate-500 px-2 whitespace-nowrap">No levels</span>
           )}
           {sortedLevels.map((lvl) => {
             const active = lvl.id === activeLevelId
@@ -123,7 +123,7 @@ export function EditorHeader({
         <button
           type="button"
           onClick={() => onToggleLevels(!levelsOpen)}
-          title="Gérer les niveaux"
+          title="Manage levels"
           aria-expanded={levelsOpen}
           className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
             levelsOpen ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -140,10 +140,10 @@ export function EditorHeader({
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        <IconButton onClick={onUndo} disabled={disabled || !canUndo} title="Annuler (Ctrl+Z)">
+        <IconButton onClick={onUndo} disabled={disabled || !canUndo} title="Undo (Ctrl+Z)">
           <Undo2 className="w-4 h-4" />
         </IconButton>
-        <IconButton onClick={onRedo} disabled={disabled || !canRedo} title="Rétablir (Ctrl+Y)">
+        <IconButton onClick={onRedo} disabled={disabled || !canRedo} title="Redo (Ctrl+Y)">
           <Redo2 className="w-4 h-4" />
         </IconButton>
 
@@ -153,15 +153,15 @@ export function EditorHeader({
           type="button"
           onClick={onImport}
           disabled={disabled}
-          title="Importer un plan depuis un JSON généré par une IA"
+          title="Import a plan from AI-generated JSON"
           className="h-8 px-2.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition-all cursor-pointer"
         >
           <Upload className="w-3.5 h-3.5" />
-          <span className="hidden lg:inline">Importer</span>
+          <span className="hidden lg:inline">Import</span>
         </button>
 
         <div ref={moreRef} className="relative">
-          <IconButton onClick={() => setMoreOpen((v) => !v)} disabled={disabled} title="Plus d'actions">
+          <IconButton onClick={() => setMoreOpen((v) => !v)} disabled={disabled} title="More actions">
             <MoreHorizontal className="w-4 h-4" />
           </IconButton>
           {moreOpen && (
@@ -175,7 +175,7 @@ export function EditorHeader({
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-slate-800 text-left cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Revenir à la version enregistrée</span>
+                <span>Revert to saved version</span>
               </button>
               <button
                 type="button"
@@ -186,7 +186,7 @@ export function EditorHeader({
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-left cursor-pointer"
               >
                 <Eraser className="w-3.5 h-3.5" />
-                <span>Effacer murs et zones</span>
+                <span>Clear walls and zones</span>
               </button>
             </div>
           )}
@@ -196,7 +196,7 @@ export function EditorHeader({
           type="button"
           onClick={onSave}
           disabled={disabled || saveState === 'saving' || (!isDirty && saveState !== 'error')}
-          title="Enregistrer le plan (Ctrl+S)"
+          title="Save plan (Ctrl+S)"
           className={`h-8 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:cursor-not-allowed ml-1 ${
             isDirty
               ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25'
@@ -218,7 +218,7 @@ export function EditorHeader({
 
         <div className="h-6 w-px bg-slate-800 mx-1" />
 
-        <IconButton onClick={onTogglePanel} title={panelOpen ? 'Masquer le panneau' : 'Afficher le panneau'} active={panelOpen}>
+        <IconButton onClick={onTogglePanel} title={panelOpen ? 'Hide panel' : 'Show panel'} active={panelOpen}>
           <PanelRight className="w-4 h-4" />
         </IconButton>
       </div>

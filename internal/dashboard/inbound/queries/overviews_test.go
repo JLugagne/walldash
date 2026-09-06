@@ -7,11 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/service/overviews/overviewstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/queries"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/service/overviews/overviewstest"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/queries"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +24,7 @@ func TestOverviewsQueryRoutes(t *testing.T) {
 		mockQueries := &overviewstest.MockOverviewQueries{
 			ListOverviewsFunc: func(ctx context.Context) ([]domain.OverviewDashboard, error) {
 				return []domain.OverviewDashboard{
-					{ID: "ov-1", Name: "Tableau 1", Order: 0},
+					{ID: "ov-1", Name: "Dashboard 1", Order: 0},
 				}, nil
 			},
 		}
@@ -52,7 +52,7 @@ func TestOverviewsQueryRoutes(t *testing.T) {
 		mockQueries := &overviewstest.MockOverviewQueries{
 			GetOverviewFunc: func(ctx context.Context, id string) (domain.OverviewDashboard, error) {
 				if id == "ov-1" {
-					return domain.OverviewDashboard{ID: "ov-1", Name: "Tableau 1"}, nil
+					return domain.OverviewDashboard{ID: "ov-1", Name: "Dashboard 1"}, nil
 				}
 				return domain.OverviewDashboard{}, domain.ErrOverviewNotFound
 			},
@@ -78,7 +78,7 @@ func TestOverviewsQueryRoutes(t *testing.T) {
 		mockQueries := &overviewstest.MockOverviewQueries{
 			ListAutomationsFunc: func(ctx context.Context) ([]domain.Automation, error) {
 				return []domain.Automation{
-					{ID: "automation.cinema", Name: "Cinéma", State: "on", Current: 0},
+					{ID: "automation.cinema", Name: "Cinema", State: "on", Current: 0},
 				}, nil
 			},
 		}

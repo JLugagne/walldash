@@ -3,7 +3,7 @@ package overviews
 import (
 	"context"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 )
 
 // OverviewRepository defines repository operations for OverviewDashboard domain entities.

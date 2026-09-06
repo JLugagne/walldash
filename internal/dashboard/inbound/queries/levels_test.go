@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	svclevelstest "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/levels/levelstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/queries"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	svclevelstest "github.com/JLugagne/walldash/internal/dashboard/domain/service/levels/levelstest"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/queries"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,7 +27,7 @@ func TestLevelsQueryHandler(t *testing.T) {
 				return []domain.Level{
 					{
 						ID:        "lvl-1",
-						Name:      "RDC",
+						Name:      "Ground Floor",
 						Order:     1,
 						IsOutdoor: false,
 						CreatedAt: time.Now(),
@@ -55,7 +55,7 @@ func TestLevelsQueryHandler(t *testing.T) {
 		assert.Equal(t, "success", resp.Status)
 		assert.Len(t, resp.Data, 1)
 		assert.Equal(t, "lvl-1", resp.Data[0].ID)
-		assert.Equal(t, "RDC", resp.Data[0].Name)
+		assert.Equal(t, "Ground Floor", resp.Data[0].Name)
 	})
 
 	t.Run("GET /api/levels/{id} returns level when found", func(t *testing.T) {
@@ -64,7 +64,7 @@ func TestLevelsQueryHandler(t *testing.T) {
 				assert.Equal(t, "lvl-1", id)
 				return domain.Level{
 					ID:        "lvl-1",
-					Name:      "RDC",
+					Name:      "Ground Floor",
 					Order:     1,
 					CreatedAt: time.Now(),
 					UpdatedAt: time.Now(),

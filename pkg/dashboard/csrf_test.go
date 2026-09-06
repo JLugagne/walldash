@@ -3,7 +3,7 @@ package dashboard_test
 import (
 	"testing"
 
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/stretchr/testify/assert"
 )
 

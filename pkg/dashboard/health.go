@@ -3,7 +3,7 @@ package dashboard
 import (
 	"time"
 
-	"github.com/JLugagne/ha-dash/domain"
+	"github.com/JLugagne/walldash/domain"
 )
 
 // HealthResponse represents the response format for the health query API.

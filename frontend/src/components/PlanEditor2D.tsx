@@ -96,7 +96,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
     doorWidth: 36,
     windowWidth: 48,
     doorAsPassage: false,
-    zoneName: 'Salon',
+    zoneName: 'Living room',
     zoneColor: '#3b82f6',
   })
 
@@ -362,9 +362,9 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
           })
           return saved
         }
-        setError(payload.error?.message || 'Erreur lors du placement de l’appareil')
+        setError(payload.error?.message || 'Error while placing the device')
       } catch {
-        setError('Impossible de joindre le serveur')
+        setError('Unable to reach the server')
       }
       return null
     },
@@ -382,7 +382,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
           setPlacements((prev) => prev.filter((p) => p.id !== placementId))
           setSelection((prev) => (prev?.type === 'device' && prev.id === placementId ? null : prev))
         } else {
-          setError(payload.error?.message || 'Erreur lors de la suppression du placement')
+          setError(payload.error?.message || 'Error while deleting the placement')
         }
       } catch {
         setError('Impossible de joindre le serveur')
@@ -458,7 +458,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
         setTimeout(() => setSaveState((s) => (s === 'saved' ? 'idle' : s)), 2500)
       } else {
         setSaveState('error')
-        setError(result.error?.message || 'Erreur lors de la sauvegarde du plan')
+        setError(result.error?.message || 'Error while saving the plan')
       }
     } catch {
       setSaveState('error')
@@ -980,12 +980,12 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
 
   const handleSelectLevel = (id: string) => {
     if (id === level?.id) return
-    if (isDirty && !confirm('Des modifications ne sont pas enregistrées. Changer de niveau les perdra. Continuer ?')) return
+    if (isDirty && !confirm('Unsaved modifications. Switching levels will discard them. Continue?')) return
     onSelectLevel(id)
   }
 
   const handleReset = () => {
-    if (!isDirty || !confirm('Revenir à la dernière version enregistrée du plan ?')) return
+    if (!isDirty || !confirm('Revert to the last saved version of the plan?')) return
     const saved = JSON.parse(savedJson) as { walls: WallSegment[]; zones: Zone[] }
     pushHistory(plan)
     setPlan({ level_id: plan.level_id, walls: saved.walls, zones: saved.zones })
@@ -994,7 +994,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
 
   const handleClear = () => {
     if (plan.walls.length === 0 && plan.zones.length === 0) return
-    if (!confirm('Supprimer tous les murs et toutes les zones de ce niveau ?')) return
+    if (!confirm('Delete all walls and all zones from this level?')) return
     mutatePlan((p) => ({ ...p, walls: [], zones: [] }))
     resetEditing()
   }
@@ -1061,28 +1061,28 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
             : 'cursor-crosshair'
 
   const statusText = (() => {
-    if (!level) return 'Sélectionnez ou créez un niveau pour commencer.'
-    if (deviceToPlace) return `Cliquez sur le plan pour placer « ${deviceToPlace.name} » · Échap pour annuler`
+    if (!level) return 'Select or create a level to get started.'
+    if (deviceToPlace) return `Click on the plan to place "${deviceToPlace.name}" · Escape to cancel`
     switch (tool) {
       case 'wall':
         return wallStart
-          ? `${geo.formatMeters(wallDraftLength)} · Cliquez pour poser le coin · Maj = orthogonal · Échap termine`
-          : 'Cliquez pour poser le point de départ du mur'
+          ? `${geo.formatMeters(wallDraftLength)} · Click to place corner · Shift = orthogonal · Escape to finish`
+          : 'Click to place the wall start point'
       case 'zone':
         return zoneDraft.length === 0
-          ? 'Cliquez pour poser le premier sommet de la zone'
-          : `${zoneDraft.length} sommet${zoneDraft.length > 1 ? 's' : ''} · Cliquez le premier point ou Entrée pour fermer`
+          ? 'Click to place the first zone vertex'
+          : `${zoneDraft.length} vertex${zoneDraft.length > 1 ? 'es' : ''} · Click first point or Enter to close`
       case 'door':
       case 'window':
-        return hoverProjection ? `Cliquez pour poser ${tool === 'door' ? 'la porte' : 'la fenêtre'}` : 'Survolez un mur pour y poser l’ouverture'
+        return hoverProjection ? `Click to place the ${tool === 'door' ? 'door' : 'window'}` : 'Hover over a wall to place the opening'
       case 'pan':
-        return 'Glissez pour déplacer la vue · Molette pour zoomer'
+        return 'Drag to move the view · Scroll wheel to zoom'
       default:
         if (selection) {
-          const label = { wall: 'Mur', zone: 'Zone', device: 'Appareil', opening: 'Ouverture' }[selection.type]
-          return `${label} sélectionné · Glissez pour déplacer · Suppr pour supprimer`
+          const label = { wall: 'Wall', zone: 'Zone', device: 'Device', opening: 'Opening' }[selection.type]
+          return `${label} selected · Drag to move · Delete to remove`
         }
-        return 'Cliquez un élément pour le sélectionner · Glissez le fond pour déplacer la vue'
+        return 'Click an element to select it · Drag the background to move the view'
     }
   })()
 
@@ -1271,7 +1271,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
 
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-950/40 backdrop-blur-[1px] text-slate-300 text-sm gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" /> Chargement du plan…
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading plan…
             </div>
           )}
 
@@ -1282,9 +1282,9 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
                   <Layers className="w-6 h-6" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-base font-semibold text-white">Aucun niveau</h3>
+                  <h3 className="text-base font-semibold text-white">No level</h3>
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    Créez un premier étage ou espace extérieur pour dessiner son plan et y placer vos appareils.
+                    Create a first floor or outdoor space to draw its plan and place your devices.
                   </p>
                 </div>
                 <button
@@ -1292,7 +1292,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
                   onClick={() => setLevelsOpen(true)}
                   className="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg shadow-indigo-500/30 transition-all cursor-pointer"
                 >
-                  Gérer les niveaux
+                  Manage levels
                 </button>
               </div>
             </div>
@@ -1302,7 +1302,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-indigo-950/90 backdrop-blur-md border border-indigo-500/50 text-indigo-100 text-xs px-3 py-1.5 rounded-full shadow-xl flex items-center gap-2">
               <Cpu className="w-3.5 h-3.5" />
               <span>
-                Placement de <strong className="text-white">{deviceToPlace.name}</strong>
+                Placement of <strong className="text-white">{deviceToPlace.name}</strong>
               </span>
               <button type="button" onClick={() => setDeviceToPlace(null)} className="ml-1 text-indigo-300 hover:text-white cursor-pointer">
                 <X className="w-3.5 h-3.5" />
@@ -1311,21 +1311,21 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
           )}
 
           <div className="absolute bottom-3 left-3 z-10 flex items-center gap-0.5 bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1 rounded-xl shadow-xl">
-            <button type="button" onClick={() => zoomBy(1.25)} title="Zoom avant (+)" className="w-8 h-8 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer">
+            <button type="button" onClick={() => zoomBy(1.25)} title="Zoom in (+)" className="w-8 h-8 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer">
               <ZoomIn className="w-4 h-4" />
             </button>
-            <button type="button" onClick={() => zoomBy(1 / 1.25)} title="Zoom arrière (-)" className="w-8 h-8 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer">
+            <button type="button" onClick={() => zoomBy(1 / 1.25)} title="Zoom out (-)" className="w-8 h-8 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer">
               <ZoomOut className="w-4 h-4" />
             </button>
             <div className="h-4 w-px bg-slate-700 mx-0.5" />
             <button
               type="button"
               onClick={() => fitToBounds(plan.walls, plan.zones, placements)}
-              title="Cadrer le plan"
+              title="Fit to plan"
               className="h-8 px-2.5 rounded-lg hover:bg-slate-800 text-indigo-300 hover:text-white text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer"
             >
               <Maximize2 className="w-3.5 h-3.5" />
-              Cadrer
+              Fit
             </button>
             <span className="px-2 text-[11px] font-mono text-slate-500">{Math.round((DEFAULT_VIEW.w / viewBox.w) * 100)}%</span>
           </div>
@@ -1344,12 +1344,12 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
         {panelOpen && (
           <aside className="w-80 shrink-0 bg-slate-900 border-l border-slate-800 flex flex-col min-h-0">
             <div className="flex items-center border-b border-slate-800 px-2 pt-2 gap-1">
-              <PanelTab active={panelTab === 'inspector'} onClick={() => setPanelTab('inspector')} icon={<SlidersHorizontal className="w-3.5 h-3.5" />} label="Propriétés" />
+              <PanelTab active={panelTab === 'inspector'} onClick={() => setPanelTab('inspector')} icon={<SlidersHorizontal className="w-3.5 h-3.5" />} label="Properties" />
               <PanelTab
                 active={panelTab === 'devices'}
                 onClick={() => setPanelTab('devices')}
                 icon={<Cpu className="w-3.5 h-3.5" />}
-                label="Appareils"
+                label="Devices"
                 badge={`${placements.length}/${devices.length}`}
               />
             </div>

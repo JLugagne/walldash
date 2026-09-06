@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels"
-	"github.com/JLugagne/ha-dash/internal/pkg/logger"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/levels"
+	"github.com/JLugagne/walldash/internal/pkg/logger"
 )
 
 func serializeLayers(layers []string) string {

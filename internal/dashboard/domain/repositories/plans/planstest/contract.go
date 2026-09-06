@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/plans"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,7 +58,7 @@ func PlanRepositoryContractTesting(t *testing.T, repo plans.PlanRepository) {
 			Zones: []domain.Zone{
 				{
 					ID:    "z1",
-					Name:  "Cuisine",
+					Name:  "Kitchen",
 					Color: "#ef4444",
 					Points: []domain.Point2D{
 						{X: 0, Y: 0},

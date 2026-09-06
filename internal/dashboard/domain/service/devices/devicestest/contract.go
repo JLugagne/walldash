@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/service/devices"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/service/devices"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -103,7 +103,7 @@ func DeviceServiceContractTesting(t *testing.T, svc devices.DeviceCommands, test
 			X:          120.0,
 			Y:          220.0,
 			Icon:       "lightbulb",
-			CustomName: "Plafonnier Salon",
+			CustomName: "Living Room Ceiling Light",
 		}
 
 		created, err := svc.SavePlacement(ctx, actor, p)

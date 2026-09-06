@@ -3,9 +3,9 @@ package converters_test
 import (
 	"testing"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/converters"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/stretchr/testify/assert"
 )
 

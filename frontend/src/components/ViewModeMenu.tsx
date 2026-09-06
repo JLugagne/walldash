@@ -10,9 +10,9 @@ interface ViewModeOption {
 }
 
 const OPTIONS: ViewModeOption[] = [
-  { key: '3d', label: 'Vue 3D', icon: Box },
+  { key: '3d', label: '3D View', icon: Box },
   { key: 'overviews', label: 'Overviews', icon: LayoutDashboard },
-  { key: 'admin', label: 'Éditeur 2D', icon: Edit3 },
+  { key: 'admin', label: '2D Editor', icon: Edit3 },
 ]
 
 interface ViewModeMenuProps {
@@ -55,8 +55,8 @@ export function ViewModeMenu({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        title="Changer de vue (Layers)"
-        aria-label="Changer de vue"
+        title="Switch view (Layers)"
+        aria-label="Switch view"
         aria-expanded={open}
         className="w-12 h-12 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-800/80 shadow-2xl shadow-black/50 flex items-center justify-center text-indigo-400 hover:text-white hover:bg-slate-800/90 active:scale-95 transition-all cursor-pointer"
       >

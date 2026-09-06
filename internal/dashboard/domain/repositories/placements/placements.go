@@ -3,7 +3,7 @@ package placements
 import (
 	"context"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 )
 
 // DevicePlacementRepository defines operations for storing and retrieving device placements on level plans.

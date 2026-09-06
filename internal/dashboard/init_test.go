@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	dashboard "github.com/JLugagne/ha-dash/internal/dashboard"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	dashboard "github.com/JLugagne/walldash/internal/dashboard"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
@@ -71,7 +71,7 @@ func TestDashboardNew(t *testing.T) {
 
 	// 4. Verify CSRF rejection on state-changing method without CSRF header
 	createPayload := pkgdashboard.CreateLevelRequest{
-		Name:      "Rez-de-chaussée",
+		Name:      "Ground Floor",
 		IsOutdoor: false,
 	}
 	body, _ := json.Marshal(createPayload)
@@ -93,7 +93,7 @@ func TestDashboardNew(t *testing.T) {
 	}
 	err = json.NewDecoder(rec.Body).Decode(&createResp)
 	require.NoError(t, err)
-	assert.Equal(t, "Rez-de-chaussée", createResp.Data.Name)
+	assert.Equal(t, "Ground Floor", createResp.Data.Name)
 	levelID := createResp.Data.ID
 	assert.NotEmpty(t, levelID)
 
@@ -119,7 +119,7 @@ func TestDashboardNew(t *testing.T) {
 		Zones: []pkgdashboard.ZoneDTO{
 			{
 				ID:    "z-test",
-				Name:  "Séjour",
+				Name:  "Living Room",
 				Color: "#3b82f6",
 				Points: []pkgdashboard.Point2DDTO{
 					{X: 0, Y: 0},

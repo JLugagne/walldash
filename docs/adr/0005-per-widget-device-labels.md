@@ -1,4 +1,4 @@
-# 5. Renommage des devices par widget plutôt que globalement
+# 5. Per-widget device renaming rather than globally
 
 Date: 2026-09-04
 
@@ -8,21 +8,21 @@ Accepted
 
 ## Context
 
-Les noms d'entités remontés par Home Assistant sont souvent trop techniques ou trop longs pour être lus d'un coup d'œil sur un Widget. Le dashboard doit donc pouvoir les renommer.
+Entity names returned by Home Assistant are often too technical or too long to be read at a glance on a Widget. The dashboard must therefore be able to rename them.
 
-Un mécanisme de renommage existe déjà : `DevicePlacement.CustomName` renomme un Device, mais **par placement sur un Plan**, et ne concerne que la vue isométrique.
+A renaming mechanism already exists: `DevicePlacement.CustomName` renames a Device, but **per placement on a Plan**, and applies only to the isometric view.
 
-L'alternative sérieuse était une table globale associant un libellé à chaque Device, partagée par les Overview Dashboards et la vue isométrique. Elle aurait permis de renommer une fois pour toutes, mais imposait de trancher immédiatement le sort de `CustomName`, de migrer les données existantes, et de perdre la possibilité d'adapter le libellé à la place disponible.
+The serious alternative was a global table associating a label with each Device, shared by Overview Dashboards and the isometric view. It would have allowed renaming once and for all, but required immediately deciding the fate of `CustomName`, migrating existing data, and losing the ability to adapt the label to available space.
 
 ## Decision
 
-Le libellé de renommage vit dans la configuration du Widget qui affiche l'entité. Deux Widgets peuvent nommer le même Device différemment, selon la taille dont ils disposent.
+The rename label lives in the configuration of the Widget that displays the entity. Two Widgets can name the same Device differently, depending on the space available to them.
 
-`DevicePlacement.CustomName` reste inchangé et conserve sa portée : la vue isométrique.
+`DevicePlacement.CustomName` remains unchanged and keeps its scope: the isometric view.
 
 ## Consequences
 
-- Deux mécanismes de renommage coexistent délibérément, avec des portées distinctes ; ce n'est pas une duplication accidentelle.
-- Aucune table ni migration n'est nécessaire pour cette fonctionnalité.
-- Renommer le même Device sur plusieurs dashboards se fait autant de fois qu'il y a de Widgets, ce qui devient pénible au-delà de quelques dizaines d'entités réutilisées.
-- Basculer plus tard vers un renommage global obligera à migrer des libellés dispersés dans les configurations de Widgets, et non une colonne unique.
+- Two renaming mechanisms deliberately coexist, with distinct scopes; this is not accidental duplication.
+- No table or migration is needed for this feature.
+- Renaming the same Device across multiple dashboards must be done as many times as there are Widgets, which becomes tedious beyond a few dozen reused entities.
+- Switching to global renaming later will require migrating labels scattered across Widget configurations, rather than a single column.

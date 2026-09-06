@@ -14,21 +14,21 @@ export interface AutomationListWidgetProps {
 const TRIGGERED_FEEDBACK_MS = 2000
 
 function formatRelativeTime(isoString: string | null): string {
-  if (!isoString) return 'Jamais'
+  if (!isoString) return 'Never'
   const date = new Date(isoString)
-  if (isNaN(date.getTime())) return 'Jamais'
+  if (isNaN(date.getTime())) return 'Never'
   const now = new Date()
   const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000)
 
-  if (diffSec < 10) return "À l'instant"
-  if (diffSec < 60) return `Il y a ${diffSec} s`
+  if (diffSec < 10) return 'Just now'
+  if (diffSec < 60) return `${diffSec}s ago`
   const diffMin = Math.floor(diffSec / 60)
-  if (diffMin < 60) return `Il y a ${diffMin} min`
+  if (diffMin < 60) return `${diffMin}min ago`
   const diffHours = Math.floor(diffMin / 60)
-  if (diffHours < 24) return `Il y a ${diffHours} h`
+  if (diffHours < 24) return `${diffHours}h ago`
   const diffDays = Math.floor(diffHours / 24)
-  if (diffDays < 7) return `Il y a ${diffDays} j`
-  return date.toLocaleDateString('fr-FR', {
+  if (diffDays < 7) return `${diffDays}d ago`
+  return date.toLocaleDateString('en-US', {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
@@ -64,7 +64,7 @@ export const AutomationListWidget: React.FC<AutomationListWidgetProps> = ({ widg
 
   const displayedAutomations = selectAutomations(widget, automations)
   const labels = widget.config?.labels ?? {}
-  const label = widget.title || 'Automatisations'
+  const label = widget.title || 'Automations'
   const count = displayedAutomations.length
 
   const markTriggered = (automationId: string) => {
@@ -115,7 +115,7 @@ export const AutomationListWidget: React.FC<AutomationListWidgetProps> = ({ widg
     >
       {count === 0 ? (
         <div className="flex-1 flex items-center justify-center text-center text-slate-500 text-xs px-2">
-          Aucune automatisation configurée.
+          No automations configured.
         </div>
       ) : (
         <ul className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-800/70 [scrollbar-width:thin]">
@@ -138,15 +138,15 @@ export const AutomationListWidget: React.FC<AutomationListWidgetProps> = ({ widg
                     {name}
                   </span>
                   <span className="text-[10px] text-slate-400 truncate tabular-nums">
-                    {isCurrentlyRunning ? `En cours (${auto.current})` : formatRelativeTime(auto.last_triggered)}
+                    {isCurrentlyRunning ? `Running (${auto.current})` : formatRelativeTime(auto.last_triggered)}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleTrigger(auto.id)}
                   disabled={isTriggering}
-                  aria-label={`Déclencher ${name}`}
-                  title="Déclencher"
+                  aria-label={`Trigger ${name}`}
+                  title="Trigger"
                   className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-lg transition-colors select-none touch-manipulation ${
                     isTriggered
                       ? 'bg-emerald-600 text-white'

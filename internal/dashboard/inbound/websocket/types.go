@@ -1,7 +1,7 @@
 package websocket
 
 import (
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 )
 
 // ClientActionMessage represents an incoming action message sent over WebSocket.

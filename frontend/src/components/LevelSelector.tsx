@@ -14,7 +14,7 @@ export function LevelSelector({ levels, activeLevelId, onSelectLevel }: LevelSel
   return (
     <div
       role="group"
-      aria-label="Sélection du niveau"
+      aria-label="Level selection"
       className="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-full p-1 shadow-xl flex items-center space-x-1 pointer-events-auto"
     >
       {sortedLevels.map((lvl) => {
@@ -25,7 +25,7 @@ export function LevelSelector({ levels, activeLevelId, onSelectLevel }: LevelSel
             type="button"
             onClick={() => onSelectLevel(lvl.id)}
             aria-pressed={isActive}
-            aria-label={`Étage ${lvl.name}`}
+            aria-label={`Level ${lvl.name}`}
             className={`px-3.5 py-1 rounded-full text-xs transition-all cursor-pointer whitespace-nowrap select-none ${
               isActive
                 ? 'bg-indigo-600 text-white shadow-md font-semibold'

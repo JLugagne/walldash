@@ -3,7 +3,7 @@ package levels
 import (
 	"context"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 )
 
 // LevelRepository defines repository operations for Level domain entities.

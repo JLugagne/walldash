@@ -1,24 +1,24 @@
-# 3. Tableaux de bord synthétiques ("Overview") et système de widgets
+# 3. Summary dashboards ("Overview") and widget system
 
 Date: 2026-09-02
 
 ## Status
 
-Accepted. Le point 2 est amendé par l'ADR 0004 : le type et le mode de rendu d'un Widget sont deux axes distincts, et non un identifiant composé unique.
+Accepted. Point 2 is amended by ADR 0004: the type and display mode of a Widget are two separate axes, not a single composite identifier.
 
 ## Context
 
-L'utilisateur souhaite pouvoir définir en mode administration des tableaux de bord "Overview" (vues synthétiques hors vue 3D) dans lesquels il configure et dispose des widgets personnalisés (notamment pour grouper des capteurs et cocher précisément les automatisations favorites à afficher et piloter).
+The user wishes to be able to define, in administration mode, "Overview" dashboards (summary views outside the 3D view) in which they configure and arrange custom widgets (notably to group sensors and precisely select which favorite automations to display and control).
 
 ## Decision
 
-Modéliser un sous-système de composition de widgets :
-1. Une entité `OverviewDashboard` possède un identifiant, un nom et une collection ordonnée de `Widget`.
-2. Chaque `Widget` possède un type décrivant ce à quoi il est lié et ce qu'un appui déclenche (`sensor`, `actuator`, `automation_list`), un Display Mode décrivant son rendu, et une configuration dédiée (ex: liste explicite des IDs d'automatisations sélectionnées).
-3. L'administration permet la création/édition des Overviews et de leurs widgets.
-4. L'utilisateur peut basculer entre la vue 3D du bâtiment et les Overview Dashboards.
+Model a widget composition subsystem:
+1. An `OverviewDashboard` entity has an identifier, a name, and an ordered collection of `Widget`.
+2. Each `Widget` has a type describing what it is linked to and what a tap triggers (`sensor`, `actuator`, `automation_list`), a Display Mode describing its rendering, and a dedicated configuration (e.g. explicit list of selected automation IDs).
+3. Administration allows creating/editing Overviews and their widgets.
+4. The user can switch between the building's 3D view and the Overview Dashboards.
 
 ## Consequences
 
-- Grande flexibilité d'affichage pour la tablette tactile sans surcharger la vue 3D de la maison.
-- Modèle de données extensible pour ajouter de futurs types de widgets sans altérer le coeur géométrique 3D.
+- Great display flexibility for the touch tablet without overloading the 3D view of the house.
+- Extensible data model to add future widget types without altering the 3D geometric core.

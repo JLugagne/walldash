@@ -36,7 +36,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
       await onRefreshLevels()
       return result
     } catch {
-      setError('Impossible de joindre le serveur')
+      setError('Unable to reach the server')
       return null
     } finally {
       setBusy(false)
@@ -49,7 +49,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
     const result = await request(
       '/api/levels',
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim(), is_outdoor: isOutdoor }) },
-      'Erreur lors de la création du niveau'
+      'Error while creating the level'
     )
     if (result) {
       setName('')
@@ -69,7 +69,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: trimmed, is_outdoor: lvl.is_outdoor, layers: lvl.layers }),
       },
-      'Erreur lors du renommage du niveau'
+      'Error while renaming the level'
     )
   }
 
@@ -81,7 +81,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: lvl.name, is_outdoor: !lvl.is_outdoor, layers: lvl.layers }),
       },
-      'Erreur lors de la mise à jour du niveau'
+      'Error while updating the level'
     )
   }
 
@@ -91,7 +91,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
     const trimmed = newLayer.trim().toLowerCase()
     if (!trimmed) return
     if (activeLayers.includes(trimmed)) {
-      setError(`Le layer « ${trimmed} » existe déjà`)
+      setError(`Layer "${trimmed}" already exists`)
       return
     }
     const updatedLayers = [...activeLayers, trimmed]
@@ -102,7 +102,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: activeLevel.name, is_outdoor: activeLevel.is_outdoor, layers: updatedLayers }),
       },
-      'Erreur lors de l’ajout du layer'
+      'Error while adding the layer'
     )
     if (result) {
       setNewLayer('')
@@ -112,10 +112,10 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
   const handleDeleteLayer = async (layerToDelete: string) => {
     if (!activeLevel) return
     if (layerToDelete === 'controls') {
-      setError('Le layer « controls » est le layer par défaut et ne peut être supprimé.')
+      setError('The "controls" layer is the default layer and cannot be deleted.')
       return
     }
-    if (!confirm(`Supprimer le layer « ${layerToDelete} » ? Les équipements associés seront réassignés vers « controls ».`)) return
+    if (!confirm(`Delete layer "${layerToDelete}"? Associated devices will be reassigned to "controls".`)) return
     const updatedLayers = activeLayers.filter((l) => l !== layerToDelete)
     await request(
       `/api/levels/${activeLevel.id}`,
@@ -124,13 +124,13 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: activeLevel.name, is_outdoor: activeLevel.is_outdoor, layers: updatedLayers }),
       },
-      'Erreur lors de la suppression du layer'
+      'Error while deleting the layer'
     )
   }
 
   const handleDelete = async (lvl: Level) => {
-    if (!confirm(`Supprimer « ${lvl.name} » ainsi que son plan et ses appareils placés ?`)) return
-    await request(`/api/levels/${lvl.id}`, { method: 'DELETE' }, 'Erreur lors de la suppression du niveau')
+    if (!confirm(`Delete "${lvl.name}" along with its plan and placed devices?`)) return
+    await request(`/api/levels/${lvl.id}`, { method: 'DELETE' }, 'Error while deleting the level')
   }
 
   const handleMove = async (index: number, direction: -1 | 1) => {
@@ -141,7 +141,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
     await request(
       '/api/levels/reorder',
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level_ids: order.map((l) => l.id) }) },
-      'Erreur lors du réordonnancement'
+      'Error while reordering'
     )
   }
 
@@ -149,8 +149,8 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
     <div className="flex flex-col min-h-0">
       <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
         <Layers className="w-4 h-4 text-indigo-400" />
-        <h2 className="text-sm font-semibold text-white flex-1">Niveaux</h2>
-        <span className="text-[11px] text-slate-500">{levels.length} niveau{levels.length > 1 ? 'x' : ''}</span>
+        <h2 className="text-sm font-semibold text-white flex-1">Levels</h2>
+        <span className="text-[11px] text-slate-500">{levels.length} level{levels.length > 1 ? 's' : ''}</span>
       </div>
 
       {error && (
@@ -163,7 +163,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
       )}
 
       <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1 max-h-[40vh]">
-        {sorted.length === 0 && <div className="text-center py-6 text-slate-500 text-xs">Aucun niveau. Créez le premier ci-dessous.</div>}
+        {sorted.length === 0 && <div className="text-center py-6 text-slate-500 text-xs">No levels. Create the first one below.</div>}
         {sorted.map((lvl, index) => {
           const active = lvl.id === activeLevelId
           const Icon = lvl.is_outdoor ? Trees : Home
@@ -179,7 +179,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
                 type="button"
                 onClick={() => handleToggleOutdoor(lvl)}
                 disabled={busy}
-                title={lvl.is_outdoor ? 'Extérieur (cliquer pour passer en intérieur)' : 'Intérieur (cliquer pour passer en extérieur)'}
+                title={lvl.is_outdoor ? 'Outdoor (click to switch to indoor)' : 'Indoor (click to switch to outdoor)'}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 cursor-pointer ${
                   lvl.is_outdoor ? 'bg-emerald-500/15 text-emerald-400' : 'bg-indigo-500/15 text-indigo-400'
                 }`}
@@ -209,24 +209,24 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
                     {lvl.name}
                     {active && <Check className="w-3 h-3 text-indigo-400" />}
                   </div>
-                  <div className="text-[10px] text-slate-500">{lvl.is_outdoor ? 'Extérieur' : 'Intérieur'}</div>
+                  <div className="text-[10px] text-slate-500">{lvl.is_outdoor ? 'Outdoor' : 'Indoor'}</div>
                 </button>
               )}
 
               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                <SmallButton title="Renommer" onClick={() => {
+                <SmallButton title="Rename" onClick={() => {
                   setEditingId(lvl.id)
                   setEditName(lvl.name)
                 }}>
                   <Pencil className="w-3 h-3" />
                 </SmallButton>
-                <SmallButton title="Monter" disabled={index === 0 || busy} onClick={() => handleMove(index, -1)}>
+                <SmallButton title="Move up" disabled={index === 0 || busy} onClick={() => handleMove(index, -1)}>
                   <ArrowUp className="w-3 h-3" />
                 </SmallButton>
-                <SmallButton title="Descendre" disabled={index === sorted.length - 1 || busy} onClick={() => handleMove(index, 1)}>
+                <SmallButton title="Move down" disabled={index === sorted.length - 1 || busy} onClick={() => handleMove(index, 1)}>
                   <ArrowDown className="w-3 h-3" />
                 </SmallButton>
-                <SmallButton title="Supprimer" danger disabled={busy} onClick={() => handleDelete(lvl)}>
+                <SmallButton title="Delete" danger disabled={busy} onClick={() => handleDelete(lvl)}>
                   <Trash2 className="w-3 h-3" />
                 </SmallButton>
               </div>
@@ -253,13 +253,13 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
               >
                 <span>{layer}</span>
                 {layer === 'controls' ? (
-                  <span className="text-[9px] font-mono text-indigo-400 uppercase tracking-wider">(défaut)</span>
+                  <span className="text-[9px] font-mono text-indigo-400 uppercase tracking-wider">(default)</span>
                 ) : (
                   <button
                     type="button"
                     onClick={() => handleDeleteLayer(layer)}
                     disabled={busy}
-                    title={`Supprimer le layer « ${layer} » (réassigne vers controls)`}
+                    title={`Delete layer "${layer}" (reassigns to controls)`}
                     className="text-slate-400 hover:text-rose-400 cursor-pointer ml-0.5"
                   >
                     <X className="w-3 h-3" />
@@ -272,7 +272,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
           <form onSubmit={handleAddLayer} className="flex items-center gap-1.5 pt-0.5">
             <input
               type="text"
-              placeholder="Nouveau layer (ex: lights, hvac…)"
+              placeholder="New layer (e.g. lights, hvac…)"
               value={newLayer}
               onChange={(e) => setNewLayer(e.target.value)}
               className="flex-1 min-w-0 h-8 bg-slate-950 border border-slate-800 rounded-lg px-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
@@ -283,18 +283,18 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
               className="h-8 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1 cursor-pointer shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
-              Ajouter
+              Add
             </button>
           </form>
         </div>
       )}
 
       <form onSubmit={handleCreate} className="p-3 border-t border-slate-800 space-y-2 bg-slate-950/40">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Nouveau niveau</div>
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">New level</div>
         <div className="flex items-center gap-1.5">
           <input
             type="text"
-            placeholder="Rez-de-chaussée, Jardin…"
+            placeholder="Ground floor, Garden…"
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="flex-1 min-w-0 h-9 bg-slate-950 border border-slate-800 rounded-lg px-3 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
@@ -302,7 +302,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
           <button
             type="button"
             onClick={() => setIsOutdoor((v) => !v)}
-            title={isOutdoor ? 'Espace extérieur' : 'Espace intérieur'}
+            title={isOutdoor ? 'Outdoor space' : 'Indoor space'}
             className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
               isOutdoor ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-800 text-slate-400 hover:text-white'
             }`}
@@ -315,7 +315,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
             className="h-9 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            Créer
+            Create
           </button>
         </div>
       </form>

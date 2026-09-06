@@ -7,9 +7,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans"
-	"github.com/JLugagne/ha-dash/internal/pkg/logger"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/plans"
+	"github.com/JLugagne/walldash/internal/pkg/logger"
 )
 
 var _ plans.PlanRepository = (*Adapter)(nil)

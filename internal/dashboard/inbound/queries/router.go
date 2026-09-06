@@ -3,12 +3,12 @@ package queries
 import (
 	"net/http"
 
-	svcdevices "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/devices"
-	svchealth "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/health"
-	svclevels "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/levels"
-	svcoverviews "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/overviews"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/middleware"
+	svcdevices "github.com/JLugagne/walldash/internal/dashboard/domain/service/devices"
+	svchealth "github.com/JLugagne/walldash/internal/dashboard/domain/service/health"
+	svclevels "github.com/JLugagne/walldash/internal/dashboard/domain/service/levels"
+	svcoverviews "github.com/JLugagne/walldash/internal/dashboard/domain/service/overviews"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/middleware"
 	"github.com/gorilla/mux"
 )
 

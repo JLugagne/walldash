@@ -5,9 +5,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow"
-	"github.com/JLugagne/ha-dash/internal/pkg/logger"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow"
+	"github.com/JLugagne/walldash/internal/pkg/logger"
 	"github.com/google/uuid"
 )
 

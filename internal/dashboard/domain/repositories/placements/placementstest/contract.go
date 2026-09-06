@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/placements"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/placements"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -70,7 +70,7 @@ func DevicePlacementRepositoryContractTesting(t *testing.T, repo placements.Devi
 			Y:            200.0,
 			Icon:         "lightbulb",
 			RenderDomain: "light",
-			CustomName:   "Spot Salon",
+			CustomName:   "Living Room Spot",
 			CreatedAt:    now,
 			UpdatedAt:    now,
 		}
@@ -114,18 +114,18 @@ func DevicePlacementRepositoryContractTesting(t *testing.T, repo placements.Devi
 		// Update coordinates and name
 		p.X = 180.0
 		p.Y = 220.0
-		p.CustomName = "Prise Télévision"
+		p.CustomName = "TV Plug"
 		updated, err := repo.SavePlacement(ctx, p)
 		require.NoError(t, err)
 		assert.Equal(t, 180.0, updated.X)
 		assert.Equal(t, 220.0, updated.Y)
-		assert.Equal(t, "Prise Télévision", updated.CustomName)
+		assert.Equal(t, "TV Plug", updated.CustomName)
 
 		found, err := repo.FindPlacementByID(ctx, p.ID)
 		require.NoError(t, err)
 		assert.Equal(t, 180.0, found.X)
 		assert.Equal(t, 220.0, found.Y)
-		assert.Equal(t, "Prise Télévision", found.CustomName)
+		assert.Equal(t, "TV Plug", found.CustomName)
 	})
 
 	t.Run("Contract: FindPlacementByID returns ErrPlacementNotFound for non-existent placement", func(t *testing.T) {

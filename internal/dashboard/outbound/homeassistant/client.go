@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/ha"
-	"github.com/JLugagne/ha-dash/internal/pkg/logger"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/ha"
+	"github.com/JLugagne/walldash/internal/pkg/logger"
 )
 
 var _ ha.HomeAssistantRepository = (*Client)(nil)
@@ -56,23 +56,23 @@ var (
 	fallbackDevices = []domain.Device{
 		{
 			ID:          "light.salon_plafond",
-			Name:        "Plafonnier Salon",
+			Name:        "Living Room Ceiling Light",
 			Domain:      domain.DomainLight,
 			State:       "on",
 			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
-				"friendly_name": "Plafonnier Salon",
+				"friendly_name": "Living Room Ceiling Light",
 				"brightness":    255,
 			},
 		},
 		{
 			ID:          "light.cuisine_spot",
-			Name:        "Spots Cuisine",
+			Name:        "Kitchen Spotlights",
 			Domain:      domain.DomainLight,
 			State:       "off",
 			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
-				"friendly_name": "Spots Cuisine",
+				"friendly_name": "Kitchen Spotlights",
 			},
 		},
 		{
@@ -88,66 +88,66 @@ var (
 		},
 		{
 			ID:          "switch.machine_a_cafe",
-			Name:        "Machine à Café",
+			Name:        "Coffee Machine",
 			Domain:      domain.DomainSwitch,
 			State:       "on",
 			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
-				"friendly_name": "Machine à Café",
+				"friendly_name": "Coffee Machine",
 			},
 		},
 		{
 			ID:          "switch.prise_tv",
-			Name:        "Prise TV Salon",
+			Name:        "Living Room TV Plug",
 			Domain:      domain.DomainSwitch,
 			State:       "on",
 			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
-				"friendly_name": "Prise TV Salon",
+				"friendly_name": "Living Room TV Plug",
 			},
 		},
 		{
 			ID:          "sensor.temperature_salon",
-			Name:        "Température Salon",
+			Name:        "Living Room Temperature",
 			Domain:      domain.DomainSensor,
 			State:       "21.4",
 			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
-				"friendly_name":       "Température Salon",
+				"friendly_name":       "Living Room Temperature",
 				"unit_of_measurement": "°C",
 			},
 		},
 		{
 			ID:          "sensor.humidite_sdb",
-			Name:        "Humidité Salle de Bain",
+			Name:        "Bathroom Humidity",
 			Domain:      domain.DomainSensor,
 			State:       "62",
 			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
-				"friendly_name":       "Humidité Salle de Bain",
+				"friendly_name":       "Bathroom Humidity",
 				"unit_of_measurement": "%",
 			},
 		},
 		{
 			ID:          "climate.thermostat_salon",
-			Name:        "Thermostat Salon",
+			Name:        "Living Room Thermostat",
 			Domain:      domain.DomainClimate,
 			State:       "heat",
 			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
-				"friendly_name":       "Thermostat Salon",
+				"friendly_name":       "Living Room Thermostat",
 				"current_temperature": 20.8,
 				"temperature":         21.5,
 			},
 		},
 		{
 			ID:          "media_player.enceinte_salon",
-			Name:        "Sonos Salon",
+			Name:        "Living Room Sonos",
 			Domain:      domain.DomainMediaPlayer,
 			State:       "playing",
 			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
-				"friendly_name": "Sonos Salon",
+				"friendly_name": "Living Room Sonos",
 				"media_title":   "Get Lucky",
 				"media_artist":  "Daft Punk",
 				"volume_level":  0.45,
@@ -158,28 +158,28 @@ var (
 	fallbackAutomations = []domain.Automation{
 		{
 			ID:            "automation.eteindre_toutes_les_lumieres",
-			Name:          "Éteindre toutes les lumières",
+			Name:          "Turn Off All Lights",
 			State:         "on",
 			Current:       0,
 			LastTriggered: &defaultLastTriggered1,
 		},
 		{
 			ID:            "automation.scenario_depart_maison",
-			Name:          "Scénario Départ Maison",
+			Name:          "Leave House Scene",
 			State:         "on",
 			Current:       0,
 			LastTriggered: &defaultLastTriggered2,
 		},
 		{
 			ID:            "automation.arrosage_automatique_jardin",
-			Name:          "Arrosage Automatique Jardin",
+			Name:          "Garden Auto Watering",
 			State:         "on",
 			Current:       1,
 			LastTriggered: &defaultLastTriggered3,
 		},
 		{
 			ID:            "automation.simulation_presence",
-			Name:          "Simulation de Présence Soirée",
+			Name:          "Evening Presence Simulation",
 			State:         "off",
 			Current:       0,
 			LastTriggered: nil,

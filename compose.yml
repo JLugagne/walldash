@@ -1,12 +1,12 @@
 services:
-  ha-dash:
-    image: ha-dash:test
+  walldash:
+    image: walldash:test
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ha-dash
+    container_name: walldash
     restart: unless-stopped
-    entrypoint: ["sh", "-c", "/app/ha-dash"]
+    entrypoint: ["sh", "-c", "/app/walldash"]
     ports:
       - "9090:8080"
     env_file:
@@ -14,11 +14,11 @@ services:
         required: false
     environment:
       - PORT=8080
-      - DB_PATH=/app/data/ha-dash.db
+      - DB_PATH=/app/data/walldash.db
       - HA_URL=${HA_URL:-http://homeassistant.local:8123}
       - HA_TOKEN=${HA_TOKEN:-}
     volumes:
-      - ha-dash-data:/app/data
+      - walldash-data:/app/data
 
 volumes:
-  ha-dash-data:
+  walldash-data:

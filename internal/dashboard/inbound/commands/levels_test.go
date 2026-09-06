@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
-	svclevelstest "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/levels/levelstest"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/commands"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	svclevelstest "github.com/JLugagne/walldash/internal/dashboard/domain/service/levels/levelstest"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/commands"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ func TestLevelsCommandHandler(t *testing.T) {
 	t.Run("POST /api/levels creates level successfully", func(t *testing.T) {
 		mockCommands := &svclevelstest.MockLevelCommands{
 			CreateLevelFunc: func(ctx context.Context, actor domain.Actor, level domain.Level) (domain.Level, error) {
-				assert.Equal(t, "Étage 1", level.Name)
+				assert.Equal(t, "1st Floor", level.Name)
 				assert.True(t, level.IsOutdoor)
 				return domain.Level{
 					ID:        "lvl-created",
@@ -42,7 +42,7 @@ func TestLevelsCommandHandler(t *testing.T) {
 		commands.SetupLevelRoutes(router, controller, mockCommands)
 
 		reqBody := pkgdashboard.CreateLevelRequest{
-			Name:      "Étage 1",
+			Name:      "1st Floor",
 			IsOutdoor: true,
 		}
 		data, _ := json.Marshal(reqBody)
@@ -59,7 +59,7 @@ func TestLevelsCommandHandler(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "success", resp.Status)
 		assert.Equal(t, "lvl-created", resp.Data.ID)
-		assert.Equal(t, "Étage 1", resp.Data.Name)
+		assert.Equal(t, "1st Floor", resp.Data.Name)
 		assert.Equal(t, []string{"controls", "sensors"}, resp.Data.Layers)
 	})
 

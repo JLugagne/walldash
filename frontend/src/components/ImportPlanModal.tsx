@@ -30,7 +30,7 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
       setPromptCopied(true)
       setTimeout(() => setPromptCopied(false), 2000)
     } catch {
-      setIssues(['Impossible de copier le prompt dans le presse-papiers.'])
+      setIssues(['Unable to copy the prompt to the clipboard.'])
     }
   }
 
@@ -48,7 +48,7 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
   const handleImport = () => {
     setIssues([])
     if (!jsonText.trim()) {
-      setIssues(['Collez ou importez un JSON avant de continuer.'])
+      setIssues(['Paste or import a JSON before continuing.'])
       return
     }
     try {
@@ -59,7 +59,7 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
       if (err instanceof PlanImportError) {
         setIssues(err.issues)
       } else {
-        setIssues(['Erreur inattendue lors de la lecture du JSON.'])
+        setIssues(['Unexpected error while reading the JSON.'])
       }
     }
   }
@@ -74,9 +74,9 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
               <FileJson className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Importer un plan depuis un JSON</h2>
+              <h2 className="text-base font-bold text-white">Import a plan from JSON</h2>
               <p className="text-xs text-slate-400">
-                Générez le JSON avec une IA à partir d'une photo de votre plan, puis collez-le ici.
+                Generate the JSON with an AI from a photo of your plan, then paste it here.
               </p>
             </div>
           </div>
@@ -95,11 +95,11 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
           <div className="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-4 space-y-2">
             <div className="flex items-center space-x-2 text-indigo-300 font-semibold text-xs">
               <Sparkles className="w-4 h-4" />
-              <span>1. Copiez le prompt et envoyez-le à une IA avec une photo de votre plan</span>
+              <span>1. Copy the prompt and send it to an AI with a photo of your plan</span>
             </div>
             <p className="text-xs text-slate-400">
-              Le prompt (en anglais) explique à l'IA le format JSON attendu : murs, portes, fenêtres, pièces et
-              dimensions réelles (mètres / centimètres).
+              The prompt (in English) explains to the AI the expected JSON format: walls, doors, windows, rooms and
+              real dimensions (meters / centimeters).
             </p>
             <button
               type="button"
@@ -107,7 +107,7 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
               className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-md transition-all"
             >
               {promptCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{promptCopied ? 'Prompt copié !' : 'Copier le prompt pour l\'IA'}</span>
+              <span>{promptCopied ? 'Prompt copied!' : "Copy prompt for AI"}</span>
             </button>
           </div>
 
@@ -115,7 +115,7 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-slate-300">
-                2. Collez la réponse JSON de l'IA
+                2. Paste the AI's JSON response
               </label>
               <button
                 type="button"
@@ -123,7 +123,7 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
                 className="flex items-center space-x-1.5 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md border border-slate-700"
               >
                 <Upload className="w-3.5 h-3.5" />
-                <span>Importer un fichier .json</span>
+                <span>Import a .json file</span>
               </button>
               <input
                 ref={fileInputRef}
@@ -147,7 +147,7 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
             <div className="bg-rose-950/40 border border-rose-500/30 rounded-xl p-3 space-y-1">
               <div className="flex items-center space-x-1.5 text-rose-400 text-xs font-semibold">
                 <AlertCircle className="w-3.5 h-3.5" />
-                <span>Le JSON contient des erreurs :</span>
+                <span>The JSON contains errors:</span>
               </div>
               <ul className="text-xs text-rose-300 list-disc list-inside space-y-0.5">
                 {issues.map((issue, i) => (
@@ -161,7 +161,7 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-800 bg-slate-900/80 flex items-center justify-between">
           <p className="text-[11px] text-slate-500">
-            L'import remplace les murs, ouvertures et zones actuels de ce niveau (sauvegardez avant si besoin).
+            The import replaces the current walls, openings and zones for this level (save first if needed).
           </p>
           <div className="flex items-center space-x-3">
             <button
@@ -169,7 +169,7 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
               onClick={handleClose}
               className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-xl transition-colors"
             >
-              Annuler
+              Cancel
             </button>
             <button
               type="button"
@@ -177,7 +177,7 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
               disabled={!jsonText.trim()}
               className="px-5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-600/30 transition-all active:scale-95 disabled:opacity-50"
             >
-              Importer le plan
+              Import plan
             </button>
           </div>
         </div>

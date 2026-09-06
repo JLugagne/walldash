@@ -3,7 +3,7 @@ package dashboard
 import (
 	"time"
 
-	"github.com/JLugagne/ha-dash/domain"
+	"github.com/JLugagne/walldash/domain"
 )
 
 // DeviceResponse represents a Home Assistant device/entity in API responses.

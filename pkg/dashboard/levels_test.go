@@ -3,8 +3,8 @@ package dashboard_test
 import (
 	"testing"
 
-	"github.com/JLugagne/ha-dash/domain"
-	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
+	"github.com/JLugagne/walldash/domain"
+	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,13 +15,13 @@ func TestLevelRequestsValidation(t *testing.T) {
 
 	t.Run("CreateLevelRequest validation", func(t *testing.T) {
 		validReq := pkgdashboard.CreateLevelRequest{
-			Name:      "Rez-de-chaussée",
+			Name:      "Ground Floor",
 			IsOutdoor: false,
 		}
 		require.NoError(t, validate.Struct(validReq))
 
 		validWithLayers := pkgdashboard.CreateLevelRequest{
-			Name:   "Rez-de-chaussée",
+			Name:   "Ground Floor",
 			Layers: []string{"controls", "sensors", "lighting"},
 		}
 		require.NoError(t, validate.Struct(validWithLayers))
@@ -36,7 +36,7 @@ func TestLevelRequestsValidation(t *testing.T) {
 
 	t.Run("UpdateLevelRequest validation", func(t *testing.T) {
 		validReq := pkgdashboard.UpdateLevelRequest{
-			Name:      "Étage 1",
+			Name:      "1st Floor",
 			IsOutdoor: false,
 		}
 		require.NoError(t, validate.Struct(validReq))
@@ -84,7 +84,7 @@ func TestLevelRequestsValidation(t *testing.T) {
 			Zones: []pkgdashboard.ZoneDTO{
 				{
 					ID:    "z1",
-					Name:  "Salon",
+					Name:  "Living Room",
 					Color: "#3b82f6",
 					Points: []pkgdashboard.Point2DDTO{
 						{X: 0, Y: 0},

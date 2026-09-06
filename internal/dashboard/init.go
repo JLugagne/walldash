@@ -8,15 +8,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/JLugagne/ha-dash/frontend"
-	"github.com/JLugagne/ha-dash/internal/dashboard/app"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/commands"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/middleware"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/queries"
-	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/websocket"
-	"github.com/JLugagne/ha-dash/internal/dashboard/outbound/homeassistant"
-	"github.com/JLugagne/ha-dash/internal/dashboard/outbound/sqlite"
+	"github.com/JLugagne/walldash/frontend"
+	"github.com/JLugagne/walldash/internal/dashboard/app"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/commands"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/middleware"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/queries"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/websocket"
+	"github.com/JLugagne/walldash/internal/dashboard/outbound/homeassistant"
+	"github.com/JLugagne/walldash/internal/dashboard/outbound/sqlite"
 	"github.com/gorilla/mux"
 )
 
@@ -54,7 +54,7 @@ func (d *Dashboard) Close() error {
 // New initializes the composition root, wiring outbound adapters, core app, and inbound routers.
 func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, error) {
 	if conf.DBPath == "" {
-		conf.DBPath = "ha-dash.db"
+		conf.DBPath = "walldash.db"
 	}
 	if conf.Version == "" {
 		conf.Version = "0.1.0"
