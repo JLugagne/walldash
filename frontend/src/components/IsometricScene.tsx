@@ -2,12 +2,16 @@ import { useEffect, useMemo } from 'react'
 import { useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import type { Plan, WallSegment, Zone } from '../types'
+import type { Plan, WallSegment, Zone, Device, DevicePlacement } from '../types'
+import { DeviceBadge3D } from './DeviceBadge3D'
 
 interface IsometricSceneProps {
   plan: Plan | null
   zoom: number
   pan: { x: number; z: number }
+  placements?: DevicePlacement[]
+  deviceMap?: Record<string, Device>
+  onToggleDevice?: (entityId: string) => void
 }
 
 const SVG_CENTER_X = 500
@@ -166,7 +170,14 @@ function ZoneMesh({ zone }: { zone: Zone }) {
   )
 }
 
-export function IsometricScene({ plan, zoom, pan }: IsometricSceneProps) {
+export function IsometricScene({
+  plan,
+  zoom,
+  pan,
+  placements = [],
+  deviceMap = {},
+  onToggleDevice = () => {},
+}: IsometricSceneProps) {
   const walls = plan?.walls || []
   const zones = plan?.zones || []
 
@@ -196,6 +207,16 @@ export function IsometricScene({ plan, zoom, pan }: IsometricSceneProps) {
         {/* Extruded 3D Walls */}
         {walls.map((wall) => (
           <WallMesh key={wall.id} wall={wall} />
+        ))}
+
+        {/* 3D Device Badges, Sensors & Light Halos */}
+        {placements.map((placement) => (
+          <DeviceBadge3D
+            key={placement.id}
+            placement={placement}
+            device={deviceMap[placement.device_id]}
+            onToggle={onToggleDevice}
+          />
         ))}
       </group>
     </>

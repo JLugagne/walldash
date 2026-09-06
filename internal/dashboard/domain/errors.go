@@ -89,4 +89,8 @@ var (
 		Code:    "INVALID_DEVICE",
 		Message: "invalid device data",
 	}
+	ErrActionNotAllowed = &Error{
+		Code:    "ACTION_NOT_ALLOWED",
+		Message: "action not permitted by whitelist",
+	}
 )

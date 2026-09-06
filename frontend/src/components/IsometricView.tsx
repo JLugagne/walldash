@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { Box, Layers, Edit3, Loader2 } from 'lucide-react'
+import { Box, Layers, Edit3, Loader2, Wifi } from 'lucide-react'
 import type { Level, Plan } from '../types'
 import { IsometricScene } from './IsometricScene'
 import { LevelSelector } from './LevelSelector'
 import { NavigationControls } from './NavigationControls'
+import { useRealtimeDevices } from '../hooks/useRealtimeDevices'
 
 interface IsometricViewProps {
   level: Level | null
@@ -27,6 +28,14 @@ export function IsometricView({
   const [loading, setLoading] = useState(false)
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM)
   const [pan, setPan] = useState<{ x: number; z: number }>({ x: 0, z: 0 })
+
+  // Real-time device placements & WebSocket action synchronization
+  const {
+    deviceMap,
+    placements,
+    connected: wsConnected,
+    toggleDevice,
+  } = useRealtimeDevices(level?.id || null)
 
   const dragStartRef = useRef<{
     clientX: number
@@ -197,22 +206,47 @@ export function IsometricView({
           camera={{ position: [30, 30, 30], zoom: zoom, near: -100, far: 300 }}
           className="w-full h-full"
         >
-          <IsometricScene plan={plan} zoom={zoom} pan={pan} />
+          <IsometricScene
+            plan={plan}
+            zoom={zoom}
+            pan={pan}
+            placements={placements}
+            deviceMap={deviceMap}
+            onToggleDevice={toggleDevice}
+          />
         </Canvas>
       </div>
 
       {/* Top Floating Bar: Level Info & Floating Level Selector */}
       <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
-        {/* Left Badge: Camera & Orientation info */}
-        <div className="bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-800/80 text-xs shadow-2xl shadow-black/50 space-y-0.5 pointer-events-auto">
+        {/* Left Badge: Camera & Orientation info + WebSocket Live Status */}
+        <div className="bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-800/80 text-xs shadow-2xl shadow-black/50 space-y-1 pointer-events-auto">
           <div className="flex items-center space-x-2 text-slate-200 font-semibold">
             <Box className="w-4 h-4 text-indigo-400" />
             <span>Vue Isométrique Fixe</span>
             {loading && <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin ml-1" />}
           </div>
-          <p className="text-slate-400 text-[11px]">
-            {level ? `${level.name} • Façade avant en bas` : 'Orientation façade avant'}
-          </p>
+          <div className="flex items-center space-x-3 text-[11px] text-slate-400">
+            <span>{level ? `${level.name} • Façade en bas` : 'Orientation façade avant'}</span>
+            <span className="text-slate-600">•</span>
+            <div className="flex items-center space-x-1.5">
+              <Wifi
+                className={`w-3 h-3 ${
+                  wsConnected ? 'text-emerald-400' : 'text-amber-400'
+                }`}
+              />
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  wsConnected
+                    ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50 animate-pulse'
+                    : 'bg-amber-400'
+                }`}
+              />
+              <span className={wsConnected ? 'text-emerald-400 font-medium' : 'text-amber-400 font-medium'}>
+                {wsConnected ? 'WebSocket Live' : 'Polling'}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Center / Right: Floating Tactile Level Selector */}
@@ -239,12 +273,16 @@ export function IsometricView({
       {/* Bottom-Left: Legend Indicators */}
       <div className="absolute bottom-4 left-4 z-20 pointer-events-none flex flex-wrap gap-2">
         <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800/80 px-3 py-1.5 rounded-xl text-xs text-slate-300 flex items-center space-x-2 shadow-xl shadow-black/40">
-          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50"></span>
-          <span>Light Halo: Actuator ON</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm shadow-amber-400/50 animate-pulse"></span>
+          <span>Light Halo: Éclairage ALLUMÉ</span>
         </div>
         <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800/80 px-3 py-1.5 rounded-xl text-xs text-slate-300 flex items-center space-x-2 shadow-xl shadow-black/40">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm shadow-amber-400/50"></span>
-          <span>Sensor: Active</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></span>
+          <span>Sensors: Valeur Permanente</span>
+        </div>
+        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800/80 px-3 py-1.5 rounded-xl text-xs text-slate-300 flex items-center space-x-2 shadow-xl shadow-black/40">
+          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50"></span>
+          <span>Actionneurs: Tap pour Commuter</span>
         </div>
       </div>
 

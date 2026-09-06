@@ -7,11 +7,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	dashboard "github.com/JLugagne/ha-dash/internal/dashboard"
 	pkgdashboard "github.com/JLugagne/ha-dash/pkg/dashboard"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -114,4 +117,41 @@ func TestDashboardNew(t *testing.T) {
 	assert.Equal(t, levelID, planResp.Data.LevelID)
 	assert.Len(t, planResp.Data.Walls, 1)
 	assert.Len(t, planResp.Data.Zones, 1)
+
+	// 6. Test WebSocket /api/ws integration
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/api/ws"
+	dialer := websocket.Dialer{}
+	conn, resp, err := dialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
+	defer conn.Close()
+
+	// Receive connected handshake
+	_, msg, err := conn.ReadMessage()
+	require.NoError(t, err)
+	var connectMsg map[string]any
+	err = json.Unmarshal(msg, &connectMsg)
+	require.NoError(t, err)
+	assert.Equal(t, "connected", connectMsg["type"])
+
+	// Send toggle action
+	actionPayload := map[string]string{
+		"type":      "action",
+		"entity_id": "light.salon_plafond",
+		"action":    "toggle",
+	}
+	err = conn.WriteJSON(actionPayload)
+	require.NoError(t, err)
+
+	// Read response (action_success or state_changed)
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, msg1, err := conn.ReadMessage()
+	require.NoError(t, err)
+	var event1 map[string]any
+	err = json.Unmarshal(msg1, &event1)
+	require.NoError(t, err)
+	assert.NotEmpty(t, event1["type"])
 }

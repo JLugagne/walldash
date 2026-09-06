@@ -12,6 +12,7 @@ import (
 	repoplacements "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/placements"
 	repoplans "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow"
+	svcactions "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/actions"
 	svcdevices "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/devices"
 	svchealth "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/health"
 	svclevels "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/levels"
@@ -26,6 +27,7 @@ type App struct {
 	placementsRepo repoplacements.DevicePlacementRepository
 	haRepo         repoha.HomeAssistantRepository
 	uow            uow.UnitOfWork
+	broadcaster    domain.DeviceBroadcaster
 	version        string
 }
 
@@ -37,7 +39,13 @@ var (
 	_ svclevels.LevelCommands   = (*App)(nil)
 	_ svcdevices.DeviceQueries  = (*App)(nil)
 	_ svcdevices.DeviceCommands = (*App)(nil)
+	_ svcactions.ActionCommands = (*App)(nil)
 )
+
+// SetBroadcaster configures the device state broadcaster (e.g. WebSocket hub).
+func (a *App) SetBroadcaster(broadcaster domain.DeviceBroadcaster) {
+	a.broadcaster = broadcaster
+}
 
 // New initializes the application service with repositories and configuration.
 func New(

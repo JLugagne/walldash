@@ -1,12 +1,14 @@
 package homeassistant
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
@@ -43,98 +45,101 @@ type haEntityState struct {
 	Attributes map[string]any `json:"attributes"`
 }
 
-var fallbackDevices = []domain.Device{
-	{
-		ID:     "light.salon_plafond",
-		Name:   "Plafonnier Salon",
-		Domain: domain.DomainLight,
-		State:  "on",
-		Attributes: map[string]any{
-			"friendly_name": "Plafonnier Salon",
-			"brightness":    255,
+var (
+	fallbackMu      sync.RWMutex
+	fallbackDevices = []domain.Device{
+		{
+			ID:     "light.salon_plafond",
+			Name:   "Plafonnier Salon",
+			Domain: domain.DomainLight,
+			State:  "on",
+			Attributes: map[string]any{
+				"friendly_name": "Plafonnier Salon",
+				"brightness":    255,
+			},
 		},
-	},
-	{
-		ID:     "light.cuisine_spot",
-		Name:   "Spots Cuisine",
-		Domain: domain.DomainLight,
-		State:  "off",
-		Attributes: map[string]any{
-			"friendly_name": "Spots Cuisine",
+		{
+			ID:     "light.cuisine_spot",
+			Name:   "Spots Cuisine",
+			Domain: domain.DomainLight,
+			State:  "off",
+			Attributes: map[string]any{
+				"friendly_name": "Spots Cuisine",
+			},
 		},
-	},
-	{
-		ID:     "light.chambre_chevet",
-		Name:   "Lampe Chevet Chambre",
-		Domain: domain.DomainLight,
-		State:  "on",
-		Attributes: map[string]any{
-			"friendly_name": "Lampe Chevet Chambre",
-			"brightness":    128,
+		{
+			ID:     "light.chambre_chevet",
+			Name:   "Lampe Chevet Chambre",
+			Domain: domain.DomainLight,
+			State:  "on",
+			Attributes: map[string]any{
+				"friendly_name": "Lampe Chevet Chambre",
+				"brightness":    128,
+			},
 		},
-	},
-	{
-		ID:     "switch.machine_a_cafe",
-		Name:   "Machine à Café",
-		Domain: domain.DomainSwitch,
-		State:  "on",
-		Attributes: map[string]any{
-			"friendly_name": "Machine à Café",
+		{
+			ID:     "switch.machine_a_cafe",
+			Name:   "Machine à Café",
+			Domain: domain.DomainSwitch,
+			State:  "on",
+			Attributes: map[string]any{
+				"friendly_name": "Machine à Café",
+			},
 		},
-	},
-	{
-		ID:     "switch.prise_tv",
-		Name:   "Prise TV Salon",
-		Domain: domain.DomainSwitch,
-		State:  "on",
-		Attributes: map[string]any{
-			"friendly_name": "Prise TV Salon",
+		{
+			ID:     "switch.prise_tv",
+			Name:   "Prise TV Salon",
+			Domain: domain.DomainSwitch,
+			State:  "on",
+			Attributes: map[string]any{
+				"friendly_name": "Prise TV Salon",
+			},
 		},
-	},
-	{
-		ID:     "sensor.temperature_salon",
-		Name:   "Température Salon",
-		Domain: domain.DomainSensor,
-		State:  "21.4",
-		Attributes: map[string]any{
-			"friendly_name":       "Température Salon",
-			"unit_of_measurement": "°C",
+		{
+			ID:     "sensor.temperature_salon",
+			Name:   "Température Salon",
+			Domain: domain.DomainSensor,
+			State:  "21.4",
+			Attributes: map[string]any{
+				"friendly_name":       "Température Salon",
+				"unit_of_measurement": "°C",
+			},
 		},
-	},
-	{
-		ID:     "sensor.humidite_sdb",
-		Name:   "Humidité Salle de Bain",
-		Domain: domain.DomainSensor,
-		State:  "62",
-		Attributes: map[string]any{
-			"friendly_name":       "Humidité Salle de Bain",
-			"unit_of_measurement": "%",
+		{
+			ID:     "sensor.humidite_sdb",
+			Name:   "Humidité Salle de Bain",
+			Domain: domain.DomainSensor,
+			State:  "62",
+			Attributes: map[string]any{
+				"friendly_name":       "Humidité Salle de Bain",
+				"unit_of_measurement": "%",
+			},
 		},
-	},
-	{
-		ID:     "climate.thermostat_salon",
-		Name:   "Thermostat Salon",
-		Domain: domain.DomainClimate,
-		State:  "heat",
-		Attributes: map[string]any{
-			"friendly_name":       "Thermostat Salon",
-			"current_temperature": 20.8,
-			"temperature":         21.5,
+		{
+			ID:     "climate.thermostat_salon",
+			Name:   "Thermostat Salon",
+			Domain: domain.DomainClimate,
+			State:  "heat",
+			Attributes: map[string]any{
+				"friendly_name":       "Thermostat Salon",
+				"current_temperature": 20.8,
+				"temperature":         21.5,
+			},
 		},
-	},
-	{
-		ID:     "media_player.enceinte_salon",
-		Name:   "Sonos Salon",
-		Domain: domain.DomainMediaPlayer,
-		State:  "playing",
-		Attributes: map[string]any{
-			"friendly_name": "Sonos Salon",
-			"media_title":   "Get Lucky",
-			"media_artist":  "Daft Punk",
-			"volume_level":  0.45,
+		{
+			ID:     "media_player.enceinte_salon",
+			Name:   "Sonos Salon",
+			Domain: domain.DomainMediaPlayer,
+			State:  "playing",
+			Attributes: map[string]any{
+				"friendly_name": "Sonos Salon",
+				"media_title":   "Get Lucky",
+				"media_artist":  "Daft Punk",
+				"volume_level":  0.45,
+			},
 		},
-	},
-}
+	}
+)
 
 // GetStates fetches all states from Home Assistant, filtering to supported domains.
 // If the remote server is unreachable or unconfigured, it gracefully falls back to mock devices.
@@ -208,6 +213,8 @@ func (c *Client) GetState(ctx context.Context, entityID string) (domain.Device, 
 	log := logger.LoggerFromContext(ctx)
 
 	if c.baseURL == "" || c.token == "" {
+		fallbackMu.RLock()
+		defer fallbackMu.RUnlock()
 		for _, d := range fallbackDevices {
 			if d.ID == entityID {
 				return d, nil
@@ -226,6 +233,8 @@ func (c *Client) GetState(ctx context.Context, entityID string) (domain.Device, 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		log.WithError(err).Warn("HA API entity fetch failed, trying fallback")
+		fallbackMu.RLock()
+		defer fallbackMu.RUnlock()
 		for _, d := range fallbackDevices {
 			if d.ID == entityID {
 				return d, nil
@@ -266,7 +275,83 @@ func (c *Client) GetState(ctx context.Context, entityID string) (domain.Device, 
 	}, nil
 }
 
+// CallService calls a Home Assistant service for the specified entity.
+// In dev/mock mode or when HA is unreachable, it mutates state in fallback devices.
+func (c *Client) CallService(ctx context.Context, domainStr string, service string, entityID string) error {
+	log := logger.LoggerFromContext(ctx)
+
+	if c.baseURL == "" || c.token == "" {
+		return c.mutateFallbackDevice(ctx, service, entityID)
+	}
+
+	payload, err := json.Marshal(map[string]string{
+		"entity_id": entityID,
+	})
+	if err != nil {
+		return errors.Join(domain.ErrInvalidRequest, err)
+	}
+
+	url := fmt.Sprintf("%s/api/services/%s/%s", c.baseURL, domainStr, service)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return errors.Join(domain.ErrHealthCheckFailed, err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		log.WithError(err).Warn("HA API unreachable, falling back to mock device mutation")
+		return c.mutateFallbackDevice(ctx, service, entityID)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return errors.Join(domain.ErrDeviceNotFound, fmt.Errorf("entity %s or service %s not found on HA", entityID, service))
+	}
+	if resp.StatusCode != http.StatusOK {
+		return errors.Join(domain.ErrHealthCheckFailed, fmt.Errorf("HA returned HTTP %d for service %s/%s", resp.StatusCode, domainStr, service))
+	}
+
+	return nil
+}
+
+func (c *Client) mutateFallbackDevice(ctx context.Context, service, entityID string) error {
+	log := logger.LoggerFromContext(ctx)
+
+	fallbackMu.Lock()
+	defer fallbackMu.Unlock()
+
+	found := false
+	for i := range fallbackDevices {
+		if fallbackDevices[i].ID == entityID {
+			found = true
+			switch service {
+			case "toggle":
+				if fallbackDevices[i].State == "on" {
+					fallbackDevices[i].State = "off"
+				} else {
+					fallbackDevices[i].State = "on"
+				}
+			case "turn_on":
+				fallbackDevices[i].State = "on"
+			case "turn_off":
+				fallbackDevices[i].State = "off"
+			}
+			log.WithField("entity_id", entityID).WithField("state", fallbackDevices[i].State).Info("fallback device state updated")
+			break
+		}
+	}
+
+	if !found {
+		return errors.Join(domain.ErrDeviceNotFound, fmt.Errorf("entity %s not found in fallback devices", entityID))
+	}
+	return nil
+}
+
 func copyFallbackDevices() []domain.Device {
+	fallbackMu.RLock()
+	defer fallbackMu.RUnlock()
 	res := make([]domain.Device, len(fallbackDevices))
 	copy(res, fallbackDevices)
 	return res

@@ -10,6 +10,7 @@ import (
 	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
 	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/commands"
 	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/queries"
+	"github.com/JLugagne/ha-dash/internal/dashboard/inbound/websocket"
 	"github.com/JLugagne/ha-dash/internal/dashboard/outbound/homeassistant"
 	"github.com/JLugagne/ha-dash/internal/dashboard/outbound/sqlite"
 	"github.com/gorilla/mux"
@@ -28,10 +29,14 @@ type Config struct {
 type Dashboard struct {
 	App     *app.App
 	Adapter *sqlite.Adapter
+	Hub     *websocket.Hub
 }
 
 // Close gracefully shuts down dashboard resources such as database connections.
 func (d *Dashboard) Close() error {
+	if d.Hub != nil {
+		d.Hub.Stop()
+	}
 	if d.Adapter != nil {
 		return d.Adapter.Close()
 	}
@@ -59,6 +64,13 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	application := app.New(adapter, adapter, adapter, adapter, haClient, adapter, conf.Version)
 	controller := inbound.NewController()
 
+	wsHub := websocket.NewHub(application)
+	go wsHub.Run()
+	application.SetBroadcaster(wsHub)
+
+	// Register WebSocket endpoint
+	router.HandleFunc("/api/ws", wsHub.ServeWS)
+
 	// Register inbound routes
 	queries.SetupRoutes(router, controller, application)
 	commands.SetupRoutes(router, controller, application)
@@ -69,6 +81,7 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	return &Dashboard{
 		App:     application,
 		Adapter: adapter,
+		Hub:     wsHub,
 	}, nil
 }
 
