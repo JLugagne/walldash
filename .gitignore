@@ -32,3 +32,9 @@ frontend/dist/
 .claude/
 skills-lock.json
 
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+

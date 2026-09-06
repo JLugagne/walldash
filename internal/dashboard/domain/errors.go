@@ -69,4 +69,24 @@ var (
 		Code:    "INVALID_PLAN",
 		Message: "invalid plan data",
 	}
+	ErrDeviceNotFound = &Error{
+		Code:    "DEVICE_NOT_FOUND",
+		Message: "device not found",
+	}
+	ErrPlacementNotFound = &Error{
+		Code:    "PLACEMENT_NOT_FOUND",
+		Message: "device placement not found",
+	}
+	ErrUnsupportedDomain = &Error{
+		Code:    "UNSUPPORTED_DOMAIN",
+		Message: "unsupported device domain",
+	}
+	ErrInvalidPlacement = &Error{
+		Code:    "INVALID_PLACEMENT",
+		Message: "invalid device placement",
+	}
+	ErrInvalidDevice = &Error{
+		Code:    "INVALID_DEVICE",
+		Message: "invalid device data",
+	}
 )

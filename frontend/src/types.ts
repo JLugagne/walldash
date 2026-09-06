@@ -33,3 +33,32 @@ export interface Plan {
   walls: WallSegment[]
   zones: Zone[]
 }
+
+export interface Device {
+  id: string
+  name: string
+  domain: string
+  state: string
+  attributes: Record<string, any>
+}
+
+export interface DevicePlacement {
+  id: string
+  level_id: string
+  device_id: string
+  x: number
+  y: number
+  icon?: string
+  custom_name?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface SavePlacementRequest {
+  id?: string
+  device_id: string
+  x: number
+  y: number
+  icon?: string
+  custom_name?: string
+}

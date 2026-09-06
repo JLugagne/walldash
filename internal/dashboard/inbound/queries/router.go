@@ -3,6 +3,7 @@ package queries
 import (
 	"net/http"
 
+	svcdevices "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/devices"
 	svchealth "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/health"
 	svclevels "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/levels"
 	"github.com/JLugagne/ha-dash/internal/dashboard/inbound"
@@ -16,5 +17,9 @@ func SetupRoutes(r *mux.Router, controller *inbound.Controller, queries svchealt
 
 	if levelQueries, ok := queries.(svclevels.LevelQueries); ok {
 		SetupLevelRoutes(r, controller, levelQueries)
+	}
+
+	if deviceQueries, ok := queries.(svcdevices.DeviceQueries); ok {
+		SetupDeviceRoutes(r, controller, deviceQueries)
 	}
 }

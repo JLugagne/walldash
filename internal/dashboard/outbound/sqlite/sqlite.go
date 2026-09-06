@@ -12,6 +12,7 @@ import (
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels"
+	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/placements"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow"
 	"github.com/JLugagne/ha-dash/internal/pkg/logger"
@@ -34,10 +35,11 @@ type Adapter struct {
 
 // Ensure Adapter implements domain repositories and uow.UnitOfWork.
 var (
-	_ health.Repository      = (*Adapter)(nil)
-	_ levels.LevelRepository = (*Adapter)(nil)
-	_ plans.PlanRepository   = (*Adapter)(nil)
-	_ uow.UnitOfWork         = (*Adapter)(nil)
+	_ health.Repository                    = (*Adapter)(nil)
+	_ levels.LevelRepository               = (*Adapter)(nil)
+	_ plans.PlanRepository                 = (*Adapter)(nil)
+	_ placements.DevicePlacementRepository = (*Adapter)(nil)
+	_ uow.UnitOfWork                       = (*Adapter)(nil)
 )
 
 // New initializes an Adapter connected to the SQLite database at dbPath and runs migrations.
@@ -100,9 +102,10 @@ func (a *Adapter) Do(ctx context.Context, fn func(repos uow.Repositories) error)
 	}()
 
 	repos := uow.Repositories{
-		Health: &txHealthRepo{tx: tx},
-		Levels: &levelRepo{db: tx},
-		Plans:  &planRepo{db: tx},
+		Health:     &txHealthRepo{tx: tx},
+		Levels:     &levelRepo{db: tx},
+		Plans:      &planRepo{db: tx},
+		Placements: &placementRepo{db: tx},
 	}
 
 	if err := fn(repos); err != nil {
