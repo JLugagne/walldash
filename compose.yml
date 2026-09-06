@@ -1,0 +1,19 @@
+services:
+  ha-dash:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ha-dash
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DB_PATH=/app/data/ha-dash.db
+      - HA_URL=${HA_URL:-http://homeassistant.local:8123}
+      - HA_TOKEN=${HA_TOKEN:-}
+    volumes:
+      - ha-dash-data:/app/data
+
+volumes:
+  ha-dash-data:

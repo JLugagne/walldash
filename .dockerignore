@@ -1,0 +1,8 @@
+.git
+.agents
+.claude
+frontend/node_modules
+frontend/dist
+tmp
+*.db
+*.db-journal
