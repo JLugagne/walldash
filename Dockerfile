@@ -12,8 +12,6 @@ RUN npm run build
 FROM golang:1.27-alpine AS backend-builder
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates
-
 COPY go.mod go.sum ./
 RUN go mod download
 
@@ -27,13 +25,16 @@ COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 # Compile static binary with modernc.org/sqlite (pure Go, CGO-free)
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/walldash ./cmd/main.go
 
-# Stage 3: Minimal runtime image with zero external asset dependencies
-FROM alpine:3.21
+# Stage 3: Scratch image — copy only the binary and runtime deps
+FROM alpine:3.21 AS runtime-deps
+RUN apk add --no-cache ca-certificates tzdata && mkdir -p /app/data
+
+FROM scratch
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates tzdata
-
-RUN mkdir -p /app/data
+COPY --from=runtime-deps /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=runtime-deps /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=runtime-deps /app/data /app/data
 
 COPY --from=backend-builder /app/walldash /app/walldash
 

@@ -33,7 +33,7 @@
 - **📦 Zero-Dependency Single Binary**:
   - Pure Go backend using `modernc.org/sqlite` (no CGO required).
   - Frontend assets compiled and embedded directly into the Go binary (`embed.FS`).
-  - Ultra-lightweight Docker image (~30 MB Alpine runtime).
+  - Ultra-lightweight Docker image (~9 MB scratch image, zero runtime dependencies).
 
 ---
 
