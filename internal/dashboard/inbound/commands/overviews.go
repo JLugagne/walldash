@@ -37,7 +37,9 @@ func SetupOverviewRoutes(r *mux.Router, controller *inbound.Controller, commands
 	r.HandleFunc("/api/overviews/{id}", handler.UpdateOverview).Methods(http.MethodPut)
 	r.HandleFunc("/api/overviews/{id}", handler.DeleteOverview).Methods(http.MethodDelete)
 	r.HandleFunc("/api/overviews/{id}/widgets", handler.CreateWidget).Methods(http.MethodPost)
+	r.HandleFunc("/api/overviews/{id}/widgets/{widgetId}", handler.UpdateWidget).Methods(http.MethodPut)
 	r.HandleFunc("/api/overviews/{id}/widgets/{widgetId}", handler.DeleteWidget).Methods(http.MethodDelete)
+	r.HandleFunc("/api/overviews/{id}/layout", handler.UpdateLayout).Methods(http.MethodPut)
 	r.HandleFunc("/api/automations/{id}/trigger", handler.TriggerAutomation).Methods(http.MethodPost)
 }
 
@@ -156,6 +158,75 @@ func (h *OverviewsHandler) CreateWidget(w http.ResponseWriter, r *http.Request) 
 
 	response := converters.ToPublicWidget(created)
 	h.controller.SendSuccess(w, r, response)
+}
+
+// UpdateWidget handles PUT /api/overviews/{id}/widgets/{widgetId}.
+func (h *OverviewsHandler) UpdateWidget(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	dashboardID := vars["id"]
+	widgetID := vars["widgetId"]
+
+	var req pkgdashboard.UpdateWidgetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidUpdateWidgetRequest, err))
+		return
+	}
+
+	if err := h.validate.Struct(req); err != nil {
+		h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidUpdateWidgetRequest, err))
+		return
+	}
+
+	actor := domain.ActorFromContext(r.Context())
+	domainWidget := converters.ToDomainUpdateWidget(dashboardID, widgetID, req)
+
+	updated, err := h.commands.UpdateWidget(r.Context(), actor, dashboardID, domainWidget)
+	if err != nil {
+		if errors.Is(err, domain.ErrWidgetNotFound) || errors.Is(err, domain.ErrOverviewNotFound) || errors.Is(err, domain.ErrInvalidWidget) {
+			h.controller.SendFail(w, r, nil, err)
+			return
+		}
+		h.controller.SendError(w, r, err)
+		return
+	}
+
+	response := converters.ToPublicWidget(updated)
+	h.controller.SendSuccess(w, r, response)
+}
+
+// UpdateLayout handles PUT /api/overviews/{id}/layout.
+func (h *OverviewsHandler) UpdateLayout(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	dashboardID := vars["id"]
+
+	var req pkgdashboard.UpdateLayoutRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidUpdateLayoutRequest, err))
+		return
+	}
+
+	if err := h.validate.Struct(req); err != nil {
+		h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidUpdateLayoutRequest, err))
+		return
+	}
+
+	actor := domain.ActorFromContext(r.Context())
+	positions := converters.ToDomainWidgetPositions(req)
+
+	if err := h.commands.UpdateLayout(r.Context(), actor, dashboardID, positions); err != nil {
+		if errors.Is(err, domain.ErrOverviewNotFound) || errors.Is(err, domain.ErrInvalidOverview) ||
+			errors.Is(err, domain.ErrInvalidWidget) || errors.Is(err, domain.ErrWidgetNotFound) {
+			h.controller.SendFail(w, r, nil, err)
+			return
+		}
+		h.controller.SendError(w, r, err)
+		return
+	}
+
+	h.controller.SendSuccess(w, r, map[string]string{
+		"dashboard_id": dashboardID,
+		"status":       "updated",
+	})
 }
 
 // DeleteWidget handles DELETE /api/overviews/{id}/widgets/{widgetId}.

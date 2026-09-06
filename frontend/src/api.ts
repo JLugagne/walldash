@@ -42,3 +42,19 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
   }
   return res
 }
+
+/**
+ * readApiError extracts a human-readable message from a failed API response, preferring the
+ * envelope's `message` or `error` field and falling back to the HTTP status line. Safe to call
+ * on any `Response`, even one whose body is not JSON or already consumed.
+ */
+export async function readApiError(res: Response): Promise<string> {
+  const fallback = res.statusText || `Erreur HTTP ${res.status}`
+  try {
+    const payload = await res.json()
+    const message = payload?.message ?? payload?.error
+    return typeof message === 'string' && message ? message : fallback
+  } catch {
+    return fallback
+  }
+}

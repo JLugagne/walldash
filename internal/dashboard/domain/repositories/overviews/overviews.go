@@ -23,4 +23,5 @@ type WidgetRepository interface {
 	UpdateWidget(ctx context.Context, widget domain.Widget) (domain.Widget, error)
 	DeleteWidget(ctx context.Context, id string) error
 	DeleteWidgetsByDashboardID(ctx context.Context, dashboardID string) error
+	ReplaceWidgetPositions(ctx context.Context, dashboardID string, positions []domain.WidgetPosition) error
 }

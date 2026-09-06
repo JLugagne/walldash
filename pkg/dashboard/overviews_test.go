@@ -21,6 +21,15 @@ func TestCreateOverviewRequestValidation(t *testing.T) {
 		require.NoError(t, validate.Struct(req))
 	})
 
+	t.Run("valid CreateOverviewRequest with explicit grid size passes validation", func(t *testing.T) {
+		req := pkgdashboard.CreateOverviewRequest{
+			Name: "Tableau Salon",
+			Cols: 12,
+			Rows: 8,
+		}
+		require.NoError(t, validate.Struct(req))
+	})
+
 	t.Run("missing Name fails validation", func(t *testing.T) {
 		req := pkgdashboard.CreateOverviewRequest{
 			Name: "",
@@ -57,11 +66,30 @@ func TestCreateWidgetRequestValidation(t *testing.T) {
 
 	t.Run("valid CreateWidgetRequest passes validation", func(t *testing.T) {
 		req := pkgdashboard.CreateWidgetRequest{
-			Type:  "automation_list",
-			Title: "Mes Scénarios",
-			Order: 0,
+			Type:    "automation_list",
+			Title:   "Mes Scénarios",
+			Order:   0,
+			Col:     0,
+			Row:     0,
+			ColSpan: 2,
+			RowSpan: 2,
 			Config: pkgdashboard.WidgetConfigDTO{
 				EntityIDs: []string{"automation.eteindre_tout"},
+				Display:   "list",
+			},
+		}
+		require.NoError(t, validate.Struct(req))
+	})
+
+	t.Run("empty Title passes validation (title is optional)", func(t *testing.T) {
+		req := pkgdashboard.CreateWidgetRequest{
+			Type:    "automation_list",
+			Title:   "",
+			ColSpan: 2,
+			RowSpan: 2,
+			Config: pkgdashboard.WidgetConfigDTO{
+				EntityIDs: []string{"automation.eteindre_tout"},
+				Display:   "list",
 			},
 		}
 		require.NoError(t, validate.Struct(req))
@@ -69,18 +97,89 @@ func TestCreateWidgetRequestValidation(t *testing.T) {
 
 	t.Run("missing Type fails validation", func(t *testing.T) {
 		req := pkgdashboard.CreateWidgetRequest{
-			Type:  "",
-			Title: "Titre",
+			Type:    "",
+			Title:   "Titre",
+			ColSpan: 1,
+			RowSpan: 1,
 		}
 		err := validate.Struct(req)
 		require.Error(t, err)
 		assert.True(t, domain.IsDomainError(pkgdashboard.ErrInvalidCreateWidgetRequest))
 	})
 
-	t.Run("missing Title fails validation", func(t *testing.T) {
+	t.Run("missing ColSpan fails validation", func(t *testing.T) {
 		req := pkgdashboard.CreateWidgetRequest{
-			Type:  "automation_list",
-			Title: "",
+			Type:    "sensor",
+			Title:   "Température",
+			ColSpan: 0,
+			RowSpan: 1,
+		}
+		err := validate.Struct(req)
+		require.Error(t, err)
+	})
+
+	t.Run("missing Display fails validation", func(t *testing.T) {
+		req := pkgdashboard.CreateWidgetRequest{
+			Type:    "sensor",
+			Title:   "Température",
+			ColSpan: 1,
+			RowSpan: 1,
+			Config:  pkgdashboard.WidgetConfigDTO{EntityIDs: []string{"sensor.temp"}},
+		}
+		err := validate.Struct(req)
+		require.Error(t, err)
+	})
+}
+
+func TestUpdateWidgetRequestValidation(t *testing.T) {
+	validate := validator.New()
+
+	t.Run("valid UpdateWidgetRequest passes validation", func(t *testing.T) {
+		req := pkgdashboard.UpdateWidgetRequest{
+			Title: "Nouveau Titre",
+			Config: pkgdashboard.WidgetConfigDTO{
+				EntityIDs: []string{"sensor.temp"},
+				Display:   "number",
+			},
+		}
+		require.NoError(t, validate.Struct(req))
+	})
+
+	t.Run("missing Display fails validation", func(t *testing.T) {
+		req := pkgdashboard.UpdateWidgetRequest{
+			Title:  "Nouveau Titre",
+			Config: pkgdashboard.WidgetConfigDTO{EntityIDs: []string{"sensor.temp"}},
+		}
+		err := validate.Struct(req)
+		require.Error(t, err)
+		assert.True(t, domain.IsDomainError(pkgdashboard.ErrInvalidUpdateWidgetRequest))
+	})
+}
+
+func TestUpdateLayoutRequestValidation(t *testing.T) {
+	validate := validator.New()
+
+	t.Run("valid UpdateLayoutRequest passes validation", func(t *testing.T) {
+		req := pkgdashboard.UpdateLayoutRequest{
+			Positions: []pkgdashboard.WidgetPositionDTO{
+				{ID: "w-1", Col: 0, Row: 0, ColSpan: 1, RowSpan: 1},
+			},
+		}
+		require.NoError(t, validate.Struct(req))
+	})
+
+	t.Run("empty positions fails validation", func(t *testing.T) {
+		req := pkgdashboard.UpdateLayoutRequest{Positions: nil}
+		err := validate.Struct(req)
+		require.Error(t, err)
+		assert.True(t, domain.IsDomainError(pkgdashboard.ErrInvalidUpdateLayoutRequest))
+	})
+
+	t.Run("position missing ID fails validation", func(t *testing.T) {
+		req := pkgdashboard.UpdateLayoutRequest{
+			Positions: []pkgdashboard.WidgetPositionDTO{
+				{ID: "", Col: 0, Row: 0, ColSpan: 1, RowSpan: 1},
+			},
 		}
 		err := validate.Struct(req)
 		require.Error(t, err)

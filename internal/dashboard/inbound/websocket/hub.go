@@ -112,7 +112,7 @@ func (h *Hub) Run() {
 		case <-h.stop:
 			h.mu.Lock()
 			for client := range h.clients {
-				close(client.send)
+				client.closeSend()
 				delete(h.clients, client)
 			}
 			h.running = false
@@ -128,19 +128,14 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				close(client.send)
+				client.closeSend()
 			}
 			h.mu.Unlock()
 
 		case message := <-h.broadcast:
 			h.mu.Lock()
 			for client := range h.clients {
-				select {
-				case client.send <- message:
-				default:
-					close(client.send)
-					delete(h.clients, client)
-				}
+				client.sendMsg(message)
 			}
 			h.mu.Unlock()
 		}
@@ -204,17 +199,44 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 		"type":    "connected",
 		"message": "Connected to ha-dash real-time WebSocket",
 	})
-	client.send <- initMsg
+	client.sendMsg(initMsg)
 
+	// Detach from HTTP request cancellation so readPump has a valid session context
+	sessionCtx := context.WithoutCancel(r.Context())
 	go client.writePump()
-	go client.readPump(r.Context())
+	go client.readPump(sessionCtx)
 }
 
 // Client represents a single WebSocket client session.
 type Client struct {
-	hub  *Hub
-	conn *websocket.Conn
-	send chan []byte
+	hub    *Hub
+	conn   *websocket.Conn
+	send   chan []byte
+	mu     sync.Mutex
+	closed bool
+}
+
+func (c *Client) closeSend() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.closed {
+		c.closed = true
+		close(c.send)
+	}
+}
+
+func (c *Client) sendMsg(msg []byte) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return false
+	}
+	select {
+	case c.send <- msg:
+		return true
+	default:
+		return false
+	}
 }
 
 func (c *Client) readPump(ctx context.Context) {
@@ -245,10 +267,7 @@ func (c *Client) readPump(ctx context.Context) {
 		switch msgType {
 		case "ping":
 			pongMsg, _ := json.Marshal(map[string]string{"type": "pong"})
-			select {
-			case c.send <- pongMsg:
-			default:
-			}
+			c.sendMsg(pongMsg)
 
 		case "action":
 			var actionMsg ClientActionMessage
@@ -257,7 +276,7 @@ func (c *Client) readPump(ctx context.Context) {
 					"type":  "error",
 					"error": "invalid action message format",
 				})
-				c.send <- errMsg
+				c.sendMsg(errMsg)
 				continue
 			}
 
@@ -274,18 +293,21 @@ func (c *Client) readPump(ctx context.Context) {
 					"error":     err.Error(),
 					"entity_id": actionMsg.EntityID,
 				})
-				c.send <- errMsg
+				c.sendMsg(errMsg)
 				continue
 			}
 
 			actor := domain.ActorFromContext(ctx)
-			if err := c.hub.actionCommands.ExecuteAction(ctx, actor, cmd); err != nil {
+			actionCtx, cancel := context.WithTimeout(ctx, 25*time.Second)
+			err := c.hub.actionCommands.ExecuteAction(actionCtx, actor, cmd)
+			cancel()
+			if err != nil {
 				errMsg, _ := json.Marshal(map[string]string{
 					"type":      "error",
 					"error":     err.Error(),
 					"entity_id": actionMsg.EntityID,
 				})
-				c.send <- errMsg
+				c.sendMsg(errMsg)
 				continue
 			}
 
@@ -294,7 +316,7 @@ func (c *Client) readPump(ctx context.Context) {
 				"entity_id": actionMsg.EntityID,
 				"action":    actionMsg.Action,
 			})
-			c.send <- successMsg
+			c.sendMsg(successMsg)
 		}
 	}
 }

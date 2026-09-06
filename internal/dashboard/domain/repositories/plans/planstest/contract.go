@@ -66,6 +66,8 @@ func PlanRepositoryContractTesting(t *testing.T, repo plans.PlanRepository) {
 						{X: 50, Y: 50},
 						{X: 0, Y: 50},
 					},
+					TempSensor:     "sensor.cuisine_temperature",
+					HumiditySensor: "sensor.cuisine_humidity",
 				},
 			},
 		}
@@ -84,6 +86,8 @@ func PlanRepositoryContractTesting(t *testing.T, repo plans.PlanRepository) {
 		assert.Equal(t, 1, len(retrieved.Zones))
 		assert.Equal(t, "z1", retrieved.Zones[0].ID)
 		assert.Equal(t, 4, len(retrieved.Zones[0].Points))
+		assert.Equal(t, "sensor.cuisine_temperature", retrieved.Zones[0].TempSensor)
+		assert.Equal(t, "sensor.cuisine_humidity", retrieved.Zones[0].HumiditySensor)
 	})
 
 	t.Run("Contract: FindByLevelID returns ErrPlanNotFound for missing plan", func(t *testing.T) {

@@ -83,6 +83,7 @@ func LevelRepositoryContractTesting(t *testing.T, repo levels.LevelRepository) {
 		assert.Equal(t, lvl.Name, created.Name)
 		assert.Equal(t, lvl.Order, created.Order)
 		assert.Equal(t, lvl.IsOutdoor, created.IsOutdoor)
+		assert.Equal(t, []string{"controls", "sensors"}, created.Layers)
 
 		found, err := repo.FindByID(ctx, lvl.ID)
 		require.NoError(t, err)
@@ -90,6 +91,7 @@ func LevelRepositoryContractTesting(t *testing.T, repo levels.LevelRepository) {
 		assert.Equal(t, lvl.Name, found.Name)
 		assert.Equal(t, lvl.Order, found.Order)
 		assert.Equal(t, lvl.IsOutdoor, found.IsOutdoor)
+		assert.Equal(t, []string{"controls", "sensors"}, found.Layers)
 	})
 
 	t.Run("Contract: FindByID returns ErrLevelNotFound for missing level", func(t *testing.T) {
@@ -146,15 +148,18 @@ func LevelRepositoryContractTesting(t *testing.T, repo levels.LevelRepository) {
 
 		lvl.Name = "Jardin Modifié"
 		lvl.IsOutdoor = true
+		lvl.Layers = []string{"controls", "plants", "lighting"}
 		lvl.UpdatedAt = time.Now().UTC().Truncate(time.Second)
 
 		updated, err := repo.Update(ctx, lvl)
 		require.NoError(t, err)
 		assert.Equal(t, "Jardin Modifié", updated.Name)
+		assert.Equal(t, []string{"controls", "plants", "lighting"}, updated.Layers)
 
 		found, err := repo.FindByID(ctx, lvl.ID)
 		require.NoError(t, err)
 		assert.Equal(t, "Jardin Modifié", found.Name)
+		assert.Equal(t, []string{"controls", "plants", "lighting"}, found.Layers)
 	})
 
 	t.Run("Contract: Update returns ErrLevelNotFound for non-existent level", func(t *testing.T) {

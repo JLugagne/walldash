@@ -20,6 +20,12 @@ func TestLevelRequestsValidation(t *testing.T) {
 		}
 		require.NoError(t, validate.Struct(validReq))
 
+		validWithLayers := pkgdashboard.CreateLevelRequest{
+			Name:   "Rez-de-chaussée",
+			Layers: []string{"controls", "sensors", "lighting"},
+		}
+		require.NoError(t, validate.Struct(validWithLayers))
+
 		invalidReq := pkgdashboard.CreateLevelRequest{
 			Name: "",
 		}
@@ -101,5 +107,59 @@ func TestLevelRequestsValidation(t *testing.T) {
 		err := validate.Struct(invalidReq)
 		require.Error(t, err)
 		assert.True(t, domain.IsDomainError(pkgdashboard.ErrInvalidSavePlanRequest))
+
+		validWithOpenings := pkgdashboard.SavePlanRequest{
+			Walls: []pkgdashboard.WallSegmentDTO{
+				{
+					ID:        "w1",
+					X1:        0,
+					Y1:        0,
+					X2:        100,
+					Y2:        0,
+					Thickness: 10,
+					Openings: []pkgdashboard.WallOpeningDTO{
+						{
+							ID:     "win-1",
+							Type:   "window",
+							Offset: 30,
+							Width:  20,
+						},
+						{
+							ID:        "door-1",
+							Type:      "door",
+							Offset:    70,
+							Width:     25,
+							FlipSide:  true,
+							FlipHinge: true,
+							HideDoor:  true,
+						},
+					},
+				},
+			},
+			Zones: []pkgdashboard.ZoneDTO{},
+		}
+		require.NoError(t, validate.Struct(validWithOpenings))
+		assert.True(t, validWithOpenings.Walls[0].Openings[1].FlipSide)
+		assert.True(t, validWithOpenings.Walls[0].Openings[1].FlipHinge)
+		assert.True(t, validWithOpenings.Walls[0].Openings[1].HideDoor)
+
+		invalidOpeningType := pkgdashboard.SavePlanRequest{
+			Walls: []pkgdashboard.WallSegmentDTO{
+				{
+					ID:        "w1",
+					Thickness: 10,
+					Openings: []pkgdashboard.WallOpeningDTO{
+						{
+							ID:     "bad-1",
+							Type:   "invalid",
+							Offset: 10,
+							Width:  20,
+						},
+					},
+				},
+			},
+		}
+		err = validate.Struct(invalidOpeningType)
+		require.Error(t, err)
 	})
 }

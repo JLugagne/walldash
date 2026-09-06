@@ -21,6 +21,17 @@ func TestSavePlacementRequestValidation(t *testing.T) {
 			Y:          250.0,
 			Icon:       "lightbulb",
 			CustomName: "Plafonnier Salon",
+			Layer:      "controls",
+		}
+		require.NoError(t, validate.Struct(req))
+	})
+
+	t.Run("valid SavePlacementRequest with custom layer passes validation", func(t *testing.T) {
+		req := pkgdashboard.SavePlacementRequest{
+			DeviceID: "light.living_room",
+			X:        100.0,
+			Y:        100.0,
+			Layer:    "security",
 		}
 		require.NoError(t, validate.Struct(req))
 	})
@@ -60,6 +71,27 @@ func TestSavePlacementRequestValidation(t *testing.T) {
 			DeviceID: "sensor.temp",
 			X:        10.0,
 			Y:        -0.5,
+		}
+		err := validate.Struct(req)
+		require.Error(t, err)
+	})
+
+	t.Run("supported RenderDomain override passes validation", func(t *testing.T) {
+		req := pkgdashboard.SavePlacementRequest{
+			DeviceID:     "switch.lamp",
+			X:            10.0,
+			Y:            10.0,
+			RenderDomain: "light",
+		}
+		require.NoError(t, validate.Struct(req))
+	})
+
+	t.Run("unsupported RenderDomain fails validation", func(t *testing.T) {
+		req := pkgdashboard.SavePlacementRequest{
+			DeviceID:     "switch.lamp",
+			X:            10.0,
+			Y:            10.0,
+			RenderDomain: "camera",
 		}
 		err := validate.Struct(req)
 		require.Error(t, err)

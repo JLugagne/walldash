@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
+	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow"
 	"github.com/JLugagne/ha-dash/internal/pkg/logger"
 	"github.com/google/uuid"
 )
@@ -54,7 +55,6 @@ func (a *App) CreateOverview(ctx context.Context, actor domain.Actor, overview d
 		overview.ID = uuid.NewString()
 	}
 
-	// Auto-assign order if 0 and there are existing overviews
 	existing, err := a.overviewsRepo.FindAllOverviews(ctx)
 	if err == nil && len(existing) > 0 && overview.Order == 0 {
 		maxOrder := 0
@@ -76,7 +76,11 @@ func (a *App) CreateOverview(ctx context.Context, actor domain.Actor, overview d
 	return created, nil
 }
 
-// UpdateOverview validates and updates an existing overview dashboard.
+// UpdateOverview renames and reorders an existing overview dashboard, and may resize its Widget
+// Grid. A zero Cols or Rows preserves the stored dimension. Resizing is refused when it would
+// push an existing widget out of the viewport or make two widgets overlap, so the grid invariant
+// cannot be broken from this route. Returns domain.ErrOverviewNotFound, or an error wrapping
+// domain.ErrInvalidOverview or domain.ErrInvalidWidget.
 func (a *App) UpdateOverview(ctx context.Context, actor domain.Actor, overview domain.OverviewDashboard) (domain.OverviewDashboard, error) {
 	log := logger.LoggerFromContext(ctx)
 
@@ -85,6 +89,31 @@ func (a *App) UpdateOverview(ctx context.Context, actor domain.Actor, overview d
 	}
 	if strings.TrimSpace(overview.Name) == "" {
 		return domain.OverviewDashboard{}, errors.Join(domain.ErrInvalidOverview, errors.New("overview name is required"))
+	}
+
+	current, err := a.overviewsRepo.FindOverviewByID(ctx, overview.ID)
+	if err != nil {
+		log.WithError(err).WithField("overview_id", overview.ID).Error("failed to load overview dashboard for grid size preservation")
+		return domain.OverviewDashboard{}, err
+	}
+	if overview.Cols == 0 {
+		overview.Cols = current.Cols
+	}
+	if overview.Rows == 0 {
+		overview.Rows = current.Rows
+	}
+
+	if overview.Cols != current.Cols || overview.Rows != current.Rows {
+		widgets, err := a.widgetsRepo.FindWidgetsByDashboardID(ctx, overview.ID)
+		if err != nil {
+			log.WithError(err).WithField("overview_id", overview.ID).Error("failed to load widgets for grid resize validation")
+			return domain.OverviewDashboard{}, err
+		}
+		resized := overview
+		resized.Widgets = widgets
+		if err := resized.Validate(); err != nil {
+			return domain.OverviewDashboard{}, err
+		}
 	}
 
 	updated, err := a.overviewsRepo.UpdateOverview(ctx, overview)
@@ -105,7 +134,13 @@ func (a *App) DeleteOverview(ctx context.Context, actor domain.Actor, id string)
 		return errors.Join(domain.ErrInvalidOverview, errors.New("overview id is required"))
 	}
 
-	if err := a.overviewsRepo.DeleteOverview(ctx, id); err != nil {
+	err := a.uow.Do(ctx, func(repos uow.Repositories) error {
+		if err := repos.Widgets.DeleteWidgetsByDashboardID(ctx, id); err != nil {
+			return err
+		}
+		return repos.Overviews.DeleteOverview(ctx, id)
+	})
+	if err != nil {
 		log.WithError(err).WithField("overview_id", id).Error("failed to delete overview dashboard")
 		return err
 	}
@@ -114,31 +149,48 @@ func (a *App) DeleteOverview(ctx context.Context, actor domain.Actor, id string)
 	return nil
 }
 
-// CreateWidget validates and attaches a new widget to an overview dashboard.
+// CreateWidget anchors a new widget in the Widget Grid of its dashboard. The candidate is
+// checked against the dashboard as a whole inside the same transaction that writes it, so a
+// widget whose type and display pair is illegal, whose footprint is below the display minimum,
+// which leaves the grid, or which overlaps an existing widget is refused and nothing is written.
+// An empty title is accepted: the UI falls back to the config label then to the Home Assistant
+// device name. Returns domain.ErrOverviewNotFound when the parent dashboard is unknown, and an
+// error wrapping domain.ErrInvalidWidget or domain.ErrInvalidOverview when the resulting
+// dashboard would break the grid invariant.
 func (a *App) CreateWidget(ctx context.Context, actor domain.Actor, widget domain.Widget) (domain.Widget, error) {
 	log := logger.LoggerFromContext(ctx)
 
 	if strings.TrimSpace(widget.DashboardID) == "" {
 		return domain.Widget{}, errors.Join(domain.ErrInvalidWidget, errors.New("widget dashboard_id is required"))
 	}
-
-	// Verify parent dashboard exists
-	if _, err := a.overviewsRepo.FindOverviewByID(ctx, widget.DashboardID); err != nil {
-		log.WithError(err).WithField("dashboard_id", widget.DashboardID).Error("parent overview dashboard not found")
-		return domain.Widget{}, err
-	}
-
-	if strings.TrimSpace(widget.Title) == "" {
-		return domain.Widget{}, errors.Join(domain.ErrInvalidWidget, errors.New("widget title is required"))
-	}
-	if strings.TrimSpace(widget.Type) == "" {
-		return domain.Widget{}, errors.Join(domain.ErrInvalidWidget, errors.New("widget type is required"))
-	}
 	if strings.TrimSpace(widget.ID) == "" {
 		widget.ID = uuid.NewString()
 	}
 
-	created, err := a.widgetsRepo.CreateWidget(ctx, widget)
+	var created domain.Widget
+	err := a.uow.Do(ctx, func(repos uow.Repositories) error {
+		dashboard, err := repos.Overviews.FindOverviewByID(ctx, widget.DashboardID)
+		if err != nil {
+			return err
+		}
+
+		siblings, err := repos.Widgets.FindWidgetsByDashboardID(ctx, widget.DashboardID)
+		if err != nil {
+			return err
+		}
+
+		candidate := make([]domain.Widget, 0, len(siblings)+1)
+		candidate = append(candidate, siblings...)
+		candidate = append(candidate, widget)
+		dashboard.Widgets = candidate
+
+		if err := dashboard.Validate(); err != nil {
+			return err
+		}
+
+		created, err = repos.Widgets.CreateWidget(ctx, widget)
+		return err
+	})
 	if err != nil {
 		log.WithError(err).WithField("widget_id", widget.ID).Error("failed to create widget")
 		return domain.Widget{}, err
@@ -156,7 +208,6 @@ func (a *App) DeleteWidget(ctx context.Context, actor domain.Actor, dashboardID 
 		return errors.Join(domain.ErrInvalidWidget, errors.New("widget id is required"))
 	}
 
-	// Check if widget exists and belongs to the specified dashboard
 	widget, err := a.widgetsRepo.FindWidgetByID(ctx, widgetID)
 	if err != nil {
 		log.WithError(err).WithField("widget_id", widgetID).Error("widget not found")
@@ -173,6 +224,107 @@ func (a *App) DeleteWidget(ctx context.Context, actor domain.Actor, dashboardID 
 	}
 
 	log.WithField("widget_id", widgetID).WithField("actor", actor.UserID).Info("widget deleted successfully")
+	return nil
+}
+
+// UpdateWidget overlays the title and configuration of an existing widget, leaving its
+// grid position untouched: position only ever changes through UpdateLayout. Returns
+// domain.ErrWidgetNotFound when widgetID is unknown or does not belong to dashboardID,
+// domain.ErrInvalidOverview when the parent dashboard cannot be loaded, and
+// domain.ErrInvalidWidget when the resulting widget violates the dashboard grid.
+func (a *App) UpdateWidget(ctx context.Context, actor domain.Actor, dashboardID string, widget domain.Widget) (domain.Widget, error) {
+	log := logger.LoggerFromContext(ctx)
+
+	if strings.TrimSpace(widget.ID) == "" {
+		return domain.Widget{}, errors.Join(domain.ErrInvalidWidget, errors.New("widget id is required"))
+	}
+
+	existing, err := a.widgetsRepo.FindWidgetByID(ctx, widget.ID)
+	if err != nil {
+		log.WithError(err).WithField("widget_id", widget.ID).Error("widget not found")
+		return domain.Widget{}, err
+	}
+
+	if dashboardID != "" && existing.DashboardID != dashboardID {
+		return domain.Widget{}, errors.Join(domain.ErrWidgetNotFound, errors.New("widget does not belong to specified dashboard"))
+	}
+
+	existing.Title = widget.Title
+	existing.Config = widget.Config
+
+	dashboard, err := a.overviewsRepo.FindOverviewByID(ctx, existing.DashboardID)
+	if err != nil {
+		log.WithError(err).WithField("dashboard_id", existing.DashboardID).Error("parent overview dashboard not found")
+		return domain.Widget{}, err
+	}
+
+	if err := existing.ValidateIn(dashboard.Cols, dashboard.Rows); err != nil {
+		return domain.Widget{}, err
+	}
+
+	updated, err := a.widgetsRepo.UpdateWidget(ctx, existing)
+	if err != nil {
+		log.WithError(err).WithField("widget_id", existing.ID).Error("failed to update widget")
+		return domain.Widget{}, err
+	}
+
+	log.WithField("widget_id", updated.ID).WithField("actor", actor.UserID).Info("widget updated successfully")
+	return updated, nil
+}
+
+// UpdateLayout replaces the grid positions of the widgets named in positions, all inside
+// a single transaction: the candidate layout is validated against the dashboard grid
+// invariant before ReplaceWidgetPositions ever writes, so a rejected layout leaves the
+// stored positions untouched. Returns domain.ErrWidgetNotFound when a position names a
+// widget outside dashboardID, and an error wrapping domain.ErrInvalidOverview or
+// domain.ErrInvalidWidget when the resulting layout would violate the grid invariant.
+func (a *App) UpdateLayout(ctx context.Context, actor domain.Actor, dashboardID string, positions []domain.WidgetPosition) error {
+	log := logger.LoggerFromContext(ctx)
+
+	if strings.TrimSpace(dashboardID) == "" {
+		return errors.Join(domain.ErrInvalidOverview, errors.New("dashboard id is required"))
+	}
+
+	err := a.uow.Do(ctx, func(repos uow.Repositories) error {
+		dashboard, err := repos.Overviews.FindOverviewByID(ctx, dashboardID)
+		if err != nil {
+			return err
+		}
+
+		widgets, err := repos.Widgets.FindWidgetsByDashboardID(ctx, dashboardID)
+		if err != nil {
+			return err
+		}
+
+		widgetIndexByID := make(map[string]int, len(widgets))
+		for i, w := range widgets {
+			widgetIndexByID[w.ID] = i
+		}
+
+		for _, p := range positions {
+			idx, ok := widgetIndexByID[p.ID]
+			if !ok {
+				return errors.Join(domain.ErrWidgetNotFound, errors.New("widget "+p.ID+" does not belong to dashboard "+dashboardID))
+			}
+			widgets[idx].Col = p.Col
+			widgets[idx].Row = p.Row
+			widgets[idx].ColSpan = p.ColSpan
+			widgets[idx].RowSpan = p.RowSpan
+		}
+		dashboard.Widgets = widgets
+
+		if err := dashboard.Validate(); err != nil {
+			return err
+		}
+
+		return repos.Widgets.ReplaceWidgetPositions(ctx, dashboardID, positions)
+	})
+	if err != nil {
+		log.WithError(err).WithField("dashboard_id", dashboardID).Error("failed to update widget layout")
+		return err
+	}
+
+	log.WithField("dashboard_id", dashboardID).WithField("actor", actor.UserID).Info("widget layout updated successfully")
 	return nil
 }
 

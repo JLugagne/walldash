@@ -15,21 +15,25 @@ func TestLevelConverters(t *testing.T) {
 		req := pkgdashboard.CreateLevelRequest{
 			Name:      "Rez-de-chaussée",
 			IsOutdoor: false,
+			Layers:    []string{"controls", "sensors"},
 		}
 		domainLevel := converters.ToDomainCreateLevel(req)
 		assert.Equal(t, req.Name, domainLevel.Name)
 		assert.Equal(t, req.IsOutdoor, domainLevel.IsOutdoor)
+		assert.Equal(t, req.Layers, domainLevel.Layers)
 	})
 
 	t.Run("ToDomainUpdateLevel converts request with ID", func(t *testing.T) {
 		req := pkgdashboard.UpdateLevelRequest{
 			Name:      "Étage 1",
 			IsOutdoor: true,
+			Layers:    []string{"controls", "hvac"},
 		}
 		domainLevel := converters.ToDomainUpdateLevel("lvl-123", req)
 		assert.Equal(t, "lvl-123", domainLevel.ID)
 		assert.Equal(t, req.Name, domainLevel.Name)
 		assert.Equal(t, req.IsOutdoor, domainLevel.IsOutdoor)
+		assert.Equal(t, req.Layers, domainLevel.Layers)
 	})
 
 	t.Run("ToPublicLevel converts domain level", func(t *testing.T) {
@@ -39,6 +43,7 @@ func TestLevelConverters(t *testing.T) {
 			Name:      "Salon",
 			Order:     2,
 			IsOutdoor: false,
+			Layers:    []string{"controls", "custom"},
 			CreatedAt: now,
 			UpdatedAt: now,
 		}
@@ -47,8 +52,22 @@ func TestLevelConverters(t *testing.T) {
 		assert.Equal(t, domainLevel.Name, publicLevel.Name)
 		assert.Equal(t, domainLevel.Order, publicLevel.Order)
 		assert.Equal(t, domainLevel.IsOutdoor, publicLevel.IsOutdoor)
+		assert.Equal(t, []string{"controls", "custom"}, publicLevel.Layers)
 		assert.Equal(t, domainLevel.CreatedAt, publicLevel.CreatedAt)
 		assert.Equal(t, domainLevel.UpdatedAt, publicLevel.UpdatedAt)
+	})
+
+	t.Run("ToPublicLevel defaults empty layers to controls and sensors", func(t *testing.T) {
+		now := time.Now()
+		domainLevel := domain.Level{
+			ID:        "lvl-def",
+			Name:      "Salon",
+			Order:     0,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		publicLevel := converters.ToPublicLevel(domainLevel)
+		assert.Equal(t, []string{"controls", "sensors"}, publicLevel.Layers)
 	})
 
 	t.Run("ToPublicLevels converts slice of domain levels", func(t *testing.T) {
@@ -75,6 +94,17 @@ func TestPlanConverters(t *testing.T) {
 					X2:        30,
 					Y2:        40,
 					Thickness: 12,
+					Openings: []pkgdashboard.WallOpeningDTO{
+						{
+							ID:        "win-1",
+							Type:      "window",
+							Offset:    15,
+							Width:     10,
+							FlipSide:  true,
+							FlipHinge: true,
+							HideDoor:  true,
+						},
+					},
 				},
 			},
 			Zones: []pkgdashboard.ZoneDTO{
@@ -87,6 +117,8 @@ func TestPlanConverters(t *testing.T) {
 						{X: 50, Y: 0},
 						{X: 50, Y: 50},
 					},
+					TempSensor:     "sensor.terrasse_temp",
+					HumiditySensor: "sensor.terrasse_hum",
 				},
 			},
 		}
@@ -96,9 +128,19 @@ func TestPlanConverters(t *testing.T) {
 		assert.Len(t, plan.Walls, 1)
 		assert.Equal(t, "w1", plan.Walls[0].ID)
 		assert.Equal(t, 10.0, plan.Walls[0].X1)
+		assert.Len(t, plan.Walls[0].Openings, 1)
+		assert.Equal(t, "win-1", plan.Walls[0].Openings[0].ID)
+		assert.Equal(t, "window", plan.Walls[0].Openings[0].Type)
+		assert.Equal(t, 15.0, plan.Walls[0].Openings[0].Offset)
+		assert.Equal(t, 10.0, plan.Walls[0].Openings[0].Width)
+		assert.True(t, plan.Walls[0].Openings[0].FlipSide)
+		assert.True(t, plan.Walls[0].Openings[0].FlipHinge)
+		assert.True(t, plan.Walls[0].Openings[0].HideDoor)
 		assert.Len(t, plan.Zones, 1)
 		assert.Equal(t, "z1", plan.Zones[0].ID)
 		assert.Len(t, plan.Zones[0].Points, 3)
+		assert.Equal(t, "sensor.terrasse_temp", plan.Zones[0].TempSensor)
+		assert.Equal(t, "sensor.terrasse_hum", plan.Zones[0].HumiditySensor)
 	})
 
 	t.Run("ToPublicPlan converts domain plan", func(t *testing.T) {
@@ -112,6 +154,17 @@ func TestPlanConverters(t *testing.T) {
 					X2:        200,
 					Y2:        100,
 					Thickness: 15,
+					Openings: []domain.WallOpening{
+						{
+							ID:        "door-1",
+							Type:      "door",
+							Offset:    50,
+							Width:     20,
+							FlipSide:  true,
+							FlipHinge: true,
+							HideDoor:  true,
+						},
+					},
 				},
 			},
 			Zones: []domain.Zone{
@@ -124,6 +177,8 @@ func TestPlanConverters(t *testing.T) {
 						{X: 60, Y: 10},
 						{X: 60, Y: 60},
 					},
+					TempSensor:     "sensor.chambre_temp",
+					HumiditySensor: "sensor.chambre_hum",
 				},
 			},
 		}
@@ -132,8 +187,70 @@ func TestPlanConverters(t *testing.T) {
 		assert.Equal(t, "lvl-200", pub.LevelID)
 		assert.Len(t, pub.Walls, 1)
 		assert.Equal(t, "w2", pub.Walls[0].ID)
+		assert.Len(t, pub.Walls[0].Openings, 1)
+		assert.Equal(t, "door-1", pub.Walls[0].Openings[0].ID)
+		assert.Equal(t, "door", pub.Walls[0].Openings[0].Type)
+		assert.Equal(t, 50.0, pub.Walls[0].Openings[0].Offset)
+		assert.Equal(t, 20.0, pub.Walls[0].Openings[0].Width)
+		assert.True(t, pub.Walls[0].Openings[0].FlipSide)
+		assert.True(t, pub.Walls[0].Openings[0].FlipHinge)
+		assert.True(t, pub.Walls[0].Openings[0].HideDoor)
 		assert.Len(t, pub.Zones, 1)
 		assert.Equal(t, "z2", pub.Zones[0].ID)
 		assert.Len(t, pub.Zones[0].Points, 3)
+		assert.Equal(t, "sensor.chambre_temp", pub.Zones[0].TempSensor)
+		assert.Equal(t, "sensor.chambre_hum", pub.Zones[0].HumiditySensor)
+	})
+}
+
+func TestZoneConverters(t *testing.T) {
+	tempMin := 17.5
+	tempMax := 23.0
+
+	t.Run("ToDomainZone converts dto to domain with sensors and thresholds", func(t *testing.T) {
+		dto := pkgdashboard.ZoneDTO{
+			ID:             "zone-1",
+			Name:           "Chambre Parentale",
+			Color:          "#6366f1",
+			Points:         []pkgdashboard.Point2DDTO{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 10}},
+			TempSensor:     "sensor.chambre_temperature",
+			TempMin:        &tempMin,
+			TempMax:        &tempMax,
+			HumiditySensor: "sensor.chambre_humidity",
+		}
+
+		z := converters.ToDomainZone(dto)
+		assert.Equal(t, dto.ID, z.ID)
+		assert.Equal(t, dto.Name, z.Name)
+		assert.Equal(t, dto.Color, z.Color)
+		assert.Len(t, z.Points, 3)
+		assert.Equal(t, 0.0, z.Points[0].X)
+		assert.Equal(t, "sensor.chambre_temperature", z.TempSensor)
+		assert.Equal(t, &tempMin, z.TempMin)
+		assert.Equal(t, &tempMax, z.TempMax)
+		assert.Equal(t, "sensor.chambre_humidity", z.HumiditySensor)
+	})
+
+	t.Run("ToPublicZone converts domain to dto with sensors and thresholds", func(t *testing.T) {
+		zone := domain.Zone{
+			ID:             "zone-2",
+			Name:           "Salon",
+			Color:          "#10b981",
+			Points:         []domain.Point2D{{X: 0, Y: 0}, {X: 20, Y: 0}, {X: 20, Y: 20}},
+			TempSensor:     "sensor.salon_temp",
+			TempMin:        &tempMin,
+			TempMax:        &tempMax,
+			HumiditySensor: "sensor.salon_humidity",
+		}
+
+		dto := converters.ToPublicZone(zone)
+		assert.Equal(t, zone.ID, dto.ID)
+		assert.Equal(t, zone.Name, dto.Name)
+		assert.Equal(t, zone.Color, dto.Color)
+		assert.Len(t, dto.Points, 3)
+		assert.Equal(t, "sensor.salon_temp", dto.TempSensor)
+		assert.Equal(t, &tempMin, dto.TempMin)
+		assert.Equal(t, &tempMax, dto.TempMax)
+		assert.Equal(t, "sensor.salon_humidity", dto.HumiditySensor)
 	})
 }

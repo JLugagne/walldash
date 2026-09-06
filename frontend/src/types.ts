@@ -3,6 +3,7 @@ export interface Level {
   name: string
   order: number
   is_outdoor: boolean
+  layers?: string[]
   created_at: string
   updated_at: string
 }
@@ -12,6 +13,18 @@ export interface Point2D {
   y: number
 }
 
+export interface WallOpening {
+  id: string
+  type: 'door' | 'window'
+  offset: number
+  width: number
+  flip_side?: boolean
+  flip_hinge?: boolean
+  /** Keep the hole in the wall but never render the door leaf/frame (passage). Doors only. */
+  hide_door?: boolean
+}
+
+
 export interface WallSegment {
   id: string
   x1: number
@@ -19,13 +32,19 @@ export interface WallSegment {
   x2: number
   y2: number
   thickness: number
+  openings?: WallOpening[]
 }
+
 
 export interface Zone {
   id: string
   name: string
   color: string
   points: Point2D[]
+  temp_sensor?: string
+  temp_min?: number
+  temp_max?: number
+  humidity_sensor?: string
 }
 
 export interface Plan {
@@ -40,6 +59,7 @@ export interface Device {
   domain: string
   state: string
   attributes: Record<string, any>
+  last_updated: string
 }
 
 export interface DevicePlacement {
@@ -49,7 +69,9 @@ export interface DevicePlacement {
   x: number
   y: number
   icon?: string
+  render_domain?: string
   custom_name?: string
+  layer?: string
   created_at?: string
   updated_at?: string
 }
@@ -60,30 +82,49 @@ export interface SavePlacementRequest {
   x: number
   y: number
   icon?: string
+  render_domain?: string
   custom_name?: string
+  layer?: string
 }
 
+/** What a Widget is bound to, and therefore what a tap on it does. */
+export type WidgetType = 'sensor' | 'actuator' | 'automation_list'
+
+/** How a Widget draws its data, independent of what that data is. */
+export type DisplayMode = 'number' | 'arc' | 'bar' | 'toggle' | 'list'
+
 export interface WidgetConfig {
-  entity_ids?: string[]
+  entity_ids: string[]
+  display: DisplayMode
+  labels?: Record<string, string>
+  min?: number
+  max?: number
+  unit?: string
 }
 
 export interface Widget {
   id: string
   dashboard_id: string
-  type: string
+  type: WidgetType
   title: string
   order: number
+  col: number
+  row: number
+  col_span: number
+  row_span: number
   config: WidgetConfig
-  created_at?: string
-  updated_at?: string
+  created_at: string
+  updated_at: string
 }
 
 export interface OverviewDashboard {
   id: string
   name: string
   order: number
-  created_at?: string
-  updated_at?: string
+  cols: number
+  rows: number
+  created_at: string
+  updated_at: string
   widgets: Widget[]
 }
 

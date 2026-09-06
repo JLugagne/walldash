@@ -47,7 +47,9 @@ type MockOverviewCommands struct {
 	UpdateOverviewFunc    func(ctx context.Context, actor domain.Actor, overview domain.OverviewDashboard) (domain.OverviewDashboard, error)
 	DeleteOverviewFunc    func(ctx context.Context, actor domain.Actor, id string) error
 	CreateWidgetFunc      func(ctx context.Context, actor domain.Actor, widget domain.Widget) (domain.Widget, error)
+	UpdateWidgetFunc      func(ctx context.Context, actor domain.Actor, dashboardID string, widget domain.Widget) (domain.Widget, error)
 	DeleteWidgetFunc      func(ctx context.Context, actor domain.Actor, dashboardID string, widgetID string) error
+	UpdateLayoutFunc      func(ctx context.Context, actor domain.Actor, dashboardID string, positions []domain.WidgetPosition) error
 	TriggerAutomationFunc func(ctx context.Context, actor domain.Actor, id string) error
 }
 
@@ -100,11 +102,25 @@ func (m *MockOverviewCommands) CreateWidget(ctx context.Context, actor domain.Ac
 	return m.CreateWidgetFunc(ctx, actor, widget)
 }
 
+func (m *MockOverviewCommands) UpdateWidget(ctx context.Context, actor domain.Actor, dashboardID string, widget domain.Widget) (domain.Widget, error) {
+	if m.UpdateWidgetFunc == nil {
+		panic("called not defined UpdateWidgetFunc")
+	}
+	return m.UpdateWidgetFunc(ctx, actor, dashboardID, widget)
+}
+
 func (m *MockOverviewCommands) DeleteWidget(ctx context.Context, actor domain.Actor, dashboardID string, widgetID string) error {
 	if m.DeleteWidgetFunc == nil {
 		panic("called not defined DeleteWidgetFunc")
 	}
 	return m.DeleteWidgetFunc(ctx, actor, dashboardID, widgetID)
+}
+
+func (m *MockOverviewCommands) UpdateLayout(ctx context.Context, actor domain.Actor, dashboardID string, positions []domain.WidgetPosition) error {
+	if m.UpdateLayoutFunc == nil {
+		panic("called not defined UpdateLayoutFunc")
+	}
+	return m.UpdateLayoutFunc(ctx, actor, dashboardID, positions)
 }
 
 func (m *MockOverviewCommands) TriggerAutomation(ctx context.Context, actor domain.Actor, id string) error {
@@ -139,7 +155,6 @@ func OverviewQueriesContractTesting(t *testing.T, queries overviews.OverviewQuer
 
 // OverviewCommandsContractTesting verifies that any OverviewCommands implementation adheres to command contracts.
 func OverviewCommandsContractTesting(t *testing.T, commands overviews.OverviewCommands) {
-	// Runs all query contract tests first
 	OverviewQueriesContractTesting(t, commands)
 
 	ctx := context.Background()

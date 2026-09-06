@@ -38,8 +38,8 @@ func (r *overviewRepo) CreateOverview(ctx context.Context, overview domain.Overv
 		overview.UpdatedAt = now
 	}
 
-	query := `INSERT INTO overview_dashboards (id, name, "order", created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
-	_, err := r.db.ExecContext(ctx, query, overview.ID, overview.Name, overview.Order, overview.CreatedAt, overview.UpdatedAt)
+	query := `INSERT INTO overview_dashboards (id, name, "order", cols, rows, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	_, err := r.db.ExecContext(ctx, query, overview.ID, overview.Name, overview.Order, overview.Cols, overview.Rows, overview.CreatedAt, overview.UpdatedAt)
 	if err != nil {
 		log.WithError(err).WithField("overview_id", overview.ID).Error("failed to insert overview dashboard")
 		return domain.OverviewDashboard{}, errors.Join(domain.ErrDatabaseUnavailable, err)
@@ -53,12 +53,12 @@ func (r *overviewRepo) CreateOverview(ctx context.Context, overview domain.Overv
 
 func (r *overviewRepo) FindOverviewByID(ctx context.Context, id string) (domain.OverviewDashboard, error) {
 	log := logger.LoggerFromContext(ctx)
-	query := `SELECT id, name, "order", created_at, updated_at FROM overview_dashboards WHERE id = ?`
+	query := `SELECT id, name, "order", cols, rows, created_at, updated_at FROM overview_dashboards WHERE id = ?`
 	row := r.db.QueryRowContext(ctx, query, id)
 
 	var ov domain.OverviewDashboard
 	var createdAt, updatedAt time.Time
-	err := row.Scan(&ov.ID, &ov.Name, &ov.Order, &createdAt, &updatedAt)
+	err := row.Scan(&ov.ID, &ov.Name, &ov.Order, &ov.Cols, &ov.Rows, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.OverviewDashboard{}, errors.Join(domain.ErrOverviewNotFound, err)
@@ -70,7 +70,6 @@ func (r *overviewRepo) FindOverviewByID(ctx context.Context, id string) (domain.
 	ov.CreatedAt = createdAt
 	ov.UpdatedAt = updatedAt
 
-	// Load child widgets
 	wRepo := &widgetRepo{db: r.db}
 	widgets, err := wRepo.FindWidgetsByDashboardID(ctx, id)
 	if err != nil {
@@ -83,7 +82,7 @@ func (r *overviewRepo) FindOverviewByID(ctx context.Context, id string) (domain.
 
 func (r *overviewRepo) FindAllOverviews(ctx context.Context) ([]domain.OverviewDashboard, error) {
 	log := logger.LoggerFromContext(ctx)
-	query := `SELECT id, name, "order", created_at, updated_at FROM overview_dashboards ORDER BY "order" ASC, created_at ASC`
+	query := `SELECT id, name, "order", cols, rows, created_at, updated_at FROM overview_dashboards ORDER BY "order" ASC, created_at ASC`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		log.WithError(err).Error("failed to query all overview dashboards")
@@ -97,7 +96,7 @@ func (r *overviewRepo) FindAllOverviews(ctx context.Context) ([]domain.OverviewD
 	for rows.Next() {
 		var ov domain.OverviewDashboard
 		var createdAt, updatedAt time.Time
-		if err := rows.Scan(&ov.ID, &ov.Name, &ov.Order, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&ov.ID, &ov.Name, &ov.Order, &ov.Cols, &ov.Rows, &createdAt, &updatedAt); err != nil {
 			log.WithError(err).Error("failed to scan overview dashboard row")
 			return nil, errors.Join(domain.ErrDatabaseUnavailable, err)
 		}
@@ -133,8 +132,8 @@ func (r *overviewRepo) UpdateOverview(ctx context.Context, overview domain.Overv
 	now := time.Now().UTC().Truncate(time.Second)
 	overview.UpdatedAt = now
 
-	query := `UPDATE overview_dashboards SET name = ?, "order" = ?, updated_at = ? WHERE id = ?`
-	res, err := r.db.ExecContext(ctx, query, overview.Name, overview.Order, overview.UpdatedAt, overview.ID)
+	query := `UPDATE overview_dashboards SET name = ?, "order" = ?, cols = ?, rows = ?, updated_at = ? WHERE id = ?`
+	res, err := r.db.ExecContext(ctx, query, overview.Name, overview.Order, overview.Cols, overview.Rows, overview.UpdatedAt, overview.ID)
 	if err != nil {
 		log.WithError(err).WithField("overview_id", overview.ID).Error("failed to update overview dashboard")
 		return domain.OverviewDashboard{}, errors.Join(domain.ErrDatabaseUnavailable, err)
@@ -148,7 +147,6 @@ func (r *overviewRepo) UpdateOverview(ctx context.Context, overview domain.Overv
 		return domain.OverviewDashboard{}, errors.Join(domain.ErrOverviewNotFound, errors.New("no overview dashboard found to update"))
 	}
 
-	// Fetch current widgets to preserve complete entity
 	wRepo := &widgetRepo{db: r.db}
 	widgets, err := wRepo.FindWidgetsByDashboardID(ctx, overview.ID)
 	if err == nil {
@@ -162,9 +160,6 @@ func (r *overviewRepo) UpdateOverview(ctx context.Context, overview domain.Overv
 
 func (r *overviewRepo) DeleteOverview(ctx context.Context, id string) error {
 	log := logger.LoggerFromContext(ctx)
-	// Delete associated widgets
-	_, _ = r.db.ExecContext(ctx, `DELETE FROM widgets WHERE dashboard_id = ?`, id)
-
 	query := `DELETE FROM overview_dashboards WHERE id = ?`
 	res, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
@@ -211,10 +206,10 @@ func (r *widgetRepo) CreateWidget(ctx context.Context, widget domain.Widget) (do
 	}
 
 	query := `
-		INSERT INTO widgets (id, dashboard_id, type, title, "order", config_json, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO widgets (id, dashboard_id, type, title, "order", col, row, col_span, row_span, config_json, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err = r.db.ExecContext(ctx, query, widget.ID, widget.DashboardID, widget.Type, widget.Title, widget.Order, string(configBytes), widget.CreatedAt, widget.UpdatedAt)
+	_, err = r.db.ExecContext(ctx, query, widget.ID, widget.DashboardID, widget.Type, widget.Title, widget.Order, widget.Col, widget.Row, widget.ColSpan, widget.RowSpan, string(configBytes), widget.CreatedAt, widget.UpdatedAt)
 	if err != nil {
 		log.WithError(err).WithField("widget_id", widget.ID).Error("failed to insert widget")
 		return domain.Widget{}, errors.Join(domain.ErrDatabaseUnavailable, err)
@@ -226,7 +221,7 @@ func (r *widgetRepo) CreateWidget(ctx context.Context, widget domain.Widget) (do
 func (r *widgetRepo) FindWidgetByID(ctx context.Context, id string) (domain.Widget, error) {
 	log := logger.LoggerFromContext(ctx)
 	query := `
-		SELECT id, dashboard_id, type, title, "order", config_json, created_at, updated_at
+		SELECT id, dashboard_id, type, title, "order", col, row, col_span, row_span, config_json, created_at, updated_at
 		FROM widgets
 		WHERE id = ?
 	`
@@ -235,7 +230,7 @@ func (r *widgetRepo) FindWidgetByID(ctx context.Context, id string) (domain.Widg
 	var w domain.Widget
 	var configJSON string
 	var createdAt, updatedAt time.Time
-	err := row.Scan(&w.ID, &w.DashboardID, &w.Type, &w.Title, &w.Order, &configJSON, &createdAt, &updatedAt)
+	err := row.Scan(&w.ID, &w.DashboardID, &w.Type, &w.Title, &w.Order, &w.Col, &w.Row, &w.ColSpan, &w.RowSpan, &configJSON, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Widget{}, errors.Join(domain.ErrWidgetNotFound, err)
@@ -259,7 +254,7 @@ func (r *widgetRepo) FindWidgetByID(ctx context.Context, id string) (domain.Widg
 func (r *widgetRepo) FindWidgetsByDashboardID(ctx context.Context, dashboardID string) ([]domain.Widget, error) {
 	log := logger.LoggerFromContext(ctx)
 	query := `
-		SELECT id, dashboard_id, type, title, "order", config_json, created_at, updated_at
+		SELECT id, dashboard_id, type, title, "order", col, row, col_span, row_span, config_json, created_at, updated_at
 		FROM widgets
 		WHERE dashboard_id = ?
 		ORDER BY "order" ASC, created_at ASC
@@ -277,7 +272,7 @@ func (r *widgetRepo) FindWidgetsByDashboardID(ctx context.Context, dashboardID s
 		var configJSON string
 		var createdAt, updatedAt time.Time
 
-		if err := rows.Scan(&w.ID, &w.DashboardID, &w.Type, &w.Title, &w.Order, &configJSON, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&w.ID, &w.DashboardID, &w.Type, &w.Title, &w.Order, &w.Col, &w.Row, &w.ColSpan, &w.RowSpan, &configJSON, &createdAt, &updatedAt); err != nil {
 			log.WithError(err).Error("failed to scan widget row")
 			return nil, errors.Join(domain.ErrDatabaseUnavailable, err)
 		}
@@ -321,8 +316,8 @@ func (r *widgetRepo) UpdateWidget(ctx context.Context, widget domain.Widget) (do
 		return domain.Widget{}, errors.Join(domain.ErrInvalidWidget, err)
 	}
 
-	query := `UPDATE widgets SET title = ?, "order" = ?, config_json = ?, updated_at = ? WHERE id = ?`
-	res, err := r.db.ExecContext(ctx, query, widget.Title, widget.Order, string(configBytes), widget.UpdatedAt, widget.ID)
+	query := `UPDATE widgets SET title = ?, "order" = ?, col = ?, row = ?, col_span = ?, row_span = ?, config_json = ?, updated_at = ? WHERE id = ?`
+	res, err := r.db.ExecContext(ctx, query, widget.Title, widget.Order, widget.Col, widget.Row, widget.ColSpan, widget.RowSpan, string(configBytes), widget.UpdatedAt, widget.ID)
 	if err != nil {
 		log.WithError(err).WithField("widget_id", widget.ID).Error("failed to update widget")
 		return domain.Widget{}, errors.Join(domain.ErrDatabaseUnavailable, err)
@@ -366,6 +361,27 @@ func (r *widgetRepo) DeleteWidgetsByDashboardID(ctx context.Context, dashboardID
 	if err != nil {
 		log.WithError(err).WithField("dashboard_id", dashboardID).Error("failed to delete widgets by dashboard id")
 		return errors.Join(domain.ErrDatabaseUnavailable, err)
+	}
+	return nil
+}
+
+func (r *widgetRepo) ReplaceWidgetPositions(ctx context.Context, dashboardID string, positions []domain.WidgetPosition) error {
+	log := logger.LoggerFromContext(ctx)
+	query := `UPDATE widgets SET col = ?, row = ?, col_span = ?, row_span = ? WHERE id = ? AND dashboard_id = ?`
+	for _, p := range positions {
+		res, err := r.db.ExecContext(ctx, query, p.Col, p.Row, p.ColSpan, p.RowSpan, p.ID, dashboardID)
+		if err != nil {
+			log.WithError(err).WithField("widget_id", p.ID).Error("failed to update widget position")
+			return errors.Join(domain.ErrDatabaseUnavailable, err)
+		}
+
+		rowsAffected, err := res.RowsAffected()
+		if err != nil {
+			return errors.Join(domain.ErrDatabaseUnavailable, err)
+		}
+		if rowsAffected == 0 {
+			return errors.Join(domain.ErrWidgetNotFound, fmt.Errorf("widget %s not found in dashboard %s", p.ID, dashboardID))
+		}
 	}
 	return nil
 }
@@ -414,4 +430,8 @@ func (a *Adapter) DeleteWidget(ctx context.Context, id string) error {
 
 func (a *Adapter) DeleteWidgetsByDashboardID(ctx context.Context, dashboardID string) error {
 	return (&widgetRepo{db: a.db}).DeleteWidgetsByDashboardID(ctx, dashboardID)
+}
+
+func (a *Adapter) ReplaceWidgetPositions(ctx context.Context, dashboardID string, positions []domain.WidgetPosition) error {
+	return (&widgetRepo{db: a.db}).ReplaceWidgetPositions(ctx, dashboardID, positions)
 }

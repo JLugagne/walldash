@@ -1,191 +1,139 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import {
-  Save,
-  Undo,
-  RotateCcw,
-  Trash2,
-  Grid,
-  Square,
-  Minus,
-  Pointer,
-  Check,
-  AlertCircle,
-  Maximize2,
-  Palette,
-  Lightbulb,
-  Power,
-  Thermometer,
-  Flame,
-  Music,
-  Cpu,
-  Search,
-  X,
-  GripVertical,
-  Plus,
-} from 'lucide-react'
-import type { Level, Plan, WallSegment, Zone, Point2D, Device, DevicePlacement, SavePlacementRequest } from '../types'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { AlertCircle, Cpu, Layers, Loader2, Maximize2, SlidersHorizontal, X, ZoomIn, ZoomOut } from 'lucide-react'
+import type { Device, DevicePlacement, Level, Plan, Point2D, SavePlacementRequest, WallOpening, WallSegment, Zone } from '../types'
 import { apiFetch } from '../api'
+import { ImportPlanModal } from './ImportPlanModal'
+import { LevelsManager } from './LevelsManager'
+import { EditorHeader, type SaveState } from './editor/EditorHeader'
+import { ToolRail } from './editor/ToolRail'
+import { Inspector, type ToolSettings } from './editor/Inspector'
+import { DevicePalette } from './editor/DevicePalette'
+import { DimensionLabel, WallLayer } from './editor/canvas/WallLayer'
+import { ZoneDraft, ZoneLayer } from './editor/canvas/ZoneLayer'
+import { DeviceLayer } from './editor/canvas/DeviceLayer'
+import { CANVAS, GRID_SIZES, TOOLS, type ToolMode } from './editor/constants'
+import * as geo from './editor/geometry'
+import type { EditorSelection, OpeningDragMode } from './editor/types'
 
 interface PlanEditor2DProps {
   level: Level | null
+  levels: Level[]
+  onSelectLevel: (id: string) => void
+  onRefreshLevels: () => Promise<void>
+  viewModeMenu?: ReactNode
 }
 
-type ToolMode = 'select' | 'wall' | 'zone'
-
-const COLOR_PRESETS = [
-  { name: 'Bleu Salon', value: '#3b82f6' },
-  { name: 'Vert Jardin', value: '#10b981' },
-  { name: 'Ambre Cuisine', value: '#f59e0b' },
-  { name: 'Violet Chambre', value: '#8b5cf6' },
-  { name: 'Rose Salle de bain', value: '#ec4899' },
-  { name: 'Gris Couloir', value: '#64748b' },
-  { name: 'Émeraude Terrasse', value: '#059669' },
-]
-
-const DOMAIN_CATEGORIES = [
-  { key: 'all', label: 'Tous' },
-  { key: 'light', label: 'Lumières' },
-  { key: 'switch', label: 'Prises' },
-  { key: 'sensor', label: 'Capteurs' },
-  { key: 'climate', label: 'Chauffage' },
-  { key: 'media_player', label: 'Médias' },
-]
-
-let idCounter = 0
-function generateId(prefix: string): string {
-  idCounter += 1
-  return `${prefix}-${Date.now()}-${idCounter}`
+interface ViewBox {
+  x: number
+  y: number
+  w: number
+  h: number
 }
 
-function getDomainColor(domain: string) {
-  switch (domain) {
-    case 'light':
-      return {
-        bg: 'bg-amber-500/10',
-        text: 'text-amber-400',
-        border: 'border-amber-500/30',
-        fill: '#f59e0b',
-        ring: '#fbbf24',
-      }
-    case 'switch':
-      return {
-        bg: 'bg-cyan-500/10',
-        text: 'text-cyan-400',
-        border: 'border-cyan-500/30',
-        fill: '#06b6d4',
-        ring: '#22d3ee',
-      }
-    case 'sensor':
-      return {
-        bg: 'bg-emerald-500/10',
-        text: 'text-emerald-400',
-        border: 'border-emerald-500/30',
-        fill: '#10b981',
-        ring: '#34d399',
-      }
-    case 'climate':
-      return {
-        bg: 'bg-rose-500/10',
-        text: 'text-rose-400',
-        border: 'border-rose-500/30',
-        fill: '#f43f5e',
-        ring: '#fb7185',
-      }
-    case 'media_player':
-      return {
-        bg: 'bg-purple-500/10',
-        text: 'text-purple-400',
-        border: 'border-purple-500/30',
-        fill: '#a855f7',
-        ring: '#c084fc',
-      }
-    default:
-      return {
-        bg: 'bg-indigo-500/10',
-        text: 'text-indigo-400',
-        border: 'border-indigo-500/30',
-        fill: '#6366f1',
-        ring: '#818cf8',
-      }
-  }
+const DEFAULT_VIEW: ViewBox = { x: 0, y: 0, w: 1000, h: 700 }
+const JOINT_TOLERANCE = 4
+const VERTEX_SNAP_PX = 10
+const OPENING_HOVER_PX = 22
+const DRAG_THRESHOLD_PX = 3
+const HISTORY_LIMIT = 50
+const MIN_VIEW_W = 80
+const MAX_VIEW_W = 30000
+
+type DragState =
+  | { kind: 'pan'; startClient: Point2D; startView: ViewBox; upx: number }
+  | { kind: 'press'; startClient: Point2D; startView: ViewBox; upx: number; pan: boolean; moved: boolean }
+  | {
+      kind: 'wall-move'
+      wallId: string
+      refs: geo.VertexRef[]
+      selfRefs: geo.VertexRef[]
+      startPlan: Plan
+      startPt: Point2D
+      startClient: Point2D
+      moved: boolean
+    }
+  | { kind: 'vertex'; refs: geo.VertexRef[]; selfRef: geo.VertexRef; startPlan: Plan; startClient: Point2D; moved: boolean }
+  | { kind: 'opening'; wallId: string; openingId: string; mode: OpeningDragMode; startPlan: Plan; startClient: Point2D; moved: boolean }
+  | { kind: 'zone-move'; zoneId: string; startPlan: Plan; startPt: Point2D; startClient: Point2D; moved: boolean }
+  | { kind: 'zone-vertex'; zoneId: string; index: number; startPlan: Plan; startClient: Point2D; moved: boolean }
+  | { kind: 'device'; placementId: string; startPlacements: DevicePlacement[]; grabOffset: Point2D; startClient: Point2D; moved: boolean }
+
+function emptyPlan(levelId: string): Plan {
+  return { level_id: levelId, walls: [], zones: [] }
 }
 
-function getDomainIcon(domain: string, className = 'w-4 h-4') {
-  switch (domain) {
-    case 'light':
-      return <Lightbulb className={className} />
-    case 'switch':
-      return <Power className={className} />
-    case 'sensor':
-      return <Thermometer className={className} />
-    case 'climate':
-      return <Flame className={className} />
-    case 'media_player':
-      return <Music className={className} />
-    default:
-      return <Cpu className={className} />
-  }
+function serializePlan(plan: Plan): string {
+  return JSON.stringify({ walls: plan.walls, zones: plan.zones })
 }
 
-export function PlanEditor2D({ level }: PlanEditor2DProps) {
-  const [plan, setPlan] = useState<Plan>({
-    level_id: level?.id || '',
-    walls: [],
-    zones: [],
-  })
+function clonePlan(plan: Plan): Plan {
+  return JSON.parse(JSON.stringify(plan))
+}
+
+export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, viewModeMenu }: PlanEditor2DProps) {
+  const [plan, setPlan] = useState<Plan>(() => emptyPlan(level?.id ?? ''))
+  const [savedJson, setSavedJson] = useState(() => serializePlan(emptyPlan('')))
   const [history, setHistory] = useState<Plan[]>([])
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [savedNotification, setSavedNotification] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [redoStack, setRedoStack] = useState<Plan[]>([])
+  const lastHistoryRef = useRef<{ key: string; time: number } | null>(null)
 
-  // Devices & placements state
+  const [loading, setLoading] = useState(false)
+  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [error, setError] = useState<string | null>(null)
+  const [showImport, setShowImport] = useState(false)
+  const [levelsOpen, setLevelsOpen] = useState(false)
+
   const [devices, setDevices] = useState<Device[]>([])
   const [placements, setPlacements] = useState<DevicePlacement[]>([])
   const [loadingDevices, setLoadingDevices] = useState(false)
-  const [showDevicePalette, setShowDevicePalette] = useState(true)
-  const [deviceCategory, setDeviceCategory] = useState<string>('all')
-  const [deviceSearch, setDeviceSearch] = useState<string>('')
   const [deviceToPlace, setDeviceToPlace] = useState<Device | null>(null)
 
-  // Dragging placed devices on SVG canvas
-  const [draggingPlacementId, setDraggingPlacementId] = useState<string | null>(null)
-  const [dragOffset, setDragOffset] = useState<Point2D>({ x: 0, y: 0 })
-  const [isMovedDuringDrag, setIsMovedDuringDrag] = useState(false)
-
-  // Editor configuration
-  const [tool, setTool] = useState<ToolMode>('wall')
+  const [tool, setToolState] = useState<ToolMode>('select')
   const [snapGrid, setSnapGrid] = useState(true)
   const [gridSize, setGridSize] = useState(20)
-  const [wallThickness, setWallThickness] = useState(12)
+  const [settings, setSettings] = useState<ToolSettings>({
+    wallThickness: 8,
+    doorWidth: 36,
+    windowWidth: 48,
+    doorAsPassage: false,
+    zoneName: 'Salon',
+    zoneColor: '#3b82f6',
+  })
 
-  // Zone creation state
-  const [zoneName, setZoneName] = useState('Salon')
-  const [zoneColor, setZoneColor] = useState('#3b82f6')
-  const [currentZonePoints, setCurrentZonePoints] = useState<Point2D[]>([])
-
-  // Wall creation state
   const [wallStart, setWallStart] = useState<Point2D | null>(null)
-  const [cursorPos, setCursorPos] = useState<Point2D | null>(null)
+  const chainOriginRef = useRef<Point2D | null>(null)
+  const [zoneDraft, setZoneDraft] = useState<Point2D[]>([])
 
-  // Selection state
-  const [selectedElement, setSelectedElement] = useState<{
-    type: 'wall' | 'zone' | 'device'
-    id: string
-  } | null>(null)
+  const [selection, setSelection] = useState<EditorSelection | null>(null)
+  const [hoverWallId, setHoverWallId] = useState<string | null>(null)
+  const [hoverProjection, setHoverProjection] = useState<geo.WallProjection | null>(null)
+  const [cursorRaw, setCursorRaw] = useState<Point2D | null>(null)
+  const [cursorSnap, setCursorSnap] = useState<{ point: Point2D; vertex: boolean } | null>(null)
+
+  const [panelOpen, setPanelOpen] = useState(true)
+  const [panelTab, setPanelTab] = useState<'inspector' | 'devices'>('inspector')
 
   const svgRef = useRef<SVGSVGElement | null>(null)
+  const [viewBox, setViewBox] = useState<ViewBox>(DEFAULT_VIEW)
+  const [svgSize, setSvgSize] = useState({ width: 1000, height: 700 })
+  const upx = viewBox.w / svgSize.width
 
-  // Fetch Home Assistant devices
+  const dragRef = useRef<DragState | null>(null)
+  const [dragKind, setDragKind] = useState<DragState['kind'] | null>(null)
+  const spaceRef = useRef(false)
+  const [spaceDown, setSpaceDown] = useState(false)
+  const pinchRef = useRef<{ dist: number; center: Point2D; view: ViewBox } | null>(null)
+
+  const isDirty = useMemo(() => serializePlan(plan) !== savedJson, [plan, savedJson])
+  const placedDeviceIds = useMemo(() => new Set(placements.map((p) => p.device_id)), [placements])
+
   const fetchDevices = useCallback(async () => {
     setLoadingDevices(true)
     try {
       const res = await fetch('/api/devices')
       if (res.ok) {
         const payload = await res.json()
-        if (payload?.status === 'success' && Array.isArray(payload.data)) {
-          setDevices(payload.data)
-        }
+        if (payload?.status === 'success' && Array.isArray(payload.data)) setDevices(payload.data)
       }
     } catch (err) {
       console.error('Failed to load devices:', err)
@@ -198,113 +146,201 @@ export function PlanEditor2D({ level }: PlanEditor2DProps) {
     fetchDevices()
   }, [fetchDevices])
 
-  // Fetch plan and device placements when level changes
   useEffect(() => {
-    if (!level) return
-    let ignore = false
-    setLoading(true)
-    setSelectedElement(null)
+    const el = svgRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const width = Math.max(1, entry.contentRect.width)
+        const height = Math.max(1, entry.contentRect.height)
+        setSvgSize({ width, height })
+        setViewBox((prev) => ({ ...prev, h: (prev.w * height) / width }))
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const fitToBounds = useCallback(
+    (walls: WallSegment[], zones: Zone[], plcs: DevicePlacement[]) => {
+      const b = geo.planBounds(walls, zones, plcs)
+      const aspect = svgSize.width / svgSize.height
+      if (!b) {
+        setViewBox({ x: 0, y: 0, w: DEFAULT_VIEW.w, h: DEFAULT_VIEW.w / aspect })
+        return
+      }
+      const padding = 80
+      const spanW = Math.max(b.maxX - b.minX + padding * 2, 300)
+      const spanH = Math.max(b.maxY - b.minY + padding * 2, 200)
+      let w = spanW
+      let h = spanH
+      if (spanW / spanH > aspect) h = spanW / aspect
+      else w = spanH * aspect
+      setViewBox({ x: (b.minX + b.maxX) / 2 - w / 2, y: (b.minY + b.maxY) / 2 - h / 2, w, h })
+    },
+    [svgSize.width, svgSize.height]
+  )
+
+  const fitRef = useRef(fitToBounds)
+  useEffect(() => {
+    fitRef.current = fitToBounds
+  }, [fitToBounds])
+
+  const resetEditing = useCallback(() => {
+    setSelection(null)
     setDeviceToPlace(null)
     setWallStart(null)
-    setCurrentZonePoints([])
+    chainOriginRef.current = null
+    setZoneDraft([])
+    setHoverProjection(null)
+    setHoverWallId(null)
+    dragRef.current = null
+    setDragKind(null)
+  }, [])
 
-    // Load plan
-    fetch(`/api/levels/${level.id}/plan`)
-      .then(async (res) => {
-        if (!res.ok) {
-          return { status: 'success', data: { level_id: level.id, walls: [], zones: [] } }
+  const levelId = level?.id ?? null
+  useEffect(() => {
+    resetEditing()
+    setHistory([])
+    setRedoStack([])
+    setError(null)
+    setSaveState('idle')
+    if (!levelId) {
+      const empty = emptyPlan('')
+      setPlan(empty)
+      setSavedJson(serializePlan(empty))
+      setPlacements([])
+      return
+    }
+    let ignore = false
+    setLoading(true)
+    Promise.all([
+      fetch(`/api/levels/${levelId}/plan`)
+        .then(async (res) => (res.ok ? res.json() : { status: 'success', data: { walls: [], zones: [] } }))
+        .catch(() => null),
+      fetch(`/api/levels/${levelId}/placements`)
+        .then((res) => res.json())
+        .catch(() => null),
+    ])
+      .then(([planPayload, plcPayload]) => {
+        if (ignore) return
+        const loaded: Plan = {
+          level_id: levelId,
+          walls: planPayload?.data?.walls || [],
+          zones: planPayload?.data?.zones || [],
         }
-        return res.json()
-      })
-      .then((payload) => {
-        if (!ignore && payload?.status === 'success' && payload?.data) {
-          setPlan({
-            level_id: level.id,
-            walls: payload.data.walls || [],
-            zones: payload.data.zones || [],
-          })
-        }
-      })
-      .catch((err) => {
-        if (!ignore) {
-          console.error('Failed to load plan:', err)
-          setError('Erreur lors du chargement du plan')
-        }
+        const plcs: DevicePlacement[] = plcPayload?.data || []
+        setPlan(loaded)
+        setSavedJson(serializePlan(loaded))
+        setPlacements(plcs)
+        fitRef.current(loaded.walls, loaded.zones, plcs)
       })
       .finally(() => {
         if (!ignore) setLoading(false)
       })
-
-    // Load device placements
-    fetch(`/api/levels/${level.id}/placements`)
-      .then((res) => res.json())
-      .then((payload) => {
-        if (!ignore && payload?.status === 'success' && Array.isArray(payload.data)) {
-          setPlacements(payload.data)
-        }
-      })
-      .catch((err) => {
-        if (!ignore) console.error('Failed to load placements:', err)
-      })
-
     return () => {
       ignore = true
     }
-  }, [level])
+  }, [levelId, resetEditing])
 
-  // Push history snapshot before mutating
-  const pushHistory = useCallback((currentPlan: Plan) => {
-    setHistory((prev) => [...prev.slice(-20), JSON.parse(JSON.stringify(currentPlan))])
+  useEffect(() => {
+    if (!isDirty) return
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [isDirty])
+
+  const selectElement = useCallback((next: EditorSelection | null) => {
+    setSelection(next)
+    if (next) setPanelTab('inspector')
   }, [])
 
-  // Coordinate snapping helper
-  const snap = useCallback(
-    (coord: Point2D): Point2D => {
-      if (!snapGrid) return coord
-      return {
-        x: Math.round(coord.x / gridSize) * gridSize,
-        y: Math.round(coord.y / gridSize) * gridSize,
-      }
+  const pushHistory = useCallback((snapshot: Plan, coalesceKey?: string) => {
+    const now = Date.now()
+    const last = lastHistoryRef.current
+    if (coalesceKey && last && last.key === coalesceKey && now - last.time < 1200) {
+      lastHistoryRef.current = { key: coalesceKey, time: now }
+      return
+    }
+    lastHistoryRef.current = { key: coalesceKey ?? '', time: now }
+    setHistory((prev) => [...prev.slice(-(HISTORY_LIMIT - 1)), clonePlan(snapshot)])
+    setRedoStack([])
+  }, [])
+
+  const mutatePlan = useCallback(
+    (updater: (current: Plan) => Plan, coalesceKey?: string) => {
+      pushHistory(plan, coalesceKey)
+      setPlan(updater(plan))
     },
-    [snapGrid, gridSize]
+    [plan, pushHistory]
   )
 
-  // Convert client mouse/touch event to SVG coordinate space
-  const getSvgCoordinates = useCallback(
-    (e: { clientX?: number; clientY?: number; touches?: React.TouchList }): Point2D | null => {
-      if (!svgRef.current) return null
-      const svg = svgRef.current
-      const ctm = svg.getScreenCTM()
-      if (!ctm) return null
+  const undo = useCallback(() => {
+    if (history.length === 0) return
+    const previous = history[history.length - 1]
+    setHistory((prev) => prev.slice(0, -1))
+    setRedoStack((prev) => [...prev.slice(-(HISTORY_LIMIT - 1)), clonePlan(plan)])
+    setPlan(previous)
+    lastHistoryRef.current = null
+    setSelection(null)
+    setZoneDraft([])
+    setWallStart(null)
+  }, [history, plan])
 
-      let clientX: number | undefined
-      let clientY: number | undefined
+  const redo = useCallback(() => {
+    if (redoStack.length === 0) return
+    const next = redoStack[redoStack.length - 1]
+    setRedoStack((prev) => prev.slice(0, -1))
+    setHistory((prev) => [...prev.slice(-(HISTORY_LIMIT - 1)), clonePlan(plan)])
+    setPlan(next)
+    lastHistoryRef.current = null
+    setSelection(null)
+  }, [redoStack, plan])
 
-      if (e.touches && e.touches.length > 0) {
-        clientX = e.touches[0].clientX
-        clientY = e.touches[0].clientY
-      } else if (typeof e.clientX === 'number' && typeof e.clientY === 'number') {
-        clientX = e.clientX
-        clientY = e.clientY
-      }
-
-      if (typeof clientX !== 'number' || typeof clientY !== 'number') {
-        return null
-      }
-
-      const inverse = ctm.inverse()
-      return {
-        x: inverse.a * clientX + inverse.c * clientY + inverse.e,
-        y: inverse.b * clientX + inverse.d * clientY + inverse.f,
-      }
+  const setTool = useCallback(
+    (next: ToolMode) => {
+      setToolState(next)
+      setWallStart(null)
+      chainOriginRef.current = null
+      setZoneDraft([])
+      setDeviceToPlace(null)
+      setHoverProjection(null)
+      if (next !== 'select') setSelection(null)
     },
     []
   )
 
-  // Save device placement to backend
-  const handleSavePlacement = useCallback(
-    async (req: SavePlacementRequest) => {
-      if (!level) return
+  const toSvgPoint = useCallback((clientX: number, clientY: number): Point2D | null => {
+    const svg = svgRef.current
+    if (!svg) return null
+    const ctm = svg.getScreenCTM()
+    if (!ctm) return null
+    const inv = ctm.inverse()
+    return { x: inv.a * clientX + inv.c * clientY + inv.e, y: inv.b * clientX + inv.d * clientY + inv.f }
+  }, [])
+
+  const snapPoint = useCallback(
+    (
+      raw: Point2D,
+      opts: { walls?: WallSegment[]; skip?: (ref: geo.VertexRef) => boolean; from?: Point2D | null; axis?: boolean; noVertex?: boolean } = {}
+    ): { point: Point2D; vertex: boolean } => {
+      let pt = raw
+      if (opts.axis && opts.from) pt = geo.axisLock(opts.from, pt)
+      if (!opts.noVertex) {
+        const v = geo.nearestVertex(opts.walls ?? plan.walls, pt, VERTEX_SNAP_PX * upx, opts.skip)
+        if (v) return { point: v, vertex: true }
+      }
+      if (snapGrid) pt = geo.snapToGrid(pt, gridSize)
+      return { point: { x: Math.round(pt.x), y: Math.round(pt.y) }, vertex: false }
+    },
+    [plan.walls, snapGrid, gridSize, upx]
+  )
+
+  const savePlacement = useCallback(
+    async (req: SavePlacementRequest): Promise<DevicePlacement | null> => {
+      if (!level) return null
       setError(null)
       try {
         const res = await apiFetch(`/api/levels/${level.id}/placements`, {
@@ -325,29 +361,26 @@ export function PlanEditor2D({ level }: PlanEditor2DProps) {
             return [...prev, saved]
           })
           return saved
-        } else {
-          setError(payload.error?.message || 'Erreur lors du placement de l’appareil')
         }
+        setError(payload.error?.message || 'Erreur lors du placement de l’appareil')
       } catch {
         setError('Impossible de joindre le serveur')
       }
+      return null
     },
     [level]
   )
 
-  // Delete device placement from backend
-  const handleDeletePlacement = useCallback(
+  const deletePlacement = useCallback(
     async (placementId: string) => {
       if (!level) return
       setError(null)
       try {
-        const res = await apiFetch(`/api/levels/${level.id}/placements/${placementId}`, {
-          method: 'DELETE',
-        })
+        const res = await apiFetch(`/api/levels/${level.id}/placements/${placementId}`, { method: 'DELETE' })
         const payload = await res.json()
         if (res.ok && payload.status === 'success') {
           setPlacements((prev) => prev.filter((p) => p.id !== placementId))
-          setSelectedElement((prev) => (prev?.type === 'device' && prev.id === placementId ? null : prev))
+          setSelection((prev) => (prev?.type === 'device' && prev.id === placementId ? null : prev))
         } else {
           setError(payload.error?.message || 'Erreur lors de la suppression du placement')
         }
@@ -358,1188 +391,1055 @@ export function PlanEditor2D({ level }: PlanEditor2DProps) {
     [level]
   )
 
-  // Handle pointer movements on SVG
-  const handlePointerMove = (e: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>) => {
-    const raw = getSvgCoordinates(e)
-    if (!raw) return
-    const snapped = snap(raw)
-    setCursorPos(snapped)
-
-    // Handle dragging an existing device placement
-    if (draggingPlacementId) {
-      setIsMovedDuringDrag(true)
-      setPlacements((prev) =>
-        prev.map((p) => {
-          if (p.id === draggingPlacementId) {
-            return {
-              ...p,
-              x: Math.max(20, Math.min(980, snapped.x - dragOffset.x)),
-              y: Math.max(20, Math.min(680, snapped.y - dragOffset.y)),
-            }
-          }
-          return p
-        })
-      )
+  const placementRequest = (p: DevicePlacement, patch: Partial<DevicePlacement> = {}): SavePlacementRequest => {
+    const merged = { ...p, ...patch }
+    return {
+      id: merged.id,
+      device_id: merged.device_id,
+      x: merged.x,
+      y: merged.y,
+      icon: merged.icon,
+      custom_name: merged.custom_name,
+      render_domain: merged.render_domain,
+      layer: merged.layer,
     }
   }
 
-  // Handle pointer up (finish dragging a placed device)
-  const handlePointerUp = () => {
-    if (draggingPlacementId) {
-      const moved = placements.find((p) => p.id === draggingPlacementId)
-      if (moved && isMovedDuringDrag) {
-        handleSavePlacement({
-          id: moved.id,
-          device_id: moved.device_id,
-          x: moved.x,
-          y: moved.y,
-          icon: moved.icon,
-          custom_name: moved.custom_name,
-        })
-      }
-      setDraggingPlacementId(null)
-      setIsMovedDuringDrag(false)
-    }
-  }
-
-  // Handle SVG canvas clicks
-  const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (isMovedDuringDrag) {
+  const deleteSelection = useCallback(() => {
+    if (!selection) return
+    if (selection.type === 'device') {
+      deletePlacement(selection.id)
       return
     }
-
-    const raw = getSvgCoordinates(e)
-    if (!raw) return
-    const point = snap(raw)
-
-    // If a device is chosen for placement via click-to-place
-    if (deviceToPlace) {
-      handleSavePlacement({
-        device_id: deviceToPlace.id,
-        x: point.x,
-        y: point.y,
-        custom_name: deviceToPlace.name,
-        icon: deviceToPlace.domain,
-      })
-      setDeviceToPlace(null)
-      return
-    }
-
-    if (tool === 'wall') {
-      if (!wallStart) {
-        setWallStart(point)
-      } else {
-        if (wallStart.x !== point.x || wallStart.y !== point.y) {
-          pushHistory(plan)
-          const newWall: WallSegment = {
-            id: generateId('wall'),
-            x1: wallStart.x,
-            y1: wallStart.y,
-            x2: point.x,
-            y2: point.y,
-            thickness: wallThickness,
-          }
-          setPlan((prev) => ({
-            ...prev,
-            walls: [...prev.walls, newWall],
-          }))
-        }
-        setWallStart(null)
+    mutatePlan((p) => {
+      if (selection.type === 'wall') return { ...p, walls: p.walls.filter((w) => w.id !== selection.id) }
+      if (selection.type === 'zone') return { ...p, zones: p.zones.filter((z) => z.id !== selection.id) }
+      return {
+        ...p,
+        walls: p.walls.map((w) =>
+          w.id === selection.wallId ? { ...w, openings: (w.openings ?? []).filter((o) => o.id !== selection.id) } : w
+        ),
       }
-    } else if (tool === 'zone') {
-      if (currentZonePoints.length >= 3) {
-        const startPoint = currentZonePoints[0]
-        const dist = Math.hypot(point.x - startPoint.x, point.y - startPoint.y)
-        if (dist <= gridSize * 1.2) {
-          completeCurrentZone()
-          return
-        }
-      }
-      setCurrentZonePoints((prev) => [...prev, point])
-    } else if (tool === 'select') {
-      if (e.target === svgRef.current || (e.target as HTMLElement).tagName === 'svg') {
-        setSelectedElement(null)
-      }
-    }
-  }
-
-  // HTML5 Drag and Drop handlers for dropping devices onto SVG
-  const handleDragOver = (e: React.DragEvent<SVGSVGElement>) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'copy'
-    const raw = getSvgCoordinates(e)
-    if (raw) {
-      setCursorPos(snap(raw))
-    }
-  }
-
-  const handleDrop = (e: React.DragEvent<SVGSVGElement>) => {
-    e.preventDefault()
-    const deviceId = e.dataTransfer.getData('text/plain')
-    if (!deviceId || !level) return
-
-    const dev = devices.find((d) => d.id === deviceId)
-    if (!dev) return
-
-    const raw = getSvgCoordinates(e)
-    if (!raw) return
-    const point = snap(raw)
-
-    handleSavePlacement({
-      device_id: dev.id,
-      x: point.x,
-      y: point.y,
-      custom_name: dev.name,
-      icon: dev.domain,
     })
-  }
+    setSelection(null)
+  }, [selection, deletePlacement, mutatePlan])
 
-  const completeCurrentZone = () => {
-    if (currentZonePoints.length < 3) {
-      alert('Une zone doit contenir au moins 3 points pour former un polygone fermé.')
-      return
+  const completeZone = useCallback(() => {
+    if (zoneDraft.length < 3) return
+    const zone: Zone = {
+      id: geo.generateId('zone'),
+      name: settings.zoneName.trim() || 'Zone',
+      color: settings.zoneColor,
+      points: zoneDraft,
     }
-    pushHistory(plan)
-    const newZone: Zone = {
-      id: generateId('zone'),
-      name: zoneName.trim() || 'Zone',
-      color: zoneColor,
-      points: currentZonePoints,
-    }
-    setPlan((prev) => ({
-      ...prev,
-      zones: [...prev.zones, newZone],
-    }))
-    setCurrentZonePoints([])
-  }
+    mutatePlan((p) => ({ ...p, zones: [...p.zones, zone] }))
+    setZoneDraft([])
+  }, [zoneDraft, settings.zoneName, settings.zoneColor, mutatePlan])
 
-  // Delete selected item (wall, zone, or device)
-  const handleDeleteSelected = useCallback(() => {
-    if (!selectedElement) return
-    if (selectedElement.type === 'device') {
-      handleDeletePlacement(selectedElement.id)
-      return
-    }
-
-    pushHistory(plan)
-    if (selectedElement.type === 'wall') {
-      setPlan((prev) => ({
-        ...prev,
-        walls: prev.walls.filter((w) => w.id !== selectedElement.id),
-      }))
-    } else if (selectedElement.type === 'zone') {
-      setPlan((prev) => ({
-        ...prev,
-        zones: prev.zones.filter((z) => z.id !== selectedElement.id),
-      }))
-    }
-    setSelectedElement(null)
-  }, [selectedElement, handleDeletePlacement, plan, pushHistory])
-
-  // Global keyboard shortcuts (Delete / Esc)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const activeTag = document.activeElement?.tagName.toLowerCase()
-      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
-        return
-      }
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedElement) {
-          e.preventDefault()
-          handleDeleteSelected()
-        }
-      } else if (e.key === 'Escape') {
-        setDeviceToPlace(null)
-        setWallStart(null)
-        setCurrentZonePoints([])
-        setSelectedElement(null)
-        setDraggingPlacementId(null)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedElement, handleDeleteSelected])
-
-  // Undo last modification
-  const handleUndo = () => {
-    if (history.length === 0) return
-    const last = history[history.length - 1]
-    setHistory((prev) => prev.slice(0, -1))
-    setPlan(last)
-    setSelectedElement(null)
-    setCurrentZonePoints([])
+  const endWallChain = useCallback(() => {
     setWallStart(null)
-  }
+    chainOriginRef.current = null
+  }, [])
 
-  // Reset to original plan
-  const handleReset = () => {
-    if (!confirm('Réinitialiser le plan aux dernières données sauvegardées ?')) return
-    if (!level) return
-    setHistory([])
-    setSelectedElement(null)
-    setCurrentZonePoints([])
-    setWallStart(null)
-
-    fetch(`/api/levels/${level.id}/plan`)
-      .then((res) => res.json())
-      .then((payload) => {
-        if (payload?.status === 'success' && payload?.data) {
-          setPlan({
-            level_id: level.id,
-            walls: payload.data.walls || [],
-            zones: payload.data.zones || [],
-          })
-        }
-      })
-  }
-
-  // Clear all walls and zones
-  const handleClear = () => {
-    if (!confirm('Supprimer tous les murs et toutes les zones de ce niveau ?')) return
-    pushHistory(plan)
-    setPlan((prev) => ({ ...prev, walls: [], zones: [] }))
-    setSelectedElement(null)
-    setCurrentZonePoints([])
-    setWallStart(null)
-  }
-
-  // Save plan walls/zones to backend
-  const handleSavePlan = async () => {
-    if (!level) return
-    setSaving(true)
+  const savePlan = useCallback(async () => {
+    if (!level || saveState === 'saving') return
+    setSaveState('saving')
     setError(null)
     try {
       const res = await apiFetch(`/api/levels/${level.id}/plan`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walls: plan.walls,
-          zones: plan.zones,
-        }),
+        body: JSON.stringify({ walls: plan.walls, zones: plan.zones }),
       })
       const result = await res.json()
       if (res.ok && result.status === 'success') {
-        setSavedNotification(true)
-        setTimeout(() => setSavedNotification(false), 3000)
+        setSavedJson(serializePlan(plan))
+        setSaveState('saved')
+        setTimeout(() => setSaveState((s) => (s === 'saved' ? 'idle' : s)), 2500)
       } else {
+        setSaveState('error')
         setError(result.error?.message || 'Erreur lors de la sauvegarde du plan')
       }
     } catch {
+      setSaveState('error')
       setError('Impossible de joindre le serveur')
-    } finally {
-      setSaving(false)
+    }
+  }, [level, plan, saveState])
+
+  const zoomBy = useCallback((factor: number, focus?: Point2D) => {
+    setViewBox((prev) => {
+      const w = prev.w / factor
+      if (w < MIN_VIEW_W || w > MAX_VIEW_W) return prev
+      const h = prev.h / factor
+      const fx = focus?.x ?? prev.x + prev.w / 2
+      const fy = focus?.y ?? prev.y + prev.h / 2
+      return { x: fx - ((fx - prev.x) * w) / prev.w, y: fy - ((fy - prev.y) * h) / prev.h, w, h }
+    })
+  }, [])
+
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const focus = toSvgPoint(e.clientX, e.clientY)
+      zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15, focus ?? undefined)
+    }
+    svg.addEventListener('wheel', onWheel, { passive: false })
+    return () => svg.removeEventListener('wheel', onWheel)
+  }, [toSvgPoint, zoomBy])
+
+  const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {})
+  const handleKeyDown = (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null
+    const tag = target?.tagName?.toLowerCase()
+    const typing = tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable
+    const mod = e.ctrlKey || e.metaKey
+
+    if (mod && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+      if (typing) return
+      e.preventDefault()
+      undo()
+      return
+    }
+    if (mod && (e.key === 'y' || e.key === 'Y' || ((e.key === 'z' || e.key === 'Z') && e.shiftKey))) {
+      if (typing) return
+      e.preventDefault()
+      redo()
+      return
+    }
+    if (mod && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault()
+      if (isDirty) savePlan()
+      return
+    }
+    if (typing) return
+
+    if (e.code === 'Space') {
+      e.preventDefault()
+      if (!spaceRef.current) {
+        spaceRef.current = true
+        setSpaceDown(true)
+      }
+      return
+    }
+    if (e.key === 'Escape') {
+      if (deviceToPlace) setDeviceToPlace(null)
+      else if (wallStart) endWallChain()
+      else if (zoneDraft.length > 0) setZoneDraft([])
+      else if (selection) setSelection(null)
+      dragRef.current = null
+      setDragKind(null)
+      return
+    }
+    if (e.key === 'Enter') {
+      if (tool === 'zone' && zoneDraft.length >= 3) completeZone()
+      else if (tool === 'wall' && wallStart) endWallChain()
+      return
+    }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (selection) {
+        e.preventDefault()
+        deleteSelection()
+      }
+      return
+    }
+    if (mod || e.altKey) return
+    const key = e.key.toUpperCase()
+    const toolDef = TOOLS.find((t) => t.shortcut === key)
+    if (toolDef) {
+      setTool(toolDef.key)
+      return
+    }
+    if (key === 'G') setSnapGrid((v) => !v)
+    if (e.key === '+' || e.key === '=') zoomBy(1.25)
+    if (e.key === '-') zoomBy(1 / 1.25)
+  }
+
+  useEffect(() => {
+    keyHandlerRef.current = handleKeyDown
+  })
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => keyHandlerRef.current(e)
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        spaceRef.current = false
+        setSpaceDown(false)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
+  }, [])
+
+  const beginDrag = (state: DragState, e: React.PointerEvent) => {
+    dragRef.current = state
+    setDragKind(state.kind)
+    try {
+      svgRef.current?.setPointerCapture(e.pointerId)
+    } catch {
+      /* capture is best effort */
     }
   }
 
-  // Filter devices in palette
-  const filteredDevices = useMemo(() => {
-    return devices.filter((d) => {
-      const matchesCategory = deviceCategory === 'all' || d.domain === deviceCategory
-      const matchesSearch =
-        !deviceSearch ||
-        d.name.toLowerCase().includes(deviceSearch.toLowerCase()) ||
-        d.id.toLowerCase().includes(deviceSearch.toLowerCase())
-      return matchesCategory && matchesSearch
-    })
-  }, [devices, deviceCategory, deviceSearch])
+  const clientPoint = (e: React.PointerEvent): Point2D => ({ x: e.clientX, y: e.clientY })
 
-  // Count placed devices on this level
-  const placedDeviceIds = useMemo(() => {
-    return new Set(placements.map((p) => p.device_id))
-  }, [placements])
-
-  // SVG grid pattern calculation
-  const gridPattern = useMemo(() => {
-    return (
-      <pattern
-        id="editorGrid"
-        width={gridSize}
-        height={gridSize}
-        patternUnits="userSpaceOnUse"
-      >
-        <path
-          d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`}
-          fill="none"
-          stroke="#334155"
-          strokeWidth="0.5"
-          strokeDasharray={snapGrid ? 'none' : '2 2'}
-        />
-        <circle cx={0} cy={0} r="1" fill="#475569" />
-      </pattern>
-    )
-  }, [gridSize, snapGrid])
-
-  if (!level) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 bg-slate-950">
-        <Maximize2 className="w-12 h-12 text-slate-600 mb-3" />
-        <p className="text-sm font-semibold text-slate-400">Aucun niveau sélectionné</p>
-        <p className="text-xs text-slate-500 max-w-sm mt-1">
-          Sélectionnez un niveau dans la barre latérale ou créez-en un nouveau pour commencer à dessiner le plan 2D et placer vos appareils.
-        </p>
-      </div>
+  const handleBackgroundPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (e.button === 1 || e.button === 2 || tool === 'pan' || spaceRef.current) {
+      e.preventDefault()
+      beginDrag({ kind: 'pan', startClient: clientPoint(e), startView: viewBox, upx }, e)
+      return
+    }
+    if (e.button !== 0) return
+    beginDrag(
+      { kind: 'press', startClient: clientPoint(e), startView: viewBox, upx, pan: tool === 'select' && !deviceToPlace, moved: false },
+      e
     )
   }
 
+  const handleWallPointerDown = (wall: WallSegment, e: React.PointerEvent) => {
+    if (e.button !== 0 || tool !== 'select') return
+    if (spaceRef.current) {
+      beginDrag({ kind: 'pan', startClient: clientPoint(e), startView: viewBox, upx }, e)
+      return
+    }
+    const raw = toSvgPoint(e.clientX, e.clientY)
+    if (!raw) return
+    selectElement({ type: 'wall', id: wall.id })
+    beginDrag(
+      {
+        kind: 'wall-move',
+        wallId: wall.id,
+        refs: geo.wallWithJoints(plan.walls, wall, JOINT_TOLERANCE),
+        selfRefs: [
+          { wallId: wall.id, end: 'start' },
+          { wallId: wall.id, end: 'end' },
+        ],
+        startPlan: plan,
+        startPt: raw,
+        startClient: clientPoint(e),
+        moved: false,
+      },
+      e
+    )
+  }
+
+  const handleVertexPointerDown = (ref: geo.VertexRef, e: React.PointerEvent) => {
+    if (e.button !== 0) return
+    beginDrag(
+      {
+        kind: 'vertex',
+        refs: geo.vertexWithJoints(plan.walls, ref, JOINT_TOLERANCE),
+        selfRef: ref,
+        startPlan: plan,
+        startClient: clientPoint(e),
+        moved: false,
+      },
+      e
+    )
+  }
+
+  const handleOpeningPointerDown = (wall: WallSegment, opening: WallOpening, mode: OpeningDragMode, e: React.PointerEvent) => {
+    if (e.button !== 0 || tool !== 'select') return
+    selectElement({ type: 'opening', id: opening.id, wallId: wall.id })
+    beginDrag({ kind: 'opening', wallId: wall.id, openingId: opening.id, mode, startPlan: plan, startClient: clientPoint(e), moved: false }, e)
+  }
+
+  const handleZonePointerDown = (zone: Zone, e: React.PointerEvent) => {
+    if (e.button !== 0 || tool !== 'select') return
+    const raw = toSvgPoint(e.clientX, e.clientY)
+    if (!raw) return
+    selectElement({ type: 'zone', id: zone.id })
+    beginDrag({ kind: 'zone-move', zoneId: zone.id, startPlan: plan, startPt: raw, startClient: clientPoint(e), moved: false }, e)
+  }
+
+  const handleZoneVertexPointerDown = (zone: Zone, index: number, e: React.PointerEvent) => {
+    if (e.button !== 0) return
+    beginDrag({ kind: 'zone-vertex', zoneId: zone.id, index, startPlan: plan, startClient: clientPoint(e), moved: false }, e)
+  }
+
+  const handlePlacementPointerDown = (placement: DevicePlacement, e: React.PointerEvent) => {
+    if (e.button !== 0 || deviceToPlace) return
+    const raw = toSvgPoint(e.clientX, e.clientY)
+    if (!raw) return
+    selectElement({ type: 'device', id: placement.id })
+    beginDrag(
+      {
+        kind: 'device',
+        placementId: placement.id,
+        startPlacements: placements,
+        grabOffset: { x: raw.x - placement.x, y: raw.y - placement.y },
+        startClient: clientPoint(e),
+        moved: false,
+      },
+      e
+    )
+  }
+
+  const panFrom = (start: ViewBox, startUpx: number, dxPx: number, dyPx: number) => {
+    setViewBox({ ...start, x: start.x - dxPx * startUpx, y: start.y - dyPx * startUpx })
+  }
+
+  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const raw = toSvgPoint(e.clientX, e.clientY)
+    if (!raw) return
+    const drag = dragRef.current
+    if (!drag) {
+      updateHover(raw, e.shiftKey)
+      return
+    }
+
+    const dxPx = e.clientX - drag.startClient.x
+    const dyPx = e.clientY - drag.startClient.y
+    if (drag.kind === 'pan') {
+      panFrom(drag.startView, drag.upx, dxPx, dyPx)
+      return
+    }
+    if (!drag.moved) {
+      if (Math.hypot(dxPx, dyPx) < DRAG_THRESHOLD_PX) return
+      drag.moved = true
+      if ('startPlan' in drag) pushHistory(drag.startPlan)
+    }
+
+    switch (drag.kind) {
+      case 'press':
+        if (drag.pan) panFrom(drag.startView, drag.upx, dxPx, dyPx)
+        return
+      case 'wall-move': {
+        const wall = drag.startPlan.walls.find((w) => w.id === drag.wallId)
+        if (!wall) return
+        let dx = raw.x - drag.startPt.x
+        let dy = raw.y - drag.startPt.y
+        if (snapGrid) {
+          const a = geo.snapToGrid({ x: wall.x1 + dx, y: wall.y1 + dy }, gridSize)
+          dx = a.x - wall.x1
+          dy = a.y - wall.y1
+        }
+        const refs = e.altKey ? drag.selfRefs : drag.refs
+        setPlan({ ...drag.startPlan, walls: geo.translateVertices(drag.startPlan.walls, refs, Math.round(dx), Math.round(dy)) })
+        return
+      }
+      case 'vertex': {
+        const refs = e.altKey ? [drag.selfRef] : drag.refs
+        const { point } = snapPoint(raw, { walls: drag.startPlan.walls, skip: (r) => refs.some((x) => geo.sameRef(x, r)) })
+        setPlan({ ...drag.startPlan, walls: geo.setVertices(drag.startPlan.walls, refs, point) })
+        return
+      }
+      case 'opening': {
+        const wall = drag.startPlan.walls.find((w) => w.id === drag.wallId)
+        if (!wall) return
+        const len = geo.wallLength(wall)
+        const dist = geo.offsetAlongWall(wall, raw)
+        setPlan({
+          ...drag.startPlan,
+          walls: drag.startPlan.walls.map((w) => {
+            if (w.id !== drag.wallId) return w
+            return {
+              ...w,
+              openings: (w.openings ?? []).map((op) => {
+                if (op.id !== drag.openingId) return op
+                if (drag.mode === 'move') return geo.clampOpening({ ...op, offset: dist }, len)
+                const startEdge = op.offset - op.width / 2
+                const endEdge = op.offset + op.width / 2
+                if (drag.mode === 'resize-end') {
+                  const newEnd = Math.max(startEdge + geo.MIN_OPENING_WIDTH, Math.min(len, dist))
+                  return geo.clampOpening({ ...op, width: newEnd - startEdge, offset: (startEdge + newEnd) / 2 }, len)
+                }
+                const newStart = Math.min(endEdge - geo.MIN_OPENING_WIDTH, Math.max(0, dist))
+                return geo.clampOpening({ ...op, width: endEdge - newStart, offset: (newStart + endEdge) / 2 }, len)
+              }),
+            }
+          }),
+        })
+        return
+      }
+      case 'zone-move': {
+        const zone = drag.startPlan.zones.find((z) => z.id === drag.zoneId)
+        if (!zone || zone.points.length === 0) return
+        let dx = raw.x - drag.startPt.x
+        let dy = raw.y - drag.startPt.y
+        if (snapGrid) {
+          const a = geo.snapToGrid({ x: zone.points[0].x + dx, y: zone.points[0].y + dy }, gridSize)
+          dx = a.x - zone.points[0].x
+          dy = a.y - zone.points[0].y
+        }
+        setPlan({
+          ...drag.startPlan,
+          zones: drag.startPlan.zones.map((z) => (z.id === drag.zoneId ? { ...z, points: geo.translatePoints(z.points, Math.round(dx), Math.round(dy)) } : z)),
+        })
+        return
+      }
+      case 'zone-vertex': {
+        const { point } = snapPoint(raw, { walls: drag.startPlan.walls })
+        setPlan({
+          ...drag.startPlan,
+          zones: drag.startPlan.zones.map((z) =>
+            z.id === drag.zoneId ? { ...z, points: z.points.map((p, i) => (i === drag.index ? point : p)) } : z
+          ),
+        })
+        return
+      }
+      case 'device': {
+        const { point } = snapPoint({ x: raw.x - drag.grabOffset.x, y: raw.y - drag.grabOffset.y }, { noVertex: true })
+        setPlacements(drag.startPlacements.map((p) => (p.id === drag.placementId ? { ...p, x: point.x, y: point.y } : p)))
+        return
+      }
+    }
+  }
+
+  const updateHover = (raw: Point2D, shift: boolean) => {
+    setCursorRaw(raw)
+    if (deviceToPlace) {
+      setCursorSnap({ ...snapPoint(raw, { noVertex: true }) })
+      return
+    }
+    switch (tool) {
+      case 'wall':
+        setCursorSnap(snapPoint(raw, { from: wallStart, axis: shift && !!wallStart }))
+        break
+      case 'zone':
+        setCursorSnap(snapPoint(raw))
+        break
+      case 'door':
+      case 'window':
+        setHoverProjection(geo.projectOnNearestWall(plan.walls, raw, OPENING_HOVER_PX * upx))
+        break
+      default:
+        if (cursorSnap) setCursorSnap(null)
+    }
+  }
+
+  const handlePointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+    const drag = dragRef.current
+    if (!drag) return
+    dragRef.current = null
+    setDragKind(null)
+    try {
+      svgRef.current?.releasePointerCapture(e.pointerId)
+    } catch {
+      /* already released */
+    }
+    if (drag.kind === 'pan') return
+    if (drag.kind === 'press') {
+      if (!drag.moved) {
+        const raw = toSvgPoint(e.clientX, e.clientY)
+        if (raw) handleTap(raw, e.shiftKey)
+      }
+      return
+    }
+    if (drag.kind === 'device' && drag.moved) {
+      const moved = placements.find((p) => p.id === drag.placementId)
+      if (moved) savePlacement(placementRequest(moved))
+    }
+  }
+
+  const handlePointerCancel = () => {
+    dragRef.current = null
+    setDragKind(null)
+  }
+
+  const handleTap = (raw: Point2D, shift: boolean) => {
+    if (deviceToPlace) {
+      const { point } = snapPoint(raw, { noVertex: true })
+      savePlacement({ device_id: deviceToPlace.id, x: point.x, y: point.y, custom_name: deviceToPlace.name, icon: deviceToPlace.domain })
+      setDeviceToPlace(null)
+      return
+    }
+    switch (tool) {
+      case 'select':
+        setSelection(null)
+        return
+      case 'wall':
+        placeWallPoint(raw, shift)
+        return
+      case 'zone':
+        addZonePoint(raw)
+        return
+      case 'door':
+      case 'window':
+        placeOpening(raw)
+        return
+      default:
+        return
+    }
+  }
+
+  const placeWallPoint = (raw: Point2D, shift: boolean) => {
+    const { point } = snapPoint(raw, { from: wallStart, axis: shift && !!wallStart })
+    if (!wallStart) {
+      setWallStart(point)
+      chainOriginRef.current = point
+      return
+    }
+    if (geo.samePoint(point, wallStart)) {
+      endWallChain()
+      return
+    }
+    if (Math.hypot(point.x - wallStart.x, point.y - wallStart.y) < geo.MIN_WALL_LENGTH) return
+    const wall: WallSegment = {
+      id: geo.generateId('wall'),
+      x1: wallStart.x,
+      y1: wallStart.y,
+      x2: point.x,
+      y2: point.y,
+      thickness: settings.wallThickness,
+      openings: [],
+    }
+    mutatePlan((p) => ({ ...p, walls: [...p.walls, wall] }))
+    const origin = chainOriginRef.current
+    if (origin && geo.samePoint(point, origin)) endWallChain()
+    else setWallStart(point)
+  }
+
+  const addZonePoint = (raw: Point2D) => {
+    const { point } = snapPoint(raw)
+    if (zoneDraft.length >= 3 && geo.samePoint(point, zoneDraft[0], Math.max(gridSize * 0.6, 8 * upx))) {
+      completeZone()
+      return
+    }
+    if (zoneDraft.length > 0 && geo.samePoint(point, zoneDraft[zoneDraft.length - 1])) return
+    setZoneDraft((prev) => [...prev, point])
+  }
+
+  const placeOpening = (raw: Point2D) => {
+    const proj = hoverProjection ?? geo.projectOnNearestWall(plan.walls, raw, OPENING_HOVER_PX * upx)
+    if (!proj) return
+    const isDoor = tool === 'door'
+    const opening = geo.clampOpening(
+      {
+        id: geo.generateId(tool),
+        type: isDoor ? 'door' : 'window',
+        offset: proj.offset,
+        width: isDoor ? settings.doorWidth : settings.windowWidth,
+        hide_door: isDoor && settings.doorAsPassage,
+      },
+      geo.wallLength(proj.wall)
+    )
+    mutatePlan((p) => ({
+      ...p,
+      walls: p.walls.map((w) => (w.id === proj.wall.id ? { ...w, openings: [...(w.openings ?? []), opening] } : w)),
+    }))
+  }
+
+  const handleDoubleClick = () => {
+    if (tool === 'wall') endWallChain()
+    else if (tool === 'zone' && zoneDraft.length >= 3) completeZone()
+  }
+
+  const handleTouchStart = (e: React.TouchEvent<SVGSVGElement>) => {
+    if (e.touches.length !== 2) return
+    dragRef.current = null
+    setDragKind(null)
+    const [t1, t2] = [e.touches[0], e.touches[1]]
+    pinchRef.current = {
+      dist: Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY),
+      center: { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 },
+      view: viewBox,
+    }
+  }
+
+  const handleTouchMove = (e: React.TouchEvent<SVGSVGElement>) => {
+    const pinch = pinchRef.current
+    if (e.touches.length !== 2 || !pinch) return
+    e.preventDefault()
+    const [t1, t2] = [e.touches[0], e.touches[1]]
+    const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
+    const center = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 }
+    const ratio = dist / Math.max(pinch.dist, 1)
+    const startUpx = pinch.view.w / svgSize.width
+    const w = pinch.view.w / ratio
+    if (w < MIN_VIEW_W || w > MAX_VIEW_W) return
+    const h = pinch.view.h / ratio
+    const focus = toSvgPoint(pinch.center.x, pinch.center.y)
+    if (!focus) return
+    setViewBox({
+      x: focus.x - ((focus.x - pinch.view.x) * w) / pinch.view.w - (center.x - pinch.center.x) * startUpx,
+      y: focus.y - ((focus.y - pinch.view.y) * h) / pinch.view.h - (center.y - pinch.center.y) * startUpx,
+      w,
+      h,
+    })
+  }
+
+  const handleTouchEnd = () => {
+    pinchRef.current = null
+  }
+
+  const handleDrop = (e: React.DragEvent<SVGSVGElement>) => {
+    e.preventDefault()
+    const deviceId = e.dataTransfer.getData('text/plain')
+    const dev = devices.find((d) => d.id === deviceId)
+    const raw = toSvgPoint(e.clientX, e.clientY)
+    if (!dev || !raw || !level) return
+    const { point } = snapPoint(raw, { noVertex: true })
+    savePlacement({ device_id: dev.id, x: point.x, y: point.y, custom_name: dev.name, icon: dev.domain })
+  }
+
+  const handleSelectLevel = (id: string) => {
+    if (id === level?.id) return
+    if (isDirty && !confirm('Des modifications ne sont pas enregistrées. Changer de niveau les perdra. Continuer ?')) return
+    onSelectLevel(id)
+  }
+
+  const handleReset = () => {
+    if (!isDirty || !confirm('Revenir à la dernière version enregistrée du plan ?')) return
+    const saved = JSON.parse(savedJson) as { walls: WallSegment[]; zones: Zone[] }
+    pushHistory(plan)
+    setPlan({ level_id: plan.level_id, walls: saved.walls, zones: saved.zones })
+    resetEditing()
+  }
+
+  const handleClear = () => {
+    if (plan.walls.length === 0 && plan.zones.length === 0) return
+    if (!confirm('Supprimer tous les murs et toutes les zones de ce niveau ?')) return
+    mutatePlan((p) => ({ ...p, walls: [], zones: [] }))
+    resetEditing()
+  }
+
+  const handleImport = (imported: Plan) => {
+    mutatePlan(() => imported)
+    resetEditing()
+    fitToBounds(imported.walls, imported.zones, placements)
+  }
+
+  const updateWall = (id: string, patch: Partial<WallSegment>) =>
+    mutatePlan((p) => ({ ...p, walls: p.walls.map((w) => (w.id === id ? geo.withClampedOpenings({ ...w, ...patch }) : w)) }), `wall:${id}`)
+
+  const setWallLengthById = (id: string, length: number) =>
+    mutatePlan((p) => ({ ...p, walls: p.walls.map((w) => (w.id === id ? geo.setWallLength(w, length) : w)) }), `wall-len:${id}`)
+
+  const splitWallById = (id: string) => {
+    const wall = plan.walls.find((w) => w.id === id)
+    if (!wall) return
+    const [a, b] = geo.splitWall(wall, geo.generateId('wall'))
+    mutatePlan((p) => ({ ...p, walls: p.walls.flatMap((w) => (w.id === id ? [a, b] : [w])) }))
+  }
+
+  const updateOpening = (wallId: string, openingId: string, patch: Partial<WallOpening>) =>
+    mutatePlan(
+      (p) => ({
+        ...p,
+        walls: p.walls.map((w) => {
+          if (w.id !== wallId) return w
+          const len = geo.wallLength(w)
+          return { ...w, openings: (w.openings ?? []).map((o) => (o.id === openingId ? geo.clampOpening({ ...o, ...patch }, len) : o)) }
+        }),
+      }),
+      `opening:${openingId}:${Object.keys(patch).join(',')}`
+    )
+
+  const updateZone = (id: string, patch: Partial<Zone>) =>
+    mutatePlan((p) => ({ ...p, zones: p.zones.map((z) => (z.id === id ? { ...z, ...patch } : z)) }), `zone:${id}:${Object.keys(patch).join(',')}`)
+
+  const updatePlacement = (placement: DevicePlacement, patch: Partial<Pick<DevicePlacement, 'custom_name' | 'render_domain' | 'layer'>>) => {
+    savePlacement(placementRequest(placement, patch))
+  }
+
+  const cycleGrid = () => setGridSize((g) => GRID_SIZES[(GRID_SIZES.indexOf(g) + 1) % GRID_SIZES.length] ?? 20)
+
+  const displayGrid = useMemo(() => {
+    let step = gridSize
+    while (step / upx < 14) step *= 2
+    return step
+  }, [gridSize, upx])
+
+  const wallDraftPoint = tool === 'wall' && wallStart && cursorSnap ? cursorSnap.point : null
+  const wallDraftLength = wallDraftPoint && wallStart ? Math.hypot(wallDraftPoint.x - wallStart.x, wallDraftPoint.y - wallStart.y) : 0
+
+  const cursorClass =
+    dragKind === 'pan' || (dragKind === 'press' && tool === 'select')
+      ? 'cursor-grabbing'
+      : tool === 'pan' || spaceDown
+        ? 'cursor-grab'
+        : deviceToPlace
+          ? 'cursor-copy'
+          : tool === 'select'
+            ? 'cursor-default'
+            : 'cursor-crosshair'
+
+  const statusText = (() => {
+    if (!level) return 'Sélectionnez ou créez un niveau pour commencer.'
+    if (deviceToPlace) return `Cliquez sur le plan pour placer « ${deviceToPlace.name} » · Échap pour annuler`
+    switch (tool) {
+      case 'wall':
+        return wallStart
+          ? `${geo.formatMeters(wallDraftLength)} · Cliquez pour poser le coin · Maj = orthogonal · Échap termine`
+          : 'Cliquez pour poser le point de départ du mur'
+      case 'zone':
+        return zoneDraft.length === 0
+          ? 'Cliquez pour poser le premier sommet de la zone'
+          : `${zoneDraft.length} sommet${zoneDraft.length > 1 ? 's' : ''} · Cliquez le premier point ou Entrée pour fermer`
+      case 'door':
+      case 'window':
+        return hoverProjection ? `Cliquez pour poser ${tool === 'door' ? 'la porte' : 'la fenêtre'}` : 'Survolez un mur pour y poser l’ouverture'
+      case 'pan':
+        return 'Glissez pour déplacer la vue · Molette pour zoomer'
+      default:
+        if (selection) {
+          const label = { wall: 'Mur', zone: 'Zone', device: 'Appareil', opening: 'Ouverture' }[selection.type]
+          return `${label} sélectionné · Glissez pour déplacer · Suppr pour supprimer`
+        }
+        return 'Cliquez un élément pour le sélectionner · Glissez le fond pour déplacer la vue'
+    }
+  })()
+
+  const interactive = tool === 'select' && !deviceToPlace
+
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden select-none">
-      {/* Top Toolbar */}
-      <div className="bg-slate-900/90 border-b border-slate-800 p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-        {/* Tool selector */}
-        <div className="flex items-center space-x-1 bg-slate-800/80 p-1 rounded-lg border border-slate-700">
-          <button
-            type="button"
-            onClick={() => {
-              setTool('wall')
-              setWallStart(null)
-              setCurrentZonePoints([])
-              setDeviceToPlace(null)
+    <div className="flex-1 flex flex-col h-full min-h-0 bg-slate-950 overflow-hidden">
+      <EditorHeader
+        levels={levels}
+        activeLevelId={level?.id ?? null}
+        onSelectLevel={handleSelectLevel}
+        levelsManager={
+          <LevelsManager
+            levels={levels}
+            activeLevelId={level?.id ?? null}
+            onSelectLevel={(id) => {
+              handleSelectLevel(id)
+              setLevelsOpen(false)
             }}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
-              tool === 'wall'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
-                : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
-            }`}
-          >
-            <Minus className="w-4 h-4 stroke-[3]" />
-            <span>Mur</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setTool('zone')
-              setWallStart(null)
-              setCurrentZonePoints([])
-              setDeviceToPlace(null)
+            onRefreshLevels={async () => {
+              await onRefreshLevels()
+              if (level?.id) {
+                try {
+                  const res = await fetch(`/api/levels/${level.id}/placements`)
+                  const data = await res.json()
+                  if (data?.data) setPlacements(data.data)
+                } catch {
+                  // ignore
+                }
+              }
             }}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
-              tool === 'zone'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
-                : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
-            }`}
-          >
-            <Square className="w-4 h-4" />
-            <span>Zone</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setTool('select')
-              setWallStart(null)
-              setCurrentZonePoints([])
-              setDeviceToPlace(null)
-            }}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md font-medium transition-all ${
-              tool === 'select'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
-                : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
-            }`}
-          >
-            <Pointer className="w-4 h-4" />
-            <span>Sélection / Gomme</span>
-          </button>
-        </div>
-
-        {/* Snap to grid controls */}
-        <div className="flex items-center space-x-2">
-          <button
-            type="button"
-            onClick={() => setSnapGrid(!snapGrid)}
-            className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors ${
-              snapGrid
-                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
-                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-            }`}
-            title="Activer/Désactiver l'aimantation sur la grille"
-          >
-            <Grid className="w-3.5 h-3.5" />
-            <span>Grille: {snapGrid ? 'Aimantée' : 'Libre'}</span>
-          </button>
-
-          <select
-            value={gridSize}
-            onChange={(e) => setGridSize(Number(e.target.value))}
-            className="bg-slate-800 border border-slate-700 text-slate-200 rounded-md px-2 py-1.5 text-xs focus:outline-none"
-          >
-            <option value="10">Pas: 10px</option>
-            <option value="20">Pas: 20px</option>
-            <option value="40">Pas: 40px</option>
-          </select>
-        </div>
-
-        {/* HA Devices Drawer Toggle Button */}
-        <div className="flex items-center space-x-2">
-          <button
-            type="button"
-            onClick={() => setShowDevicePalette(!showDevicePalette)}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-md border text-xs font-medium transition-all ${
-              showDevicePalette
-                ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm shadow-indigo-500/30'
-                : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700/60'
-            }`}
-          >
-            <Cpu className="w-4 h-4" />
-            <span>Appareils HA</span>
-            <span className="bg-black/30 text-slate-200 px-1.5 py-0.5 rounded-full text-[10px] font-mono">
-              {placements.length}/{devices.length}
-            </span>
-          </button>
-        </div>
-
-        {/* Plan actions */}
-        <div className="flex items-center space-x-2">
-          <button
-            type="button"
-            disabled={history.length === 0}
-            onClick={handleUndo}
-            className="flex items-center space-x-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 px-2.5 py-1.5 rounded-md border border-slate-700"
-            title="Annuler dernière action"
-          >
-            <Undo className="w-3.5 h-3.5" />
-            <span>Annuler</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleReset}
-            className="flex items-center space-x-1 bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-md border border-slate-700"
-            title="Réinitialiser le plan"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleClear}
-            className="flex items-center space-x-1 bg-slate-800 hover:bg-rose-900/40 text-rose-400 px-2.5 py-1.5 rounded-md border border-slate-700 hover:border-rose-700"
-            title="Effacer tout"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Effacer</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSavePlan}
-            disabled={saving}
-            className="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium px-4 py-1.5 rounded-md shadow-md shadow-emerald-600/20 transition-all ml-1"
-          >
-            {savedNotification ? (
-              <>
-                <Check className="w-4 h-4 text-white" />
-                <span>Sauvegardé !</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                <span>{saving ? 'Enregistrement...' : 'Sauvegarder le Plan'}</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Tool Context Sub-Bar */}
-      <div className="bg-slate-900/60 border-b border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between text-xs text-slate-300 gap-2">
-        {deviceToPlace && (
-          <div className="flex items-center space-x-3 bg-indigo-950/90 border border-indigo-500/50 px-3 py-1 rounded-md">
-            <span className="text-indigo-300 font-medium">
-              🎯 Cliquez sur le plan pour placer : <strong className="text-white">{deviceToPlace.name}</strong>
-            </span>
-            <button
-              type="button"
-              onClick={() => setDeviceToPlace(null)}
-              className="text-rose-400 hover:text-rose-300 underline text-xs"
-            >
-              Annuler (Esc)
-            </button>
-          </div>
-        )}
-
-        {!deviceToPlace && tool === 'wall' && (
-          <div className="flex items-center space-x-4">
-            <span className="font-semibold text-indigo-400">Outil Mur:</span>
-            <span>
-              {wallStart
-                ? `Point A fixé (${wallStart.x}, ${wallStart.y}) • Cliquez pour fixer le point B`
-                : 'Cliquez sur la grille pour placer le premier point'}
-            </span>
-            <div className="flex items-center space-x-2">
-              <span className="text-slate-400">Épaisseur:</span>
-              <select
-                value={wallThickness}
-                onChange={(e) => setWallThickness(Number(e.target.value))}
-                className="bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-xs text-white"
-              >
-                <option value="8">Fin (8px)</option>
-                <option value="12">Standard (12px)</option>
-                <option value="16">Porteur (16px)</option>
-                <option value="20">Épais (20px)</option>
-              </select>
-            </div>
-            {wallStart && (
-              <button
-                type="button"
-                onClick={() => setWallStart(null)}
-                className="text-rose-400 underline ml-2"
-              >
-                Annuler segment
-              </button>
-            )}
-          </div>
-        )}
-
-        {!deviceToPlace && tool === 'zone' && (
-          <div className="flex items-center space-x-3 flex-wrap gap-y-1">
-            <span className="font-semibold text-indigo-400">Outil Zone:</span>
-            <div className="flex items-center space-x-1.5">
-              <span>Nom:</span>
-              <input
-                type="text"
-                value={zoneName}
-                onChange={(e) => setZoneName(e.target.value)}
-                className="bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-white w-28 text-xs"
-              />
-            </div>
-
-            <div className="flex items-center space-x-1">
-              <Palette className="w-3.5 h-3.5 text-slate-400" />
-              {COLOR_PRESETS.map((preset) => (
-                <button
-                  key={preset.value}
-                  type="button"
-                  onClick={() => {
-                    setZoneColor(preset.value)
-                    setZoneName(preset.name.split(' ')[1] || zoneName)
-                  }}
-                  className={`w-4 h-4 rounded-full border transition-transform ${
-                    zoneColor === preset.value
-                      ? 'scale-125 border-white ring-1 ring-white/50'
-                      : 'border-transparent hover:scale-110'
-                  }`}
-                  style={{ backgroundColor: preset.value }}
-                  title={preset.name}
-                />
-              ))}
-              <input
-                type="color"
-                value={zoneColor}
-                onChange={(e) => setZoneColor(e.target.value)}
-                className="w-5 h-5 bg-transparent cursor-pointer rounded overflow-hidden"
-                title="Couleur personnalisée"
-              />
-            </div>
-
-            <span className="text-slate-400">{currentZonePoints.length} points placés</span>
-
-            {currentZonePoints.length >= 3 && (
-              <button
-                type="button"
-                onClick={completeCurrentZone}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-0.5 rounded text-xs flex items-center space-x-1"
-              >
-                <Check className="w-3 h-3" />
-                <span>Boucler la Zone</span>
-              </button>
-            )}
-
-            {currentZonePoints.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setCurrentZonePoints([])}
-                className="text-rose-400 underline"
-              >
-                Abandonner zone
-              </button>
-            )}
-          </div>
-        )}
-
-        {!deviceToPlace && tool === 'select' && (
-          <div className="flex items-center space-x-4">
-            <span className="font-semibold text-indigo-400">Mode Sélection / Gomme:</span>
-            {selectedElement ? (
-              <div className="flex items-center space-x-2">
-                {selectedElement.type === 'device' ? (
-                  <>
-                    <span className="text-white">
-                      Appareil:{' '}
-                      {(() => {
-                        const p = placements.find((item) => item.id === selectedElement.id)
-                        if (!p) return ''
-                        const d = devices.find((dev) => dev.id === p.device_id)
-                        return `${p.custom_name || d?.name || p.device_id}`
-                      })()}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleDeleteSelected}
-                      className="bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-0.5 rounded text-xs flex items-center space-x-1"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Retirer du plan</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-white">
-                      Élément: {selectedElement.type === 'wall' ? 'Segment de Mur' : 'Zone'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleDeleteSelected}
-                      className="bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-0.5 rounded text-xs flex items-center space-x-1"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Supprimer</span>
-                    </button>
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setSelectedElement(null)}
-                  className="text-slate-400 underline text-xs ml-2"
-                >
-                  Désélectionner
-                </button>
-              </div>
-            ) : (
-              <span className="text-slate-400">
-                Cliquez sur un mur, une zone ou un appareil pour le sélectionner et le supprimer.
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Summary info right */}
-        <div className="ml-auto text-[11px] text-slate-400 flex items-center space-x-3">
-          <span>
-            {plan.walls.length} murs • {plan.zones.length} zones • {placements.length} appareils
-          </span>
-          {cursorPos && (
-            <span className="font-mono text-slate-500">
-              X: {Math.round(cursorPos.x)} Y: {Math.round(cursorPos.y)}
-            </span>
-          )}
-        </div>
-      </div>
+          />
+        }
+        levelsOpen={levelsOpen}
+        onToggleLevels={setLevelsOpen}
+        viewModeMenu={viewModeMenu}
+        canUndo={history.length > 0}
+        canRedo={redoStack.length > 0}
+        onUndo={undo}
+        onRedo={redo}
+        onImport={() => setShowImport(true)}
+        onReset={handleReset}
+        onClear={handleClear}
+        onSave={savePlan}
+        isDirty={isDirty}
+        saveState={saveState}
+        panelOpen={panelOpen}
+        onTogglePanel={() => setPanelOpen((v) => !v)}
+        disabled={!level}
+      />
 
       {error && (
-        <div className="bg-rose-500/10 border-b border-rose-500/20 px-4 py-1.5 text-xs text-rose-400 flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4" />
-          <span>{error}</span>
-          <button type="button" onClick={() => setError(null)} className="ml-auto text-rose-400 hover:text-white">
+        <div className="bg-rose-500/10 border-b border-rose-500/20 px-4 py-1.5 text-xs text-rose-300 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button type="button" onClick={() => setError(null)} className="text-rose-300 hover:text-white cursor-pointer">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
-      {/* Main Workspace Layout (Canvas + Drawer) */}
-      <div className="flex-1 flex flex-row overflow-hidden relative">
-        {/* SVG Interactive Canvas */}
-        <div className="flex-1 relative overflow-auto bg-slate-950 flex items-center justify-center p-4">
-          {loading ? (
-            <div className="text-slate-400 text-sm">Chargement du plan...</div>
-          ) : (
-            <svg
-              ref={svgRef}
-              viewBox="0 0 1000 700"
-              className="w-full h-full max-w-[1000px] max-h-[700px] bg-slate-900/90 rounded-xl border border-slate-800 shadow-2xl shadow-black/60 cursor-crosshair touch-none select-none"
-              onMouseMove={handlePointerMove}
-              onTouchMove={handlePointerMove}
-              onMouseUp={handlePointerUp}
-              onTouchEnd={handlePointerUp}
-              onClick={handleSvgClick}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
+      <div className="flex-1 flex min-h-0">
+        <ToolRail tool={tool} onSelectTool={setTool} snapGrid={snapGrid} onToggleSnap={() => setSnapGrid((v) => !v)} gridSize={gridSize} onCycleGrid={cycleGrid} />
+
+        <div className="flex-1 relative min-w-0 min-h-0 overflow-hidden" style={{ backgroundColor: CANVAS.background }}>
+          <svg
+            ref={svgRef}
+            viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
+            preserveAspectRatio="none"
+            className={`absolute inset-0 w-full h-full touch-none select-none ${cursorClass}`}
+            onPointerDown={handleBackgroundPointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            onPointerLeave={() => {
+              if (!dragRef.current) {
+                setCursorRaw(null)
+                setCursorSnap(null)
+                setHoverProjection(null)
+              }
+            }}
+            onDoubleClick={handleDoubleClick}
+            onContextMenu={(e) => e.preventDefault()}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
+            onDragOver={(e) => {
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'copy'
+            }}
+            onDrop={handleDrop}
+          >
+            <defs>
+              <pattern id="editorGrid" width={displayGrid} height={displayGrid} patternUnits="userSpaceOnUse">
+                <rect width={displayGrid} height={displayGrid} fill={CANVAS.background} />
+                <path d={`M ${displayGrid} 0 L 0 0 0 ${displayGrid}`} fill="none" stroke={CANVAS.gridLine} strokeWidth={0.8 * upx} />
+                <circle cx={0} cy={0} r={1.2 * upx} fill={CANVAS.gridDot} />
+              </pattern>
+              <filter id="editorGlow" x="-30%" y="-30%" width="160%" height="160%">
+                <feDropShadow dx="0" dy="0" stdDeviation={3 * upx} floodColor={CANVAS.accent} floodOpacity="0.55" />
+              </filter>
+            </defs>
+
+            <rect x={viewBox.x} y={viewBox.y} width={viewBox.w} height={viewBox.h} fill="url(#editorGrid)" />
+            <line x1={viewBox.x} y1={0} x2={viewBox.x + viewBox.w} y2={0} stroke={CANVAS.axis} strokeWidth={upx} strokeDasharray={`${4 * upx} ${4 * upx}`} opacity={0.5} />
+            <line x1={0} y1={viewBox.y} x2={0} y2={viewBox.y + viewBox.h} stroke={CANVAS.axis} strokeWidth={upx} strokeDasharray={`${4 * upx} ${4 * upx}`} opacity={0.5} />
+
+            <ZoneLayer
+              zones={plan.zones}
+              selection={selection}
+              interactive={interactive}
+              upx={upx}
+              onZonePointerDown={handleZonePointerDown}
+              onZoneVertexPointerDown={handleZoneVertexPointerDown}
+            />
+            {tool === 'zone' && <ZoneDraft points={zoneDraft} cursor={cursorSnap?.point ?? null} color={settings.zoneColor} upx={upx} />}
+
+            <WallLayer
+              walls={plan.walls}
+              selection={selection}
+              hoverWallId={hoverWallId}
+              interactive={interactive}
+              showJoints={tool === 'select' || tool === 'wall'}
+              jointTolerance={JOINT_TOLERANCE}
+              upx={upx}
+              onWallPointerDown={handleWallPointerDown}
+              onVertexPointerDown={handleVertexPointerDown}
+              onOpeningPointerDown={handleOpeningPointerDown}
+              onWallHover={setHoverWallId}
+            />
+
+            {hoverProjection && (tool === 'door' || tool === 'window') && (
+              <OpeningPreview projection={hoverProjection} width={tool === 'door' ? settings.doorWidth : settings.windowWidth} upx={upx} />
+            )}
+
+            {wallStart && wallDraftPoint && (
+              <g className="pointer-events-none">
+                <line
+                  x1={wallStart.x}
+                  y1={wallStart.y}
+                  x2={wallDraftPoint.x}
+                  y2={wallDraftPoint.y}
+                  stroke={CANVAS.accentSoft}
+                  strokeWidth={settings.wallThickness}
+                  strokeLinecap="square"
+                  opacity={0.75}
+                />
+                <circle cx={wallStart.x} cy={wallStart.y} r={4 * upx} fill={CANVAS.accent} stroke="#fff" strokeWidth={1.5 * upx} />
+                {wallDraftLength > 0 && (
+                  <DimensionLabel
+                    x={(wallStart.x + wallDraftPoint.x) / 2}
+                    y={(wallStart.y + wallDraftPoint.y) / 2 - (settings.wallThickness / 2 + 16 * upx)}
+                    text={geo.formatMeters(wallDraftLength)}
+                    upx={upx}
+                  />
+                )}
+              </g>
+            )}
+
+            <DeviceLayer
+              placements={placements}
+              devices={devices}
+              selection={selection}
+              interactive={!deviceToPlace}
+              upx={upx}
+              onPlacementPointerDown={handlePlacementPointerDown}
+            />
+
+            {cursorSnap && (tool === 'wall' || tool === 'zone' || deviceToPlace) && (
+              <g className="pointer-events-none">
+                {cursorSnap.vertex && (
+                  <circle cx={cursorSnap.point.x} cy={cursorSnap.point.y} r={9 * upx} fill="none" stroke={CANVAS.preview} strokeWidth={1.5 * upx} />
+                )}
+                <circle
+                  cx={cursorSnap.point.x}
+                  cy={cursorSnap.point.y}
+                  r={3.5 * upx}
+                  fill={cursorSnap.vertex ? CANVAS.preview : '#ffffff'}
+                  stroke={CANVAS.accent}
+                  strokeWidth={1.5 * upx}
+                />
+              </g>
+            )}
+          </svg>
+
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-950/40 backdrop-blur-[1px] text-slate-300 text-sm gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Chargement du plan…
+            </div>
+          )}
+
+          {!level && !loading && (
+            <div className="absolute inset-0 flex items-center justify-center p-6">
+              <div className="max-w-sm w-full bg-slate-900/95 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center space-y-4">
+                <div className="w-12 h-12 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center mx-auto">
+                  <Layers className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-semibold text-white">Aucun niveau</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Créez un premier étage ou espace extérieur pour dessiner son plan et y placer vos appareils.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLevelsOpen(true)}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg shadow-indigo-500/30 transition-all cursor-pointer"
+                >
+                  Gérer les niveaux
+                </button>
+              </div>
+            </div>
+          )}
+
+          {deviceToPlace && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-indigo-950/90 backdrop-blur-md border border-indigo-500/50 text-indigo-100 text-xs px-3 py-1.5 rounded-full shadow-xl flex items-center gap-2">
+              <Cpu className="w-3.5 h-3.5" />
+              <span>
+                Placement de <strong className="text-white">{deviceToPlace.name}</strong>
+              </span>
+              <button type="button" onClick={() => setDeviceToPlace(null)} className="ml-1 text-indigo-300 hover:text-white cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          <div className="absolute bottom-3 left-3 z-10 flex items-center gap-0.5 bg-slate-900/90 backdrop-blur-md border border-slate-800 p-1 rounded-xl shadow-xl">
+            <button type="button" onClick={() => zoomBy(1.25)} title="Zoom avant (+)" className="w-8 h-8 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer">
+              <ZoomIn className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={() => zoomBy(1 / 1.25)} title="Zoom arrière (-)" className="w-8 h-8 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer">
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <div className="h-4 w-px bg-slate-700 mx-0.5" />
+            <button
+              type="button"
+              onClick={() => fitToBounds(plan.walls, plan.zones, placements)}
+              title="Cadrer le plan"
+              className="h-8 px-2.5 rounded-lg hover:bg-slate-800 text-indigo-300 hover:text-white text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer"
             >
-              <defs>{gridPattern}</defs>
+              <Maximize2 className="w-3.5 h-3.5" />
+              Cadrer
+            </button>
+            <span className="px-2 text-[11px] font-mono text-slate-500">{Math.round((DEFAULT_VIEW.w / viewBox.w) * 100)}%</span>
+          </div>
 
-              {/* Grid layer */}
-              <rect width="1000" height="700" fill="url(#editorGrid)" />
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 max-w-[60%] bg-slate-900/85 backdrop-blur-md border border-slate-800 text-slate-300 text-[11px] px-3 py-1.5 rounded-full shadow-xl truncate pointer-events-none">
+            {statusText}
+          </div>
 
-              {/* Render Saved Zones (Polygons) */}
-              {plan.zones.map((zone) => {
-                const isSelected = selectedElement?.type === 'zone' && selectedElement.id === zone.id
-                const pointsStr = zone.points.map((p) => `${p.x},${p.y}`).join(' ')
-
-                const cx = zone.points.reduce((acc, p) => acc + p.x, 0) / zone.points.length
-                const cy = zone.points.reduce((acc, p) => acc + p.y, 0) / zone.points.length
-
-                return (
-                  <g key={zone.id} className="cursor-pointer">
-                    <polygon
-                      points={pointsStr}
-                      fill={zone.color}
-                      fillOpacity={isSelected ? 0.45 : 0.25}
-                      stroke={isSelected ? '#ffffff' : zone.color}
-                      strokeWidth={isSelected ? 3 : 1.5}
-                      strokeDasharray={isSelected ? '4 2' : 'none'}
-                      onClick={(e) => {
-                        if (tool === 'select') {
-                          e.stopPropagation()
-                          setSelectedElement({ type: 'zone', id: zone.id })
-                        }
-                      }}
-                    />
-                    <text
-                      x={cx}
-                      y={cy}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      fill="#ffffff"
-                      fontSize="12"
-                      fontWeight="600"
-                      className="pointer-events-none select-none drop-shadow"
-                    >
-                      {zone.name}
-                    </text>
-                  </g>
-                )
-              })}
-
-              {/* Render In-Progress Zone Drawing */}
-              {currentZonePoints.length > 0 && (
-                <g className="pointer-events-none">
-                  {currentZonePoints.length > 1 && (
-                    <polyline
-                      points={currentZonePoints.map((p) => `${p.x},${p.y}`).join(' ')}
-                      fill="none"
-                      stroke={zoneColor}
-                      strokeWidth="2"
-                      strokeDasharray="4 4"
-                    />
-                  )}
-                  {cursorPos && (
-                    <line
-                      x1={currentZonePoints[currentZonePoints.length - 1].x}
-                      y1={currentZonePoints[currentZonePoints.length - 1].y}
-                      x2={cursorPos.x}
-                      y2={cursorPos.y}
-                      stroke={zoneColor}
-                      strokeWidth="2"
-                      strokeDasharray="2 2"
-                    />
-                  )}
-                  {currentZonePoints.map((pt, idx) => (
-                    <circle
-                      key={idx}
-                      cx={pt.x}
-                      cy={pt.y}
-                      r={idx === 0 ? 6 : 4}
-                      fill={idx === 0 ? '#38bdf8' : zoneColor}
-                      stroke="#ffffff"
-                      strokeWidth="1.5"
-                    />
-                  ))}
-                </g>
-              )}
-
-              {/* Render Saved Walls */}
-              {plan.walls.map((wall) => {
-                const isSelected = selectedElement?.type === 'wall' && selectedElement.id === wall.id
-                return (
-                  <g key={wall.id} className="cursor-pointer">
-                    <line
-                      x1={wall.x1}
-                      y1={wall.y1}
-                      x2={wall.x2}
-                      y2={wall.y2}
-                      stroke="transparent"
-                      strokeWidth={Math.max(wall.thickness + 10, 20)}
-                      strokeLinecap="round"
-                      onClick={(e) => {
-                        if (tool === 'select') {
-                          e.stopPropagation()
-                          setSelectedElement({ type: 'wall', id: wall.id })
-                        }
-                      }}
-                    />
-                    <line
-                      x1={wall.x1}
-                      y1={wall.y1}
-                      x2={wall.x2}
-                      y2={wall.y2}
-                      stroke={isSelected ? '#6366f1' : '#94a3b8'}
-                      strokeWidth={wall.thickness}
-                      strokeLinecap="square"
-                      className="transition-all"
-                    />
-                    <circle cx={wall.x1} cy={wall.y1} r={wall.thickness / 2} fill={isSelected ? '#818cf8' : '#cbd5e1'} />
-                    <circle cx={wall.x2} cy={wall.y2} r={wall.thickness / 2} fill={isSelected ? '#818cf8' : '#cbd5e1'} />
-                  </g>
-                )
-              })}
-
-              {/* Render In-Progress Wall Drawing */}
-              {wallStart && cursorPos && (
-                <g className="pointer-events-none">
-                  <line
-                    x1={wallStart.x}
-                    y1={wallStart.y}
-                    x2={cursorPos.x}
-                    y2={cursorPos.y}
-                    stroke="#818cf8"
-                    strokeWidth={wallThickness}
-                    strokeLinecap="square"
-                    opacity="0.8"
-                  />
-                  <circle cx={wallStart.x} cy={wallStart.y} r={wallThickness / 2} fill="#818cf8" />
-                  <circle cx={cursorPos.x} cy={cursorPos.y} r={wallThickness / 2} fill="#818cf8" />
-                </g>
-              )}
-
-              {/* Render Placed Home Assistant Devices */}
-              {placements.map((p) => {
-                const isSelected = selectedElement?.type === 'device' && selectedElement.id === p.id
-                const dev = devices.find((d) => d.id === p.device_id)
-                const domain = dev?.domain || p.icon || 'light'
-                const colors = getDomainColor(domain)
-                const displayName = p.custom_name || dev?.name || p.device_id
-                const stateLabel = dev?.state || ''
-
-                return (
-                  <g
-                    key={p.id}
-                    className="cursor-move select-none group"
-                    onMouseDown={(e) => {
-                      e.stopPropagation()
-                      const raw = getSvgCoordinates(e)
-                      if (raw) {
-                        setDraggingPlacementId(p.id)
-                        setDragOffset({ x: raw.x - p.x, y: raw.y - p.y })
-                        setIsMovedDuringDrag(false)
-                      }
-                      setSelectedElement({ type: 'device', id: p.id })
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setSelectedElement({ type: 'device', id: p.id })
-                    }}
-                  >
-                    {/* Pulsing selection halo */}
-                    {isSelected && (
-                      <circle
-                        cx={p.x}
-                        cy={p.y}
-                        r="24"
-                        fill="none"
-                        stroke={colors.ring}
-                        strokeWidth="2"
-                        strokeDasharray="4 3"
-                        className="animate-pulse"
-                      />
-                    )}
-
-                    {/* Circular badge background */}
-                    <circle
-                      cx={p.x}
-                      cy={p.y}
-                      r="16"
-                      fill="#0f172a"
-                      stroke={isSelected ? colors.ring : colors.fill}
-                      strokeWidth={isSelected ? '2.5' : '1.5'}
-                      className="transition-transform group-hover:scale-110"
-                    />
-
-                    {/* Domain icon SVG path */}
-                    <g transform={`translate(${p.x - 7}, ${p.y - 7})`} className="pointer-events-none">
-                      {domain === 'light' && (
-                        <path
-                          d="M9 18h6m-4 4h2M12 2a7 7 0 0 0-7 7c0 2.5 1.5 4.5 3 6h8c1.5-1.5 3-3.5 3-6a7 7 0 0 0-7-7z"
-                          fill="none"
-                          stroke={colors.fill}
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          transform="scale(0.58)"
-                        />
-                      )}
-                      {domain === 'switch' && (
-                        <path
-                          d="M12 2v10m-7.5-6a9 9 0 1 0 15 0"
-                          fill="none"
-                          stroke={colors.fill}
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          transform="scale(0.58)"
-                        />
-                      )}
-                      {domain === 'sensor' && (
-                        <path
-                          d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"
-                          fill="none"
-                          stroke={colors.fill}
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          transform="scale(0.58)"
-                        />
-                      )}
-                      {domain === 'climate' && (
-                        <path
-                          d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
-                          fill="none"
-                          stroke={colors.fill}
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          transform="scale(0.58)"
-                        />
-                      )}
-                      {domain === 'media_player' && (
-                        <path
-                          d="M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"
-                          fill="none"
-                          stroke={colors.fill}
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          transform="scale(0.58)"
-                        />
-                      )}
-                    </g>
-
-                    {/* State dot indicator */}
-                    <circle
-                      cx={p.x + 11}
-                      cy={p.y - 11}
-                      r="3.5"
-                      fill={stateLabel === 'on' || (stateLabel !== 'off' && stateLabel !== '' && stateLabel !== 'idle') ? '#22c55e' : '#64748b'}
-                      stroke="#0f172a"
-                      strokeWidth="1.5"
-                    />
-
-                    {/* Device name label */}
-                    <text
-                      x={p.x}
-                      y={p.y + 26}
-                      textAnchor="middle"
-                      fill="#e2e8f0"
-                      fontSize="10"
-                      fontWeight="600"
-                      className="pointer-events-none select-none drop-shadow"
-                    >
-                      {displayName}
-                    </text>
-
-                    {/* State pill if sensor or value */}
-                    {stateLabel && (
-                      <text
-                        x={p.x}
-                        y={p.y + 36}
-                        textAnchor="middle"
-                        fill="#94a3b8"
-                        fontSize="8.5"
-                        className="pointer-events-none select-none font-mono"
-                      >
-                        {stateLabel}
-                      </text>
-                    )}
-                  </g>
-                )
-              })}
-
-              {/* Cursor Grid Snapping Indicator */}
-              {cursorPos && (
-                <g className="pointer-events-none">
-                  <circle
-                    cx={cursorPos.x}
-                    cy={cursorPos.y}
-                    r="3.5"
-                    fill="#ffffff"
-                    stroke="#6366f1"
-                    strokeWidth="1.5"
-                  />
-                </g>
-              )}
-            </svg>
+          {cursorRaw && (
+            <div className="absolute bottom-3 right-3 z-10 bg-slate-900/85 backdrop-blur-md border border-slate-800 text-slate-500 text-[11px] font-mono px-2.5 py-1.5 rounded-lg pointer-events-none">
+              x {Math.round(cursorRaw.x)} · y {Math.round(cursorRaw.y)}
+            </div>
           )}
         </div>
 
-        {/* Collapsible HA Devices Drawer on the Right */}
-        {showDevicePalette && (
-          <div className="w-80 bg-slate-900 border-l border-slate-800 flex flex-col h-full z-10 shadow-xl select-none">
-            {/* Drawer Header */}
-            <div className="p-3 border-b border-slate-800 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Cpu className="w-4 h-4 text-indigo-400" />
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                  Appareils Home Assistant
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowDevicePalette(false)}
-                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
-                title="Masquer la palette"
-              >
-                <X className="w-4 h-4" />
-              </button>
+        {panelOpen && (
+          <aside className="w-80 shrink-0 bg-slate-900 border-l border-slate-800 flex flex-col min-h-0">
+            <div className="flex items-center border-b border-slate-800 px-2 pt-2 gap-1">
+              <PanelTab active={panelTab === 'inspector'} onClick={() => setPanelTab('inspector')} icon={<SlidersHorizontal className="w-3.5 h-3.5" />} label="Propriétés" />
+              <PanelTab
+                active={panelTab === 'devices'}
+                onClick={() => setPanelTab('devices')}
+                icon={<Cpu className="w-3.5 h-3.5" />}
+                label="Appareils"
+                badge={`${placements.length}/${devices.length}`}
+              />
             </div>
-
-            {/* Category tabs */}
-            <div className="p-2 border-b border-slate-800 bg-slate-950/40">
-              <div className="flex flex-wrap gap-1">
-                {DOMAIN_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.key}
-                    type="button"
-                    onClick={() => setDeviceCategory(cat.key)}
-                    className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
-                      deviceCategory === cat.key
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700'
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Search Input */}
-            <div className="p-2 border-b border-slate-800">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-500" />
-                <input
-                  type="text"
-                  placeholder="Rechercher un appareil..."
-                  value={deviceSearch}
-                  onChange={(e) => setDeviceSearch(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-md pl-8 pr-2 py-1.5 focus:outline-none focus:border-indigo-500"
+            <div className="flex-1 min-h-0">
+              {panelTab === 'inspector' ? (
+                <Inspector
+                  plan={plan}
+                  placements={placements}
+                  devices={devices}
+                  level={level}
+                  selection={selection}
+                  tool={tool}
+                  settings={settings}
+                  onSettings={(patch) => setSettings((s) => ({ ...s, ...patch }))}
+                  zoneDraftCount={zoneDraft.length}
+                  onCompleteZone={completeZone}
+                  onCancelZone={() => setZoneDraft([])}
+                  wallDrafting={!!wallStart}
+                  onCancelWall={endWallChain}
+                  onUpdateWall={updateWall}
+                  onSetWallLength={setWallLengthById}
+                  onSplitWall={splitWallById}
+                  onUpdateOpening={updateOpening}
+                  onUpdateZone={updateZone}
+                  onUpdatePlacement={updatePlacement}
+                  onDeleteSelection={deleteSelection}
+                  onSelect={selectElement}
                 />
-                {deviceSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setDeviceSearch('')}
-                    className="absolute right-2 top-2 text-slate-400 hover:text-white"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Device list */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-2">
-              {loadingDevices ? (
-                <div className="p-4 text-center text-xs text-slate-500">
-                  Chargement des appareils...
-                </div>
-              ) : filteredDevices.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-500">
-                  Aucun appareil trouvé
-                </div>
               ) : (
-                filteredDevices.map((dev) => {
-                  const colors = getDomainColor(dev.domain)
-                  const isPlaced = placedDeviceIds.has(dev.id)
-                  const isCurrentlyPlacing = deviceToPlace?.id === dev.id
-
-                  return (
-                    <div
-                      key={dev.id}
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', dev.id)
-                        e.dataTransfer.effectAllowed = 'copy'
-                      }}
-                      className={`p-2.5 rounded-lg border transition-all cursor-grab active:cursor-grabbing bg-slate-850 hover:bg-slate-800 ${
-                        isCurrentlyPlacing
-                          ? 'border-indigo-500 ring-1 ring-indigo-500 bg-indigo-950/30'
-                          : 'border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start space-x-2 min-w-0">
-                          <div className={`p-1.5 rounded-md border ${colors.bg} ${colors.border} ${colors.text} shrink-0`}>
-                            {getDomainIcon(dev.domain, 'w-3.5 h-3.5')}
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-semibold text-slate-200 truncate" title={dev.name}>
-                              {dev.name}
-                            </h4>
-                            <p className="text-[10px] text-slate-500 font-mono truncate" title={dev.id}>
-                              {dev.id}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* State badge */}
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0 ${
-                            dev.state === 'on' || (dev.state !== 'off' && dev.state !== '' && dev.state !== 'idle')
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : 'bg-slate-800 text-slate-400'
-                          }`}
-                        >
-                          {dev.state || 'off'}
-                        </span>
-                      </div>
-
-                      {/* Actions & Placement badge */}
-                      <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
-                        <span className="flex items-center text-slate-500 text-[10px]">
-                          <GripVertical className="w-3 h-3 mr-0.5" />
-                          Glisser sur le plan
-                        </span>
-
-                        <div className="flex items-center space-x-1.5">
-                          {isPlaced && (
-                            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center space-x-0.5">
-                              <Check className="w-2.5 h-2.5" />
-                              <span>Placé</span>
-                            </span>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isCurrentlyPlacing) {
-                                setDeviceToPlace(null)
-                              } else {
-                                setDeviceToPlace(dev)
-                              }
-                            }}
-                            className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors flex items-center space-x-1 ${
-                              isCurrentlyPlacing
-                                ? 'bg-rose-600 text-white hover:bg-rose-500'
-                                : 'bg-indigo-600/80 hover:bg-indigo-600 text-white'
-                            }`}
-                          >
-                            {isCurrentlyPlacing ? (
-                              <span>Annuler</span>
-                            ) : (
-                              <>
-                                <Plus className="w-3 h-3" />
-                                <span>Placer</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
+                <DevicePalette
+                  devices={devices}
+                  loading={loadingDevices}
+                  placedDeviceIds={placedDeviceIds}
+                  deviceToPlace={deviceToPlace}
+                  onPickDevice={(dev) => {
+                    setDeviceToPlace(dev)
+                    if (dev) setSelection(null)
+                  }}
+                  onRefresh={fetchDevices}
+                />
               )}
             </div>
-
-            {/* Drawer Footer Guide */}
-            <div className="p-3 border-t border-slate-800 bg-slate-950/60 text-[11px] text-slate-500">
-              <p>
-                💡 <strong>Glissez-déposez</strong> un appareil sur le plan, ou cliquez sur <strong>Placer</strong> puis sur la zone désirée.
-              </p>
-            </div>
-          </div>
+          </aside>
         )}
       </div>
+
+      {level && <ImportPlanModal isOpen={showImport} levelId={level.id} onClose={() => setShowImport(false)} onImport={handleImport} />}
     </div>
+  )
+}
+
+function PanelTab({ active, onClick, icon, label, badge }: { active: boolean; onClick: () => void; icon: ReactNode; label: string; badge?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 h-9 rounded-t-lg text-xs font-semibold flex items-center justify-center gap-1.5 border-b-2 transition-colors cursor-pointer ${
+        active ? 'text-white border-indigo-500' : 'text-slate-400 border-transparent hover:text-white'
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+      {badge && <span className="text-[10px] font-mono text-slate-500">{badge}</span>}
+    </button>
+  )
+}
+
+function OpeningPreview({ projection, width, upx }: { projection: geo.WallProjection; width: number; upx: number }) {
+  const len = geo.wallLength(projection.wall)
+  const half = Math.min(width, len) / 2
+  const offset = Math.max(half, Math.min(len - half, projection.offset))
+  const ux = Math.cos(projection.angle)
+  const uy = Math.sin(projection.angle)
+  const cx = projection.wall.x1 + ux * offset
+  const cy = projection.wall.y1 + uy * offset
+  const th = projection.wall.thickness || 12
+  return (
+    <g transform={`translate(${cx} ${cy}) rotate(${(projection.angle * 180) / Math.PI})`} className="pointer-events-none">
+      <rect
+        x={-half}
+        y={-th / 2 - 3 * upx}
+        width={half * 2}
+        height={th + 6 * upx}
+        rx={2 * upx}
+        fill={CANVAS.preview}
+        fillOpacity={0.3}
+        stroke={CANVAS.preview}
+        strokeWidth={1.5 * upx}
+        strokeDasharray={`${4 * upx} ${2 * upx}`}
+      />
+    </g>
   )
 }

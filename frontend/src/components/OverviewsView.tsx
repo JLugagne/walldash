@@ -1,84 +1,132 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import {
-  LayoutDashboard,
-  Plus,
-  Trash2,
-  Edit2,
-  Check,
-  X,
-  Settings,
-  RefreshCw,
-  SlidersHorizontal,
-} from 'lucide-react'
-import type { OverviewDashboard, Automation } from '../types'
-import { AutomationListWidget } from './AutomationListWidget'
-import { AddWidgetModal } from './AddWidgetModal'
-import { apiFetch } from '../api'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { LayoutDashboard, Plus, RefreshCw, Settings } from 'lucide-react'
+import type { Device, Widget } from '../types'
+import { AutomationListWidget } from './overview/widgets/AutomationListWidget'
+import { AddWidgetModal, type NewWidgetInput, type WidgetContentInput } from './AddWidgetModal'
+import { apiFetch, readApiError } from '../api'
+import { useRealtimeDevices } from '../hooks/useRealtimeDevices'
+import { NumberWidget } from './overview/widgets/NumberWidget'
+import { BarWidget } from './overview/widgets/BarWidget'
+import { ArcWidget } from './overview/widgets/ArcWidget'
+import { ToggleWidget } from './overview/widgets/ToggleWidget'
+import { OverviewHeader } from './overview/OverviewHeader'
+import { WidgetGrid } from './overview/WidgetGrid'
+import { Toast } from './overview/Toast'
+import { useOverviewData } from './overview/useOverviewData'
+import { widgetsToRects } from './overview/format'
+import type { Rect } from './overview/grid'
 
 interface OverviewsViewProps {
   initialIsAdmin?: boolean
+  viewModeMenu?: React.ReactNode
 }
 
-export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = false }) => {
-  const [overviews, setOverviews] = useState<OverviewDashboard[]>([])
+const STALE_MS = 30 * 60 * 1000
+const TOAST_MS = 3000
+const NETWORK_ERROR_MESSAGE = 'Connexion au serveur impossible, modification non enregistrée.'
+
+function parseNumericState(state: string | undefined): number | null {
+  if (state === undefined) return null
+  const n = Number(state)
+  return Number.isFinite(n) ? n : null
+}
+
+function isStaleDevice(device: Device | undefined): boolean {
+  if (!device) return true
+  if (device.state === 'unavailable' || device.state === 'unknown') return true
+  if (!device.last_updated) return false
+  const updatedAt = new Date(device.last_updated).getTime()
+  if (Number.isNaN(updatedAt)) return false
+  return Date.now() - updatedAt > STALE_MS
+}
+
+export const OverviewsView: React.FC<OverviewsViewProps> = ({
+  initialIsAdmin = false,
+  viewModeMenu,
+}) => {
   const [activeOverviewId, setActiveOverviewId] = useState<string | null>(null)
-  const [automations, setAutomations] = useState<Automation[]>([])
-  const [loading, setLoading] = useState(true)
+  const { overviews, automations, loading, fetchOverviews, fetchAutomations } =
+    useOverviewData(setActiveOverviewId)
   const [isAdmin, setIsAdmin] = useState(initialIsAdmin)
+  const [isEditMode, setIsEditMode] = useState(false)
   const [isAddWidgetOpen, setIsAddWidgetOpen] = useState(false)
+  const [editingWidget, setEditingWidget] = useState<Widget | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
-  // Creation / Editing states
-  const [isCreatingOverview, setIsCreatingOverview] = useState(false)
-  const [newOverviewName, setNewOverviewName] = useState('')
-  const [isRenamingOverview, setIsRenamingOverview] = useState(false)
-  const [renameValue, setRenameValue] = useState('')
+  const [lastKnownValues, setLastKnownValues] = useState<Record<string, number>>({})
 
-  const fetchOverviews = useCallback(async () => {
-    try {
-      const res = await fetch('/api/overviews')
-      if (res.ok) {
-        const payload = await res.json()
-        if (payload?.status === 'success' && Array.isArray(payload.data)) {
-          setOverviews(payload.data)
-          setActiveOverviewId((prev) => {
-            if (prev && payload.data.some((o: OverviewDashboard) => o.id === prev)) {
-              return prev
-            }
-            return payload.data.length > 0 ? payload.data[0].id : null
-          })
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch overviews:', err)
-    }
-  }, [])
-
-  const fetchAutomations = useCallback(async () => {
-    try {
-      const res = await fetch('/api/automations')
-      if (res.ok) {
-        const payload = await res.json()
-        if (payload?.status === 'success' && Array.isArray(payload.data)) {
-          setAutomations(payload.data)
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch automations:', err)
-    }
-  }, [])
+  const { deviceMap, devices, pendingDevices, toggleDevice } = useRealtimeDevices(null)
 
   useEffect(() => {
-    setLoading(true)
-    Promise.all([fetchOverviews(), fetchAutomations()]).finally(() => setLoading(false))
+    if (!isAdmin) setIsEditMode(false)
+  }, [isAdmin])
 
-    // Refresh automations state every 5 seconds for live status
-    const interval = setInterval(fetchAutomations, 5000)
-    return () => clearInterval(interval)
-  }, [fetchOverviews, fetchAutomations])
+  useEffect(() => {
+    setLastKnownValues((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const device of Object.values(deviceMap)) {
+        if (device.state !== 'unavailable' && device.state !== 'unknown') {
+          const num = parseNumericState(device.state)
+          if (num !== null && next[device.id] !== num) {
+            next[device.id] = num
+            changed = true
+          }
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [deviceMap])
 
   const activeOverview = overviews.find((o) => o.id === activeOverviewId) || null
 
-  // Create an initial default overview if none exists
+  const toastTimerRef = useRef<number | null>(null)
+
+  const showToast = useCallback((message: string) => {
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+    setToastMessage(message)
+    toastTimerRef.current = window.setTimeout(() => {
+      toastTimerRef.current = null
+      setToastMessage(null)
+    }, TOAST_MS)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+    }
+  }, [])
+
+  const persistLayout = useCallback(
+    async (rects: Rect[]): Promise<string | null> => {
+      if (!activeOverviewId) return null
+      try {
+        const res = await apiFetch(`/api/overviews/${activeOverviewId}/layout`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            positions: rects.map((r) => ({
+              id: r.id,
+              col: r.col,
+              row: r.row,
+              col_span: r.colSpan,
+              row_span: r.rowSpan,
+            })),
+          }),
+        })
+        if (res.ok) {
+          await fetchOverviews()
+          return null
+        }
+        return await readApiError(res)
+      } catch (err) {
+        console.error('Failed to persist layout:', err)
+        return NETWORK_ERROR_MESSAGE
+      }
+    },
+    [activeOverviewId, fetchOverviews]
+  )
+
   const handleCreateDefaultOverview = async () => {
     try {
       const res = await apiFetch('/api/overviews', {
@@ -88,8 +136,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
       })
       if (res.ok) {
         const payload = await res.json()
-        if (payload?.data?.id) {
-          // Also add a default automation list widget
+        if (payload?.data?.id && automations.length > 0) {
           const widgetRes = await apiFetch(`/api/overviews/${payload.data.id}/widgets`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -99,58 +146,53 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
               order: 0,
               config: {
                 entity_ids: automations.slice(0, 3).map((a) => a.id),
+                display: 'list',
               },
+              col: 0,
+              row: 0,
+              col_span: 2,
+              row_span: 2,
             }),
           })
-          if (widgetRes.ok) {
-            await fetchOverviews()
-            return
+          if (!widgetRes.ok) {
+            showToast(await readApiError(widgetRes))
           }
         }
         await fetchOverviews()
+      } else {
+        showToast(await readApiError(res))
       }
     } catch (err) {
       console.error('Failed to create default overview:', err)
+      showToast(NETWORK_ERROR_MESSAGE)
     }
   }
 
-  const handleCreateOverview = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newOverviewName.trim()) return
-
-    try {
-      const res = await apiFetch('/api/overviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newOverviewName.trim(), order: overviews.length }),
-      })
-      if (res.ok) {
-        setNewOverviewName('')
-        setIsCreatingOverview(false)
-        await fetchOverviews()
-      }
-    } catch (err) {
-      console.error('Failed to create overview:', err)
+  const handleCreateOverview = async (name: string): Promise<boolean> => {
+    const res = await apiFetch('/api/overviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, order: overviews.length }),
+    })
+    if (!res.ok) {
+      throw new Error(await readApiError(res))
     }
+    await fetchOverviews()
+    return true
   }
 
-  const handleRenameOverview = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!activeOverviewId || !renameValue.trim()) return
-
-    try {
-      const res = await apiFetch(`/api/overviews/${activeOverviewId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: renameValue.trim(), order: activeOverview?.order || 0 }),
-      })
-      if (res.ok) {
-        setIsRenamingOverview(false)
-        await fetchOverviews()
-      }
-    } catch (err) {
-      console.error('Failed to rename overview:', err)
+  const handleRenameOverview = async (name: string): Promise<boolean> => {
+    if (!activeOverviewId) return false
+    const res = await apiFetch(`/api/overviews/${activeOverviewId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, order: activeOverview?.order || 0 }),
+    })
+    if (!res.ok) {
+      throw new Error(await readApiError(res))
     }
+    await fetchOverviews()
+    return true
   }
 
   const handleDeleteOverview = async (id: string) => {
@@ -162,31 +204,39 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
       })
       if (res.ok) {
         await fetchOverviews()
+      } else {
+        showToast(await readApiError(res))
       }
     } catch (err) {
       console.error('Failed to delete overview:', err)
+      showToast(NETWORK_ERROR_MESSAGE)
     }
   }
 
-  const handleAddWidget = async (title: string, selectedEntityIds: string[]) => {
+  const handleCreateWidget = async (input: NewWidgetInput) => {
     if (!activeOverviewId) return
-
     const res = await apiFetch(`/api/overviews/${activeOverviewId}/widgets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'automation_list',
-        title,
-        order: (activeOverview?.widgets?.length || 0) + 1,
-        config: {
-          entity_ids: selectedEntityIds,
-        },
-      }),
+      body: JSON.stringify(input),
     })
-
-    if (res.ok) {
-      await fetchOverviews()
+    if (!res.ok) {
+      throw new Error(await readApiError(res))
     }
+    await fetchOverviews()
+  }
+
+  const handleUpdateWidgetContent = async (widgetId: string, input: WidgetContentInput) => {
+    if (!activeOverviewId) return
+    const res = await apiFetch(`/api/overviews/${activeOverviewId}/widgets/${widgetId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
+    if (!res.ok) {
+      throw new Error(await readApiError(res))
+    }
+    await fetchOverviews()
   }
 
   const handleDeleteWidget = async (widgetId: string) => {
@@ -199,166 +249,108 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
       })
       if (res.ok) {
         await fetchOverviews()
+      } else {
+        showToast(await readApiError(res))
       }
     } catch (err) {
       console.error('Failed to delete widget:', err)
+      showToast(NETWORK_ERROR_MESSAGE)
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-slate-400">
-        <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-        <span>Chargement des Overviews...</span>
-      </div>
-    )
+  const renderWidgetBody = (widget: Widget): React.ReactNode => {
+    if (widget.type === 'automation_list') {
+      return (
+        <AutomationListWidget widget={widget} automations={automations} onTriggerSuccess={() => fetchAutomations()} />
+      )
+    }
+
+    const entityId = widget.config.entity_ids?.[0]
+    const device = entityId ? deviceMap[entityId] : undefined
+    const label =
+      widget.title || (entityId ? widget.config.labels?.[entityId] : undefined) || device?.name || entityId || 'Widget'
+    const unit = widget.config.unit || (device?.attributes?.unit_of_measurement as string | undefined) || ''
+    const stale = isStaleDevice(device)
+
+    if (widget.type === 'sensor') {
+      const live = parseNumericState(device?.state)
+      const value = live !== null ? live : entityId ? lastKnownValues[entityId] ?? null : null
+      switch (widget.config.display) {
+        case 'number':
+          return <NumberWidget label={label} value={value ?? device?.state ?? null} unit={unit} stale={stale} dense={widget.row_span === 1} />
+        case 'bar':
+          return (
+            <BarWidget
+              label={label}
+              value={value}
+              min={widget.config.min ?? 0}
+              max={widget.config.max ?? 100}
+              unit={unit}
+              stale={stale}
+              dense={widget.row_span === 1}
+            />
+          )
+        case 'arc':
+          return (
+            <ArcWidget
+              label={label}
+              value={value}
+              min={widget.config.min ?? 0}
+              max={widget.config.max ?? 100}
+              unit={unit}
+              stale={stale}
+            />
+          )
+        default:
+          return null
+      }
+    }
+
+    if (widget.type === 'actuator') {
+      const isOn = device?.state === 'on'
+      const isPending = entityId ? !!pendingDevices[entityId] : false
+      return (
+        <ToggleWidget
+          label={label}
+          on={isOn}
+          pending={isPending}
+          stale={stale}
+          dense={widget.row_span === 1}
+          onToggle={() => {
+            if (entityId) toggleDevice(entityId)
+          }}
+        />
+      )
+    }
+
+    return null
   }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
-      {/* Sub-header Navigation & Controls */}
-      <div className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur px-6 py-3 flex flex-wrap items-center justify-between gap-4">
-        {/* Overview Tabs */}
-        <div className="flex items-center space-x-2 overflow-x-auto py-1">
-          {overviews.map((ov) => (
-            <button
-              key={ov.id}
-              type="button"
-              onClick={() => {
-                setActiveOverviewId(ov.id)
-                setIsRenamingOverview(false)
-              }}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap active:scale-95 ${
-                activeOverviewId === ov.id
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                  : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              {ov.name}
-            </button>
-          ))}
+      <OverviewHeader
+        overviews={overviews}
+        activeOverviewId={activeOverviewId}
+        isAdmin={isAdmin}
+        isEditMode={isEditMode}
+        viewModeMenu={viewModeMenu}
+        onSelectOverview={setActiveOverviewId}
+        onCreateOverview={handleCreateOverview}
+        onRenameOverview={handleRenameOverview}
+        onDeleteOverview={handleDeleteOverview}
+        onToggleEditMode={() => setIsEditMode((v) => !v)}
+        onAddWidget={() => setIsAddWidgetOpen(true)}
+        onToggleAdmin={() => setIsAdmin((v) => !v)}
+      />
 
-          {/* Add Overview Button in Admin Mode */}
-          {isAdmin && !isCreatingOverview && (
-            <button
-              type="button"
-              onClick={() => setIsCreatingOverview(true)}
-              className="flex items-center space-x-1 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800/40 hover:bg-slate-800 text-slate-400 hover:text-white border border-dashed border-slate-700 transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Nouvel Overview</span>
-            </button>
-          )}
-
-          {/* Inline Create Overview Input */}
-          {isAdmin && isCreatingOverview && (
-            <form onSubmit={handleCreateOverview} className="flex items-center space-x-1.5">
-              <input
-                type="text"
-                value={newOverviewName}
-                onChange={(e) => setNewOverviewName(e.target.value)}
-                placeholder="Nom de l'overview..."
-                autoFocus
-                className="bg-slate-800 border border-indigo-500 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="p-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg"
-              >
-                <Check className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsCreatingOverview(false)}
-                className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </form>
-          )}
-        </div>
-
-        {/* Action Controls (Admin Toggle + Dashboard Actions) */}
-        <div className="flex items-center space-x-3">
-          {activeOverview && isAdmin && !isRenamingOverview && (
-            <div className="flex items-center space-x-1.5 border-r border-slate-800 pr-3 mr-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setRenameValue(activeOverview.name)
-                  setIsRenamingOverview(true)
-                }}
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-                title="Renommer l'overview"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteOverview(activeOverview.id)}
-                className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                title="Supprimer l'overview"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-
-          {isRenamingOverview && (
-            <form onSubmit={handleRenameOverview} className="flex items-center space-x-1.5">
-              <input
-                type="text"
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                autoFocus
-                className="bg-slate-800 border border-indigo-500 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="p-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg"
-              >
-                <Check className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsRenamingOverview(false)}
-                className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </form>
-          )}
-
-          {activeOverview && isAdmin && (
-            <button
-              type="button"
-              onClick={() => setIsAddWidgetOpen(true)}
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Ajouter un Widget</span>
-            </button>
-          )}
-
-          {/* Admin / User Mode Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setIsAdmin(!isAdmin)}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
-              isAdmin
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/20'
-                : 'bg-slate-800/60 text-slate-400 border-slate-700 hover:text-slate-200'
-            }`}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>{isAdmin ? 'Mode Admin Actif' : 'Mode Utilisateur'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Main Grid View */}
-      <main className="flex-1 p-6 overflow-y-auto">
-        {overviews.length === 0 ? (
+      <main className="flex-1 min-h-0 relative overflow-hidden p-3">
+        {toastMessage && <Toast message={toastMessage} />}
+        {loading ? (
+          <div className="h-full flex items-center justify-center text-slate-400">
+            <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+            <span>Chargement des Overviews...</span>
+          </div>
+        ) : overviews.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8">
             <div className="p-4 rounded-2xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 mb-4 shadow-xl">
               <LayoutDashboard className="w-10 h-10" />
@@ -390,42 +382,48 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
               Tableau "{activeOverview.name}" vide
             </h3>
             <p className="text-xs text-slate-400 max-w-sm mb-5">
-              Ajoutez votre premier widget pour afficher et déclencher vos automatisations
-              Home Assistant préférées.
+              Ajoutez votre premier widget pour afficher vos capteurs, piloter vos appareils ou
+              déclencher vos automatisations Home Assistant préférées.
             </p>
-            <button
-              type="button"
-              onClick={() => setIsAddWidgetOpen(true)}
-              className="flex items-center space-x-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Ajouter un Widget Automatisations</span>
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setIsAddWidgetOpen(true)}
+                className="flex items-center space-x-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Ajouter un Widget</span>
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {activeOverview.widgets.map((widget) => (
-              <AutomationListWidget
-                key={widget.id}
-                widget={widget}
-                automations={automations}
-                isAdmin={isAdmin}
-                onDeleteWidget={handleDeleteWidget}
-                onTriggerSuccess={() => {
-                  fetchAutomations()
-                }}
-              />
-            ))}
-          </div>
+          <WidgetGrid
+            overview={activeOverview}
+            isEditMode={isEditMode}
+            renderWidgetBody={renderWidgetBody}
+            onEditWidget={setEditingWidget}
+            onDeleteWidget={handleDeleteWidget}
+            onPersistLayout={persistLayout}
+            onMessage={showToast}
+          />
         )}
       </main>
 
-      {/* Add Widget Modal */}
       <AddWidgetModal
-        isOpen={isAddWidgetOpen}
+        isOpen={isAddWidgetOpen || !!editingWidget}
+        overviewCols={activeOverview?.cols ?? 12}
+        overviewRows={activeOverview?.rows ?? 8}
+        occupiedRects={activeOverview ? widgetsToRects(activeOverview.widgets) : []}
+        nextOrder={activeOverview?.widgets.length ?? 0}
         automations={automations}
-        onClose={() => setIsAddWidgetOpen(false)}
-        onAddWidget={handleAddWidget}
+        devices={devices}
+        editingWidget={editingWidget}
+        onClose={() => {
+          setIsAddWidgetOpen(false)
+          setEditingWidget(null)
+        }}
+        onCreate={handleCreateWidget}
+        onUpdate={handleUpdateWidgetContent}
       />
     </div>
   )

@@ -1,48 +1,92 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { Box, Layers, Edit3, Loader2, Wifi } from 'lucide-react'
+import { Layers, Edit3, Maximize2, Minimize2 } from 'lucide-react'
 import type { Level, Plan } from '../types'
 import { IsometricScene } from './IsometricScene'
 import { LevelSelector } from './LevelSelector'
-import { NavigationControls } from './NavigationControls'
+import { LayerSelector } from './LayerSelector'
+import { ViewModeMenu, type ViewMode } from './ViewModeMenu'
 import { useRealtimeDevices } from '../hooks/useRealtimeDevices'
+import { DEFAULT_LAYERS } from '../utils/layers'
 
 interface IsometricViewProps {
   level: Level | null
   levels: Level[]
   onSelectLevel: (levelId: string) => void
   onSwitchToAdmin: () => void
+  viewMode: ViewMode
+  onSelectViewMode: (mode: ViewMode) => void
 }
-
-const DEFAULT_ZOOM = 35
-const MIN_ZOOM = 15
-const MAX_ZOOM = 90
 
 export function IsometricView({
   level,
   levels,
   onSelectLevel,
   onSwitchToAdmin,
+  viewMode,
+  onSelectViewMode,
 }: IsometricViewProps) {
   const [plan, setPlan] = useState<Plan | null>(null)
   const [loading, setLoading] = useState(false)
-  const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM)
-  const [pan, setPan] = useState<{ x: number; z: number }>({ x: 0, z: 0 })
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [viewAngle, setViewAngle] = useState(() => {
+    try {
+      const stored = localStorage.getItem('ha_dash_view_angle')
+      return stored !== null ? parseFloat(stored) : 0.6
+    } catch {
+      return 0.6
+    }
+  })
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault()
+    setViewAngle((prev) => {
+      const next = Math.max(0, Math.min(1, prev + e.deltaY * 0.0003))
+      try {
+        localStorage.setItem('ha_dash_view_angle', String(next))
+      } catch { /* ignore storage errors */ }
+      return next
+    })
+  }, [])
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {})
+    } else {
+      document.exitFullscreen().catch(() => {})
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', handler)
+    return () => document.removeEventListener('fullscreenchange', handler)
+  }, [])
+
+  // Display layer state for 3D equipment filtering (persisted across views)
+  const [selectedLayer, setSelectedLayer] = useState<string | null>(() => {
+    try {
+      return typeof window !== 'undefined' ? localStorage.getItem('ha_dash_active_layer') : null
+    } catch {
+      return null
+    }
+  })
+  const availableLayers = level?.layers && level.layers.length > 0 ? level.layers : DEFAULT_LAYERS
+  const activeLayer = selectedLayer && availableLayers.includes(selectedLayer)
+    ? selectedLayer
+    : availableLayers[0] || 'controls'
+
+  const handleSelectLayer = (layer: string) => {
+    setSelectedLayer(layer)
+    try {
+      localStorage.setItem('ha_dash_active_layer', layer)
+    } catch {
+      // ignore storage errors
+    }
+  }
 
   // Real-time device placements & WebSocket action synchronization
-  const {
-    deviceMap,
-    placements,
-    connected: wsConnected,
-    toggleDevice,
-  } = useRealtimeDevices(level?.id || null)
-
-  const dragStartRef = useRef<{
-    clientX: number
-    clientY: number
-    startPan: { x: number; z: number }
-  } | null>(null)
-  const pinchRef = useRef<{ initialDistance: number; initialZoom: number } | null>(null)
+  const { deviceMap, placements, pendingDevices, toggleDevice } = useRealtimeDevices(level?.id || null)
 
   // Fetch plan whenever active level changes
   useEffect(() => {
@@ -88,201 +132,70 @@ export function IsometricView({
     }
   }, [level])
 
-  // Recenter pan & zoom
-  const handleRecenter = useCallback(() => {
-    setPan({ x: 0, z: 0 })
-    setZoom(DEFAULT_ZOOM)
-  }, [])
-
-  // Zoom handlers
-  const handleZoomIn = useCallback(() => {
-    setZoom((prev) => Math.min(MAX_ZOOM, Math.round(prev * 1.25)))
-  }, [])
-
-  const handleZoomOut = useCallback(() => {
-    setZoom((prev) => Math.max(MIN_ZOOM, Math.round(prev / 1.25)))
-  }, [])
-
-  // Touch handlers for 2-finger pinch-to-zoom
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (e.touches.length === 2) {
-      const t1 = e.touches[0]
-      const t2 = e.touches[1]
-      const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY)
-      pinchRef.current = { initialDistance: dist, initialZoom: zoom }
-      dragStartRef.current = null
-    }
-  }
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (e.touches.length === 2 && pinchRef.current) {
-      const t1 = e.touches[0]
-      const t2 = e.touches[1]
-      const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY)
-      if (pinchRef.current.initialDistance > 0) {
-        const ratio = dist / pinchRef.current.initialDistance
-        const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(pinchRef.current.initialZoom * ratio)))
-        setZoom(newZoom)
-      }
-    }
-  }
-
-  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (e.touches.length < 2) {
-      pinchRef.current = null
-    }
-  }
-
-  // Pointer handlers for 1-finger / mouse pan
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (pinchRef.current) return
-    if (e.button !== 0) return // Only primary button
-
-    dragStartRef.current = {
-      clientX: e.clientX,
-      clientY: e.clientY,
-      startPan: { ...pan },
-    }
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId)
-    } catch {
-      // Ignore if pointer capture fails
-    }
-  }
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStartRef.current || pinchRef.current) return
-
-    const deltaX = e.clientX - dragStartRef.current.clientX
-    const deltaY = e.clientY - dragStartRef.current.clientY
-
-    // Project screen pan onto 3D isometric ground plane
-    const kX = (deltaX / zoom) * 0.70710678
-    const kY = (deltaY / zoom) * 1.22474487
-
-    setPan({
-      x: dragStartRef.current.startPan.x + (kX + kY),
-      z: dragStartRef.current.startPan.z + (-kX + kY),
-    })
-  }
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    dragStartRef.current = null
-    try {
-      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-        e.currentTarget.releasePointerCapture(e.pointerId)
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-  // Mouse wheel zoom
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    const factor = e.deltaY > 0 ? 0.9 : 1.1
-    setZoom((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(prev * factor))))
-  }
-
   const hasWallsOrZones = plan && (plan.walls.length > 0 || plan.zones.length > 0)
 
   return (
-    <section
-      className="relative flex-1 w-full h-full min-h-[420px] min-h-0 bg-slate-950 overflow-hidden select-none touch-none cursor-grab active:cursor-grabbing"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
-      onWheel={handleWheel}
-    >
+    <section className="relative flex-1 w-full h-full min-h-[420px] min-h-0 bg-[#0b0f19] overflow-hidden select-none" onWheel={handleWheel}>
       {/* 3D WebGL Canvas */}
       <div className="absolute inset-0 w-full h-full">
         <Canvas
-          orthographic
-          camera={{ position: [30, 30, 30], zoom: zoom, near: -100, far: 300 }}
+          shadows
+          dpr={[1, 2]}
+          camera={{ position: [0, 22, 32], fov: 42, near: 0.5, far: 500 }}
           className="w-full h-full"
         >
+          <color attach="background" args={['#0b0f19']} />
           <IsometricScene
             plan={plan}
-            zoom={zoom}
-            pan={pan}
+            viewAngle={viewAngle}
             placements={placements}
             deviceMap={deviceMap}
+            pendingDevices={pendingDevices}
             onToggleDevice={toggleDevice}
+            activeLayer={activeLayer}
           />
         </Canvas>
       </div>
 
-      {/* Top Floating Bar: Level Info & Floating Level Selector */}
-      <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
-        {/* Left Badge: Camera & Orientation info + WebSocket Live Status */}
-        <div className="bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-800/80 text-xs shadow-2xl shadow-black/50 space-y-1 pointer-events-auto">
-          <div className="flex items-center space-x-2 text-slate-200 font-semibold">
-            <Box className="w-4 h-4 text-indigo-400" />
-            <span>Vue Isométrique Fixe</span>
-            {loading && <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin ml-1" />}
-          </div>
-          <div className="flex items-center space-x-3 text-[11px] text-slate-400">
-            <span>{level ? `${level.name} • Façade en bas` : 'Orientation façade avant'}</span>
-            <span className="text-slate-600">•</span>
-            <div className="flex items-center space-x-1.5">
-              <Wifi
-                className={`w-3 h-3 ${
-                  wsConnected ? 'text-emerald-400' : 'text-amber-400'
-                }`}
-              />
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  wsConnected
-                    ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50 animate-pulse'
-                    : 'bg-amber-400'
-                }`}
-              />
-              <span className={wsConnected ? 'text-emerald-400 font-medium' : 'text-amber-400 font-medium'}>
-                {wsConnected ? 'WebSocket Live' : 'Polling'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Center / Right: Floating Tactile Level Selector */}
-        <div className="pointer-events-auto">
-          <LevelSelector
-            levels={levels}
-            activeLevelId={level?.id || null}
-            onSelectLevel={onSelectLevel}
-          />
-        </div>
-      </div>
-
-      {/* Bottom-Right: Tactile Navigation HUD (Recenter, Zoom In/Out) */}
-      <div className="absolute bottom-4 right-4 z-20 pointer-events-none">
-        <NavigationControls
-          zoom={zoom}
-          defaultZoom={DEFAULT_ZOOM}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-          onRecenter={handleRecenter}
+      {/* Top-Center Floating Level & Layer Selectors */}
+      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none flex flex-col items-center space-y-3">
+        <LevelSelector
+          levels={levels}
+          activeLevelId={level?.id || null}
+          onSelectLevel={onSelectLevel}
         />
+
+        {level && (
+          <LayerSelector
+            layers={level.layers}
+            activeLayer={activeLayer}
+            onSelectLayer={handleSelectLayer}
+          />
+        )}
       </div>
 
-      {/* Bottom-Left: Legend Indicators */}
-      <div className="absolute bottom-4 left-4 z-20 pointer-events-none flex flex-wrap gap-2">
-        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800/80 px-3 py-1.5 rounded-xl text-xs text-slate-300 flex items-center space-x-2 shadow-xl shadow-black/40">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm shadow-amber-400/50 animate-pulse"></span>
-          <span>Light Halo: Éclairage ALLUMÉ</span>
-        </div>
-        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800/80 px-3 py-1.5 rounded-xl text-xs text-slate-300 flex items-center space-x-2 shadow-xl shadow-black/40">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></span>
-          <span>Sensors: Valeur Permanente</span>
-        </div>
-        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800/80 px-3 py-1.5 rounded-xl text-xs text-slate-300 flex items-center space-x-2 shadow-xl shadow-black/40">
-          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50"></span>
-          <span>Actionneurs: Tap pour Commuter</span>
+      {/* Bottom-Right Floating Controls */}
+      <div className="absolute bottom-6 right-6 z-20 pointer-events-none flex flex-col items-end space-y-3">
+        {/* Fullscreen + View Mode side by side */}
+        <div className="pointer-events-auto flex items-center space-x-3">
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
+            aria-label={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
+            className="w-12 h-12 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-800/80 shadow-2xl shadow-black/50 flex items-center justify-center text-indigo-400 hover:text-white hover:bg-slate-800/90 active:scale-95 transition-all cursor-pointer"
+          >
+            {isFullscreen ? (
+              <Minimize2 className="w-5 h-5" />
+            ) : (
+              <Maximize2 className="w-5 h-5" />
+            )}
+          </button>
+          <ViewModeMenu
+            mode={viewMode}
+            onSelect={onSelectViewMode}
+            direction="up"
+          />
         </div>
       </div>
 
@@ -296,7 +209,7 @@ export function IsometricView({
             <div className="space-y-1">
               <h3 className="text-base font-semibold text-white">Aucun niveau configuré</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Créez vos étages et espaces extérieurs dans l'éditeur pour afficher et naviguer dans la vue 3D isométrique.
+                Créez vos étages et espaces extérieurs dans l'éditeur pour afficher et naviguer dans la vue 3D.
               </p>
             </div>
             <button

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, ArrowUp, ArrowDown, Trees, Home, Layers, Check } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Home, Layers, Pencil, Plus, Trash2, Trees, X } from 'lucide-react'
 import type { Level } from '../types'
 import { apiFetch } from '../api'
 
@@ -10,222 +10,346 @@ interface LevelsManagerProps {
   onRefreshLevels: () => Promise<void>
 }
 
-export function LevelsManager({
-  levels,
-  activeLevelId,
-  onSelectLevel,
-  onRefreshLevels,
-}: LevelsManagerProps) {
+export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshLevels }: LevelsManagerProps) {
   const [name, setName] = useState('')
   const [isOutdoor, setIsOutdoor] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [newLayer, setNewLayer] = useState('')
 
-  const handleCreateLevel = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) return
+  const sorted = [...levels].sort((a, b) => a.order - b.order)
+  const activeLevel = levels.find((l) => l.id === activeLevelId)
+  const activeLayers = activeLevel?.layers && activeLevel.layers.length > 0 ? activeLevel.layers : ['controls', 'sensors']
 
-    setIsSubmitting(true)
+  const request = async (input: string, init: RequestInit, failure: string) => {
+    setBusy(true)
     setError(null)
     try {
-      const res = await apiFetch('/api/levels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          is_outdoor: isOutdoor,
-        }),
-      })
-      const result = await res.json()
-      if (res.ok && result.status === 'success') {
-        setName('')
-        setIsOutdoor(false)
-        await onRefreshLevels()
-        if (result.data?.id) {
-          onSelectLevel(result.data.id)
-        }
-      } else {
-        setError(result.error?.message || 'Erreur lors de la création du niveau')
+      const res = await apiFetch(input, init)
+      const result = res.status === 204 ? { status: 'success' } : await res.json().catch(() => ({}))
+      if (!res.ok || (result.status && result.status !== 'success')) {
+        setError(result.error?.message || failure)
+        return null
       }
+      await onRefreshLevels()
+      return result
     } catch {
       setError('Impossible de joindre le serveur')
+      return null
     } finally {
-      setIsSubmitting(false)
+      setBusy(false)
     }
   }
 
-  const handleDeleteLevel = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!confirm('Voulez-vous supprimer ce niveau et son plan 2D ?')) return
-
-    try {
-      const res = await apiFetch(`/api/levels/${id}`, { method: 'DELETE' })
-      if (res.ok) {
-        await onRefreshLevels()
-      }
-    } catch (err) {
-      console.error('Delete level failed:', err)
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    const result = await request(
+      '/api/levels',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim(), is_outdoor: isOutdoor }) },
+      'Erreur lors de la création du niveau'
+    )
+    if (result) {
+      setName('')
+      setIsOutdoor(false)
+      if (result.data?.id) onSelectLevel(result.data.id)
     }
   }
 
-  const handleMove = async (index: number, direction: 'up' | 'down', e: React.MouseEvent) => {
-    e.stopPropagation()
-    const targetIndex = direction === 'up' ? index - 1 : index + 1
-    if (targetIndex < 0 || targetIndex >= levels.length) return
-
-    const newOrder = [...levels]
-    const temp = newOrder[index]
-    newOrder[index] = newOrder[targetIndex]
-    newOrder[targetIndex] = temp
-
-    const levelIds = newOrder.map((l) => l.id)
-
-    try {
-      const res = await apiFetch('/api/levels/reorder', {
-        method: 'POST',
+  const handleRename = async (lvl: Level) => {
+    const trimmed = editName.trim()
+    setEditingId(null)
+    if (!trimmed || trimmed === lvl.name) return
+    await request(
+      `/api/levels/${lvl.id}`,
+      {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ level_ids: levelIds }),
-      })
-      if (res.ok) {
-        await onRefreshLevels()
-      }
-    } catch (err) {
-      console.error('Reorder levels failed:', err)
+        body: JSON.stringify({ name: trimmed, is_outdoor: lvl.is_outdoor, layers: lvl.layers }),
+      },
+      'Erreur lors du renommage du niveau'
+    )
+  }
+
+  const handleToggleOutdoor = async (lvl: Level) => {
+    await request(
+      `/api/levels/${lvl.id}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: lvl.name, is_outdoor: !lvl.is_outdoor, layers: lvl.layers }),
+      },
+      'Erreur lors de la mise à jour du niveau'
+    )
+  }
+
+  const handleAddLayer = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!activeLevel) return
+    const trimmed = newLayer.trim().toLowerCase()
+    if (!trimmed) return
+    if (activeLayers.includes(trimmed)) {
+      setError(`Le layer « ${trimmed} » existe déjà`)
+      return
     }
+    const updatedLayers = [...activeLayers, trimmed]
+    const result = await request(
+      `/api/levels/${activeLevel.id}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: activeLevel.name, is_outdoor: activeLevel.is_outdoor, layers: updatedLayers }),
+      },
+      'Erreur lors de l’ajout du layer'
+    )
+    if (result) {
+      setNewLayer('')
+    }
+  }
+
+  const handleDeleteLayer = async (layerToDelete: string) => {
+    if (!activeLevel) return
+    if (layerToDelete === 'controls') {
+      setError('Le layer « controls » est le layer par défaut et ne peut être supprimé.')
+      return
+    }
+    if (!confirm(`Supprimer le layer « ${layerToDelete} » ? Les équipements associés seront réassignés vers « controls ».`)) return
+    const updatedLayers = activeLayers.filter((l) => l !== layerToDelete)
+    await request(
+      `/api/levels/${activeLevel.id}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: activeLevel.name, is_outdoor: activeLevel.is_outdoor, layers: updatedLayers }),
+      },
+      'Erreur lors de la suppression du layer'
+    )
+  }
+
+  const handleDelete = async (lvl: Level) => {
+    if (!confirm(`Supprimer « ${lvl.name} » ainsi que son plan et ses appareils placés ?`)) return
+    await request(`/api/levels/${lvl.id}`, { method: 'DELETE' }, 'Erreur lors de la suppression du niveau')
+  }
+
+  const handleMove = async (index: number, direction: -1 | 1) => {
+    const target = index + direction
+    if (target < 0 || target >= sorted.length) return
+    const order = [...sorted]
+    ;[order[index], order[target]] = [order[target], order[index]]
+    await request(
+      '/api/levels/reorder',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level_ids: order.map((l) => l.id) }) },
+      'Erreur lors du réordonnancement'
+    )
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-        <div className="flex items-center space-x-2">
-          <Layers className="w-5 h-5 text-indigo-400" />
-          <h2 className="text-base font-bold text-white tracking-tight">Niveaux & Étages</h2>
-        </div>
-        <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">
-          {levels.length} {levels.length > 1 ? 'niveaux' : 'niveau'}
-        </span>
+    <div className="flex flex-col min-h-0">
+      <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
+        <Layers className="w-4 h-4 text-indigo-400" />
+        <h2 className="text-sm font-semibold text-white flex-1">Niveaux</h2>
+        <span className="text-[11px] text-slate-500">{levels.length} niveau{levels.length > 1 ? 'x' : ''}</span>
       </div>
 
       {error && (
-        <div className="p-2.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
-          {error}
+        <div className="mx-3 mt-3 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+          <span className="flex-1">{error}</span>
+          <button type="button" onClick={() => setError(null)} className="hover:text-white cursor-pointer">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
-      {/* Levels list */}
-      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-        {levels.length === 0 ? (
-          <div className="text-center py-8 text-slate-500 text-xs">
-            Aucun niveau configuré. Créez un premier niveau ci-dessous.
-          </div>
-        ) : (
-          levels.map((lvl, index) => {
-            const isActive = lvl.id === activeLevelId
-            return (
-              <div
-                key={lvl.id}
-                onClick={() => onSelectLevel(lvl.id)}
-                className={`group p-3 rounded-lg border transition-all cursor-pointer flex items-center justify-between ${
-                  isActive
-                    ? 'bg-indigo-950/40 border-indigo-500/80 shadow-md shadow-indigo-500/10'
-                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40'
+      <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1 max-h-[40vh]">
+        {sorted.length === 0 && <div className="text-center py-6 text-slate-500 text-xs">Aucun niveau. Créez le premier ci-dessous.</div>}
+        {sorted.map((lvl, index) => {
+          const active = lvl.id === activeLevelId
+          const Icon = lvl.is_outdoor ? Trees : Home
+          const editing = editingId === lvl.id
+          return (
+            <div
+              key={lvl.id}
+              className={`group flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-colors ${
+                active ? 'bg-indigo-950/40 border-indigo-500/50' : 'border-transparent hover:bg-slate-800/60'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => handleToggleOutdoor(lvl)}
+                disabled={busy}
+                title={lvl.is_outdoor ? 'Extérieur (cliquer pour passer en intérieur)' : 'Intérieur (cliquer pour passer en extérieur)'}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 cursor-pointer ${
+                  lvl.is_outdoor ? 'bg-emerald-500/15 text-emerald-400' : 'bg-indigo-500/15 text-indigo-400'
                 }`}
               >
-                <div className="flex items-center space-x-3">
-                  <div
-                    className={`p-1.5 rounded-md ${
-                      lvl.is_outdoor
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-indigo-500/20 text-indigo-400'
-                    }`}
-                  >
-                    {lvl.is_outdoor ? <Trees className="w-4 h-4" /> : <Home className="w-4 h-4" />}
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-semibold text-slate-200 group-hover:text-white">
-                        {lvl.name}
-                      </span>
-                      {isActive && (
-                        <span className="flex items-center text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.2 rounded border border-indigo-500/20">
-                          <Check className="w-3 h-3 mr-0.5" /> Actif
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[11px] text-slate-400">
-                      {lvl.is_outdoor ? 'Extérieur' : 'Intérieur'} • Ordre: {lvl.order}
-                    </span>
-                  </div>
-                </div>
+                <Icon className="w-4 h-4" />
+              </button>
 
-                <div className="flex items-center space-x-1">
-                  <button
-                    type="button"
-                    disabled={index === 0}
-                    onClick={(e) => handleMove(index, 'up', e)}
-                    className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="Monter"
-                  >
-                    <ArrowUp className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={index === levels.length - 1}
-                    onClick={(e) => handleMove(index, 'down', e)}
-                    className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="Descendre"
-                  >
-                    <ArrowDown className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => handleDeleteLevel(lvl.id, e)}
-                    className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors ml-1"
-                    title="Supprimer ce niveau"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+              {editing ? (
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onBlur={() => handleRename(lvl)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRename(lvl)
+                    if (e.key === 'Escape') setEditingId(null)
+                  }}
+                  className="flex-1 min-w-0 h-8 bg-slate-950 border border-indigo-500 rounded-lg px-2 text-xs text-white focus:outline-none"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onSelectLevel(lvl.id)}
+                  className="flex-1 min-w-0 text-left cursor-pointer"
+                >
+                  <div className="text-xs font-semibold text-slate-200 truncate flex items-center gap-1.5">
+                    {lvl.name}
+                    {active && <Check className="w-3 h-3 text-indigo-400" />}
+                  </div>
+                  <div className="text-[10px] text-slate-500">{lvl.is_outdoor ? 'Extérieur' : 'Intérieur'}</div>
+                </button>
+              )}
+
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                <SmallButton title="Renommer" onClick={() => {
+                  setEditingId(lvl.id)
+                  setEditName(lvl.name)
+                }}>
+                  <Pencil className="w-3 h-3" />
+                </SmallButton>
+                <SmallButton title="Monter" disabled={index === 0 || busy} onClick={() => handleMove(index, -1)}>
+                  <ArrowUp className="w-3 h-3" />
+                </SmallButton>
+                <SmallButton title="Descendre" disabled={index === sorted.length - 1 || busy} onClick={() => handleMove(index, 1)}>
+                  <ArrowDown className="w-3 h-3" />
+                </SmallButton>
+                <SmallButton title="Supprimer" danger disabled={busy} onClick={() => handleDelete(lvl)}>
+                  <Trash2 className="w-3 h-3" />
+                </SmallButton>
               </div>
-            )
-          })
-        )}
+            </div>
+          )
+        })}
       </div>
 
-      {/* Add level form */}
-      <form onSubmit={handleCreateLevel} className="pt-3 border-t border-slate-800 space-y-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Nouveau Niveau
-        </h3>
-        <div>
+      {activeLevel && (
+        <div className="p-3 border-t border-slate-800 space-y-2 bg-slate-950/20">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+              Display Layers · {activeLevel.name}
+            </span>
+            <span className="text-[10px] text-slate-500 font-mono">{activeLayers.length}</span>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 py-1">
+            {activeLayers.map((layer) => (
+              <span
+                key={layer}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/90 border border-slate-700/60 text-xs text-slate-200"
+              >
+                <span>{layer}</span>
+                {layer === 'controls' ? (
+                  <span className="text-[9px] font-mono text-indigo-400 uppercase tracking-wider">(défaut)</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteLayer(layer)}
+                    disabled={busy}
+                    title={`Supprimer le layer « ${layer} » (réassigne vers controls)`}
+                    className="text-slate-400 hover:text-rose-400 cursor-pointer ml-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+
+          <form onSubmit={handleAddLayer} className="flex items-center gap-1.5 pt-0.5">
+            <input
+              type="text"
+              placeholder="Nouveau layer (ex: lights, hvac…)"
+              value={newLayer}
+              onChange={(e) => setNewLayer(e.target.value)}
+              className="flex-1 min-w-0 h-8 bg-slate-950 border border-slate-800 rounded-lg px-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
+            />
+            <button
+              type="submit"
+              disabled={!newLayer.trim() || busy}
+              className="h-8 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1 cursor-pointer shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Ajouter
+            </button>
+          </form>
+        </div>
+      )}
+
+      <form onSubmit={handleCreate} className="p-3 border-t border-slate-800 space-y-2 bg-slate-950/40">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Nouveau niveau</div>
+        <div className="flex items-center gap-1.5">
           <input
             type="text"
-            placeholder="Nom (ex: Rez-de-chaussée, Jardin...)"
+            placeholder="Rez-de-chaussée, Jardin…"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            className="flex-1 min-w-0 h-9 bg-slate-950 border border-slate-800 rounded-lg px-3 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500"
           />
+          <button
+            type="button"
+            onClick={() => setIsOutdoor((v) => !v)}
+            title={isOutdoor ? 'Espace extérieur' : 'Espace intérieur'}
+            className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
+              isOutdoor ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            {isOutdoor ? <Trees className="w-4 h-4" /> : <Home className="w-4 h-4" />}
+          </button>
+          <button
+            type="submit"
+            disabled={!name.trim() || busy}
+            className="h-9 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Créer
+          </button>
         </div>
-
-        <label className="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isOutdoor}
-            onChange={(e) => setIsOutdoor(e.target.checked)}
-            className="rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
-          />
-          <span>Espace extérieur (Jardin, Terrasse, Entrée)</span>
-        </label>
-
-        <button
-          type="submit"
-          disabled={!name.trim() || isSubmitting}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-md text-xs flex items-center justify-center space-x-2 shadow-md shadow-indigo-600/20 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{isSubmitting ? 'Création...' : 'Ajouter le Niveau'}</span>
-        </button>
       </form>
     </div>
+  )
+}
+
+function SmallButton({
+  children,
+  onClick,
+  title,
+  disabled,
+  danger,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  title: string
+  disabled?: boolean
+  danger?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      title={title}
+      disabled={disabled}
+      className={`w-6 h-6 rounded flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer ${
+        danger ? 'text-slate-500 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-white hover:bg-slate-700'
+      }`}
+    >
+      {children}
+    </button>
   )
 }

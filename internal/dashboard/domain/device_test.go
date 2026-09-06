@@ -89,6 +89,14 @@ func TestDevicePlacementValidation(t *testing.T) {
 		require.NoError(t, validPlacement.Validate())
 	})
 
+	t.Run("placement with layer passes validation", func(t *testing.T) {
+		p := validPlacement
+		p.Layer = "sensors"
+		require.NoError(t, p.Validate())
+		assert.Equal(t, "sensors", p.Layer)
+		assert.Equal(t, "controls", domain.DefaultPlacementLayer)
+	})
+
 	t.Run("empty placement ID fails validation", func(t *testing.T) {
 		p := validPlacement
 		p.ID = "   "
@@ -128,5 +136,46 @@ func TestDevicePlacementValidation(t *testing.T) {
 		err := p.Validate()
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidPlacement)
+	})
+
+	t.Run("supported render_domain override passes validation", func(t *testing.T) {
+		p := validPlacement
+		p.DeviceID = "switch.lamp"
+		p.RenderDomain = domain.DomainLight
+		require.NoError(t, p.Validate())
+	})
+
+	t.Run("unsupported render_domain fails validation", func(t *testing.T) {
+		p := validPlacement
+		p.RenderDomain = "camera"
+		err := p.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidPlacement)
+	})
+}
+
+func TestDeviceLastUpdated(t *testing.T) {
+	t.Run("last updated is carried on the device", func(t *testing.T) {
+		observed := time.Date(2026, 9, 4, 10, 30, 0, 0, time.UTC)
+		dev := domain.Device{
+			ID:          "sensor.temperature_salon",
+			Name:        "Température Salon",
+			Domain:      domain.DomainSensor,
+			State:       "21.4",
+			LastUpdated: observed,
+		}
+		require.NoError(t, dev.Validate())
+		assert.Equal(t, observed, dev.LastUpdated)
+	})
+
+	t.Run("zero last updated means unknown and never blocks validation", func(t *testing.T) {
+		dev := domain.Device{
+			ID:     "sensor.humidite_sdb",
+			Name:   "Humidité Salle de Bain",
+			Domain: domain.DomainSensor,
+			State:  "62",
+		}
+		require.NoError(t, dev.Validate())
+		assert.True(t, dev.LastUpdated.IsZero())
 	})
 }

@@ -63,6 +63,7 @@ type MockWidgetRepository struct {
 	UpdateWidgetFunc               func(ctx context.Context, widget domain.Widget) (domain.Widget, error)
 	DeleteWidgetFunc               func(ctx context.Context, id string) error
 	DeleteWidgetsByDashboardIDFunc func(ctx context.Context, dashboardID string) error
+	ReplaceWidgetPositionsFunc     func(ctx context.Context, dashboardID string, positions []domain.WidgetPosition) error
 }
 
 func (m *MockWidgetRepository) CreateWidget(ctx context.Context, widget domain.Widget) (domain.Widget, error) {
@@ -107,6 +108,13 @@ func (m *MockWidgetRepository) DeleteWidgetsByDashboardID(ctx context.Context, d
 	return m.DeleteWidgetsByDashboardIDFunc(ctx, dashboardID)
 }
 
+func (m *MockWidgetRepository) ReplaceWidgetPositions(ctx context.Context, dashboardID string, positions []domain.WidgetPosition) error {
+	if m.ReplaceWidgetPositionsFunc == nil {
+		panic("called not defined ReplaceWidgetPositionsFunc")
+	}
+	return m.ReplaceWidgetPositionsFunc(ctx, dashboardID, positions)
+}
+
 // OverviewRepositoryContractTesting runs all contract tests for an OverviewRepository implementation.
 func OverviewRepositoryContractTesting(t *testing.T, repo overviews.OverviewRepository) {
 	ctx := context.Background()
@@ -116,6 +124,8 @@ func OverviewRepositoryContractTesting(t *testing.T, repo overviews.OverviewRepo
 			ID:        "ov-contract-1",
 			Name:      "Tableau Général",
 			Order:     1,
+			Cols:      domain.DefaultGridCols,
+			Rows:      domain.DefaultGridRows,
 			CreatedAt: time.Now().UTC().Truncate(time.Second),
 			UpdatedAt: time.Now().UTC().Truncate(time.Second),
 		}
@@ -145,6 +155,8 @@ func OverviewRepositoryContractTesting(t *testing.T, repo overviews.OverviewRepo
 			ID:        "ov-sort-2",
 			Name:      "Overview 2",
 			Order:     20,
+			Cols:      domain.DefaultGridCols,
+			Rows:      domain.DefaultGridRows,
 			CreatedAt: time.Now().UTC(),
 			UpdatedAt: time.Now().UTC(),
 		}
@@ -152,6 +164,8 @@ func OverviewRepositoryContractTesting(t *testing.T, repo overviews.OverviewRepo
 			ID:        "ov-sort-1",
 			Name:      "Overview 1",
 			Order:     10,
+			Cols:      domain.DefaultGridCols,
+			Rows:      domain.DefaultGridRows,
 			CreatedAt: time.Now().UTC(),
 			UpdatedAt: time.Now().UTC(),
 		}
@@ -175,6 +189,8 @@ func OverviewRepositoryContractTesting(t *testing.T, repo overviews.OverviewRepo
 			ID:        "ov-update-1",
 			Name:      "Overview Original",
 			Order:     5,
+			Cols:      domain.DefaultGridCols,
+			Rows:      domain.DefaultGridRows,
 			CreatedAt: time.Now().UTC().Truncate(time.Second),
 			UpdatedAt: time.Now().UTC().Truncate(time.Second),
 		}
@@ -198,6 +214,8 @@ func OverviewRepositoryContractTesting(t *testing.T, repo overviews.OverviewRepo
 			ID:        "ov-missing-update",
 			Name:      "Inconnu",
 			Order:     99,
+			Cols:      domain.DefaultGridCols,
+			Rows:      domain.DefaultGridRows,
 			CreatedAt: time.Now().UTC(),
 			UpdatedAt: time.Now().UTC(),
 		}
@@ -212,6 +230,8 @@ func OverviewRepositoryContractTesting(t *testing.T, repo overviews.OverviewRepo
 			ID:        "ov-del-1",
 			Name:      "À Supprimer",
 			Order:     50,
+			Cols:      domain.DefaultGridCols,
+			Rows:      domain.DefaultGridRows,
 			CreatedAt: time.Now().UTC(),
 			UpdatedAt: time.Now().UTC(),
 		}
@@ -242,6 +262,8 @@ func WidgetRepositoryContractTesting(t *testing.T, repo overviews.WidgetReposito
 		ID:        "ov-parent-widget-test",
 		Name:      "Dashboard For Widgets",
 		Order:     0,
+		Cols:      domain.DefaultGridCols,
+		Rows:      domain.DefaultGridRows,
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 	}
@@ -254,8 +276,11 @@ func WidgetRepositoryContractTesting(t *testing.T, repo overviews.WidgetReposito
 			Type:        domain.WidgetTypeAutomationList,
 			Title:       "Automatisations Salon",
 			Order:       1,
+			ColSpan:     2,
+			RowSpan:     2,
 			Config: domain.WidgetConfig{
 				EntityIDs: []string{"automation.eteindre_tout", "automation.cinema"},
+				Display:   domain.DisplayList,
 			},
 			CreatedAt: time.Now().UTC().Truncate(time.Second),
 			UpdatedAt: time.Now().UTC().Truncate(time.Second),
@@ -290,8 +315,14 @@ func WidgetRepositoryContractTesting(t *testing.T, repo overviews.WidgetReposito
 			Type:        domain.WidgetTypeAutomationList,
 			Title:       "Widget 2",
 			Order:       10,
-			CreatedAt:   time.Now().UTC(),
-			UpdatedAt:   time.Now().UTC(),
+			ColSpan:     2,
+			RowSpan:     2,
+			Config: domain.WidgetConfig{
+				EntityIDs: []string{"automation.two"},
+				Display:   domain.DisplayList,
+			},
+			CreatedAt: time.Now().UTC(),
+			UpdatedAt: time.Now().UTC(),
 		}
 		w1 := domain.Widget{
 			ID:          "widget-dash-sort-1",
@@ -299,8 +330,14 @@ func WidgetRepositoryContractTesting(t *testing.T, repo overviews.WidgetReposito
 			Type:        domain.WidgetTypeAutomationList,
 			Title:       "Widget 1",
 			Order:       5,
-			CreatedAt:   time.Now().UTC(),
-			UpdatedAt:   time.Now().UTC(),
+			ColSpan:     2,
+			RowSpan:     2,
+			Config: domain.WidgetConfig{
+				EntityIDs: []string{"automation.one"},
+				Display:   domain.DisplayList,
+			},
+			CreatedAt: time.Now().UTC(),
+			UpdatedAt: time.Now().UTC(),
 		}
 
 		_, err := repo.CreateWidget(ctx, w2)
@@ -324,8 +361,11 @@ func WidgetRepositoryContractTesting(t *testing.T, repo overviews.WidgetReposito
 			Type:        domain.WidgetTypeAutomationList,
 			Title:       "Ancien Titre",
 			Order:       3,
+			ColSpan:     2,
+			RowSpan:     2,
 			Config: domain.WidgetConfig{
 				EntityIDs: []string{"automation.one"},
+				Display:   domain.DisplayList,
 			},
 			CreatedAt: time.Now().UTC().Truncate(time.Second),
 			UpdatedAt: time.Now().UTC().Truncate(time.Second),
@@ -353,8 +393,14 @@ func WidgetRepositoryContractTesting(t *testing.T, repo overviews.WidgetReposito
 			DashboardID: parent.ID,
 			Type:        domain.WidgetTypeAutomationList,
 			Title:       "Missing",
-			CreatedAt:   time.Now().UTC(),
-			UpdatedAt:   time.Now().UTC(),
+			ColSpan:     2,
+			RowSpan:     2,
+			Config: domain.WidgetConfig{
+				EntityIDs: []string{"automation.missing"},
+				Display:   domain.DisplayList,
+			},
+			CreatedAt: time.Now().UTC(),
+			UpdatedAt: time.Now().UTC(),
 		}
 		_, err := repo.UpdateWidget(ctx, missing)
 		require.Error(t, err)
@@ -368,8 +414,14 @@ func WidgetRepositoryContractTesting(t *testing.T, repo overviews.WidgetReposito
 			Type:        domain.WidgetTypeAutomationList,
 			Title:       "À détruire",
 			Order:       9,
-			CreatedAt:   time.Now().UTC(),
-			UpdatedAt:   time.Now().UTC(),
+			ColSpan:     2,
+			RowSpan:     2,
+			Config: domain.WidgetConfig{
+				EntityIDs: []string{"automation.del"},
+				Display:   domain.DisplayList,
+			},
+			CreatedAt: time.Now().UTC(),
+			UpdatedAt: time.Now().UTC(),
 		}
 		_, err := repo.CreateWidget(ctx, w)
 		require.NoError(t, err)
@@ -384,6 +436,73 @@ func WidgetRepositoryContractTesting(t *testing.T, repo overviews.WidgetReposito
 
 	t.Run("Contract: DeleteWidget returns ErrWidgetNotFound for missing widget", func(t *testing.T) {
 		err := repo.DeleteWidget(ctx, "widget-missing-del")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrWidgetNotFound)
+	})
+
+	t.Run("Contract: ReplaceWidgetPositions updates the position of every widget", func(t *testing.T) {
+		w1 := domain.Widget{
+			ID:          "widget-pos-1",
+			DashboardID: parent.ID,
+			Type:        domain.WidgetTypeAutomationList,
+			Title:       "Position 1",
+			Order:       1,
+			Col:         0,
+			Row:         0,
+			ColSpan:     2,
+			RowSpan:     2,
+			Config: domain.WidgetConfig{
+				EntityIDs: []string{"automation.pos_one"},
+				Display:   domain.DisplayList,
+			},
+			CreatedAt: time.Now().UTC().Truncate(time.Second),
+			UpdatedAt: time.Now().UTC().Truncate(time.Second),
+		}
+		w2 := domain.Widget{
+			ID:          "widget-pos-2",
+			DashboardID: parent.ID,
+			Type:        domain.WidgetTypeAutomationList,
+			Title:       "Position 2",
+			Order:       2,
+			Col:         2,
+			Row:         0,
+			ColSpan:     2,
+			RowSpan:     2,
+			Config: domain.WidgetConfig{
+				EntityIDs: []string{"automation.pos_two"},
+				Display:   domain.DisplayList,
+			},
+			CreatedAt: time.Now().UTC().Truncate(time.Second),
+			UpdatedAt: time.Now().UTC().Truncate(time.Second),
+		}
+		_, err := repo.CreateWidget(ctx, w1)
+		require.NoError(t, err)
+		_, err = repo.CreateWidget(ctx, w2)
+		require.NoError(t, err)
+
+		positions := []domain.WidgetPosition{
+			{ID: w1.ID, Col: 4, Row: 4, ColSpan: 2, RowSpan: 2},
+			{ID: w2.ID, Col: 6, Row: 4, ColSpan: 2, RowSpan: 2},
+		}
+		err = repo.ReplaceWidgetPositions(ctx, parent.ID, positions)
+		require.NoError(t, err)
+
+		found1, err := repo.FindWidgetByID(ctx, w1.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 4, found1.Col)
+		assert.Equal(t, 4, found1.Row)
+
+		found2, err := repo.FindWidgetByID(ctx, w2.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 6, found2.Col)
+		assert.Equal(t, 4, found2.Row)
+	})
+
+	t.Run("Contract: ReplaceWidgetPositions returns ErrWidgetNotFound for a missing widget", func(t *testing.T) {
+		positions := []domain.WidgetPosition{
+			{ID: "widget-pos-missing", Col: 0, Row: 0, ColSpan: 2, RowSpan: 2},
+		}
+		err := repo.ReplaceWidgetPositions(ctx, parent.ID, positions)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrWidgetNotFound)
 	})

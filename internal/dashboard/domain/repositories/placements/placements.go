@@ -12,4 +12,5 @@ type DevicePlacementRepository interface {
 	FindPlacementByID(ctx context.Context, id string) (domain.DevicePlacement, error)
 	FindPlacementsByLevelID(ctx context.Context, levelID string) ([]domain.DevicePlacement, error)
 	DeletePlacement(ctx context.Context, id string) error
+	ReassignLayer(ctx context.Context, levelID string, oldLayer string, newLayer string) error
 }

@@ -56,6 +56,18 @@ _Avoid_: Quick Action, Shortcut
 La vue 3D à projection isométrique fixe avec caméra orientée de sorte que le bas du Plan 2D corresponde à la façade avant de la maison (sans rotation libre).
 _Avoid_: 3D Orbit, Free Cam, Perspective
 
+**Display Layer**:
+Une couche d'affichage logique exclusive propre à un Level, permettant de filtrer les Device Placements visibles dans la vue 3D (par défaut : `controls` et `sensors`, extensible par l'utilisateur).
+_Avoid_: Layer (sans qualificatif, pour éviter la confusion avec Level), Filter
+
+**Ceiling Display**:
+Le marquage d'informations (mesures de capteurs ou nom de zone) projeté sur un plan horizontal 3D à hauteur de plafond (`y = WALL_HEIGHT`) au pôle d'inaccessibilité de chaque Zone, suivant fidèlement les fuyantes et la perspective 3D.
+_Avoid_: Floor Print, Ceiling HUD, Floating Tag
+
+**Zone Alert Pulse**:
+L'effet visuel de respiration sinusoïdale continue et d'interpolation chromatique progressive (bleu vers le froid, rouge vers le chaud) appliqué au texte du Ceiling Display lorsqu'une mesure franchit les seuils configurés pour la Zone.
+_Avoid_: Blink, Flash, Glow
+
 ### Sécurité & Opérations
 
 **Action Whitelist**:
@@ -69,5 +81,29 @@ Une vue synthétique personnalisée composée d'une grille de widgets configurab
 _Avoid_: Dashboard View, Summary Panel
 
 **Widget**:
-Un bloc interactif unitaire positionné sur un Overview Dashboard (ex: Widget Automations filtré, Widget Capteur Climat, Widget Éclairage).
+Un bloc unitaire ancré dans la Widget Grid d'un Overview Dashboard, lié à un ou plusieurs Devices ou Automations et rendu selon un Display Mode.
 _Avoid_: Tile, Card, Component
+
+**Widget Grid**:
+La trame fixe de colonnes et de lignes propre à un Overview Dashboard, qui occupe exactement la fenêtre et dans laquelle chaque Widget est ancré.
+_Avoid_: Canvas, Layout, Board
+
+**Display Mode**:
+La façon dont un Widget dessine la donnée à laquelle il est lié, indépendante de la nature de cette donnée.
+_Avoid_: Style, Skin, Renderer, Variant
+
+**Arc**:
+Le Display Mode en cadran ouvert vers le bas représentant une mesure située entre deux bornes saisies par l'administrateur.
+_Avoid_: Gauge, Jauge, Fer à cheval, Dial
+
+**Primary Action**:
+L'unique opération déclenchée par un appui sur un Widget lié à un Actuator. Un Widget lié à un Sensor n'en possède aucune.
+_Avoid_: Default Action, Main Command, Tap Action
+
+**Edit Mode**:
+L'état d'un Overview Dashboard dans lequel un administrateur compose la disposition de ses Widgets, par opposition à l'usage courant où un appui ne fait que déclencher une Primary Action.
+_Avoid_: Admin Mode, Design Mode, Layout Mode
+
+**Stale Value**:
+Une mesure qu'un Widget continue d'afficher alors qu'elle n'est plus digne de confiance, soit parce que son entité est déclarée injoignable, soit parce qu'elle n'a pas été rafraîchie depuis plus de trente minutes.
+_Avoid_: Outdated, Expired, Obsolete

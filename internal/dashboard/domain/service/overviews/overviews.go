@@ -20,6 +20,8 @@ type OverviewCommands interface {
 	UpdateOverview(ctx context.Context, actor domain.Actor, overview domain.OverviewDashboard) (domain.OverviewDashboard, error)
 	DeleteOverview(ctx context.Context, actor domain.Actor, id string) error
 	CreateWidget(ctx context.Context, actor domain.Actor, widget domain.Widget) (domain.Widget, error)
+	UpdateWidget(ctx context.Context, actor domain.Actor, dashboardID string, widget domain.Widget) (domain.Widget, error)
 	DeleteWidget(ctx context.Context, actor domain.Actor, dashboardID string, widgetID string) error
+	UpdateLayout(ctx context.Context, actor domain.Actor, dashboardID string, positions []domain.WidgetPosition) error
 	TriggerAutomation(ctx context.Context, actor domain.Actor, id string) error
 }

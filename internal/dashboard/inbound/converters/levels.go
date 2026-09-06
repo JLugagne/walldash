@@ -10,6 +10,7 @@ func ToDomainCreateLevel(req pkgdashboard.CreateLevelRequest) domain.Level {
 	return domain.Level{
 		Name:      req.Name,
 		IsOutdoor: req.IsOutdoor,
+		Layers:    req.Layers,
 	}
 }
 
@@ -19,16 +20,22 @@ func ToDomainUpdateLevel(id string, req pkgdashboard.UpdateLevelRequest) domain.
 		ID:        id,
 		Name:      req.Name,
 		IsOutdoor: req.IsOutdoor,
+		Layers:    req.Layers,
 	}
 }
 
 // ToPublicLevel converts a domain Level into a public LevelResponse.
 func ToPublicLevel(l domain.Level) pkgdashboard.LevelResponse {
+	layers := l.Layers
+	if len(layers) == 0 {
+		layers = append([]string(nil), domain.DefaultLayers...)
+	}
 	return pkgdashboard.LevelResponse{
 		ID:        l.ID,
 		Name:      l.Name,
 		Order:     l.Order,
 		IsOutdoor: l.IsOutdoor,
+		Layers:    layers,
 		CreatedAt: l.CreatedAt,
 		UpdatedAt: l.UpdatedAt,
 	}
@@ -50,6 +57,18 @@ func ToPublicLevels(levels []domain.Level) []pkgdashboard.LevelResponse {
 func ToDomainPlan(levelID string, req pkgdashboard.SavePlanRequest) domain.Plan {
 	walls := make([]domain.WallSegment, len(req.Walls))
 	for i, w := range req.Walls {
+		openings := make([]domain.WallOpening, len(w.Openings))
+		for j, o := range w.Openings {
+			openings[j] = domain.WallOpening{
+				ID:        o.ID,
+				Type:      o.Type,
+				Offset:    o.Offset,
+				Width:     o.Width,
+				FlipSide:  o.FlipSide,
+				FlipHinge: o.FlipHinge,
+				HideDoor:  o.HideDoor,
+			}
+		}
 		walls[i] = domain.WallSegment{
 			ID:        w.ID,
 			X1:        w.X1,
@@ -57,24 +76,13 @@ func ToDomainPlan(levelID string, req pkgdashboard.SavePlanRequest) domain.Plan 
 			X2:        w.X2,
 			Y2:        w.Y2,
 			Thickness: w.Thickness,
+			Openings:  openings,
 		}
 	}
 
 	zones := make([]domain.Zone, len(req.Zones))
 	for i, z := range req.Zones {
-		pts := make([]domain.Point2D, len(z.Points))
-		for j, p := range z.Points {
-			pts[j] = domain.Point2D{
-				X: p.X,
-				Y: p.Y,
-			}
-		}
-		zones[i] = domain.Zone{
-			ID:     z.ID,
-			Name:   z.Name,
-			Color:  z.Color,
-			Points: pts,
-		}
+		zones[i] = ToDomainZone(z)
 	}
 
 	return domain.Plan{
@@ -84,10 +92,65 @@ func ToDomainPlan(levelID string, req pkgdashboard.SavePlanRequest) domain.Plan 
 	}
 }
 
+// ToDomainZone converts a public ZoneDTO to a domain Zone.
+func ToDomainZone(z pkgdashboard.ZoneDTO) domain.Zone {
+	pts := make([]domain.Point2D, len(z.Points))
+	for j, p := range z.Points {
+		pts[j] = domain.Point2D{
+			X: p.X,
+			Y: p.Y,
+		}
+	}
+	return domain.Zone{
+		ID:             z.ID,
+		Name:           z.Name,
+		Color:          z.Color,
+		Points:         pts,
+		TempSensor:     z.TempSensor,
+		TempMin:        z.TempMin,
+		TempMax:        z.TempMax,
+		HumiditySensor: z.HumiditySensor,
+	}
+}
+
+// ToPublicZone converts a domain Zone to a public ZoneDTO.
+func ToPublicZone(z domain.Zone) pkgdashboard.ZoneDTO {
+	pts := make([]pkgdashboard.Point2DDTO, len(z.Points))
+	for j, p := range z.Points {
+		pts[j] = pkgdashboard.Point2DDTO{
+			X: p.X,
+			Y: p.Y,
+		}
+	}
+	return pkgdashboard.ZoneDTO{
+		ID:             z.ID,
+		Name:           z.Name,
+		Color:          z.Color,
+		Points:         pts,
+		TempSensor:     z.TempSensor,
+		TempMin:        z.TempMin,
+		TempMax:        z.TempMax,
+		HumiditySensor: z.HumiditySensor,
+	}
+}
+
 // ToPublicPlan converts a domain Plan into a public PlanResponse.
 func ToPublicPlan(plan domain.Plan) pkgdashboard.PlanResponse {
 	walls := make([]pkgdashboard.WallSegmentDTO, len(plan.Walls))
 	for i, w := range plan.Walls {
+		openings := make([]pkgdashboard.WallOpeningDTO, len(w.Openings))
+		for j, o := range w.Openings {
+			openings[j] = pkgdashboard.WallOpeningDTO{
+				ID:        o.ID,
+				Type:      o.Type,
+				Offset:    o.Offset,
+				Width:     o.Width,
+				FlipSide:  o.FlipSide,
+				FlipHinge: o.FlipHinge,
+				HideDoor:  o.HideDoor,
+			}
+		}
+
 		walls[i] = pkgdashboard.WallSegmentDTO{
 			ID:        w.ID,
 			X1:        w.X1,
@@ -95,24 +158,13 @@ func ToPublicPlan(plan domain.Plan) pkgdashboard.PlanResponse {
 			X2:        w.X2,
 			Y2:        w.Y2,
 			Thickness: w.Thickness,
+			Openings:  openings,
 		}
 	}
 
 	zones := make([]pkgdashboard.ZoneDTO, len(plan.Zones))
 	for i, z := range plan.Zones {
-		pts := make([]pkgdashboard.Point2DDTO, len(z.Points))
-		for j, p := range z.Points {
-			pts[j] = pkgdashboard.Point2DDTO{
-				X: p.X,
-				Y: p.Y,
-			}
-		}
-		zones[i] = pkgdashboard.ZoneDTO{
-			ID:     z.ID,
-			Name:   z.Name,
-			Color:  z.Color,
-			Points: pts,
-		}
+		zones[i] = ToPublicZone(z)
 	}
 
 	return pkgdashboard.PlanResponse{

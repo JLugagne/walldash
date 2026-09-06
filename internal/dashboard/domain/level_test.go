@@ -43,6 +43,19 @@ func TestLevelValidation(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrInvalidLevel)
 		assert.True(t, domain.IsDomainError(err))
 	})
+
+	t.Run("level supports custom layers", func(t *testing.T) {
+		level := domain.Level{
+			ID:        "level-1",
+			Name:      "Rez-de-chaussée",
+			Layers:    []string{"controls", "sensors", "hvac"},
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+		require.NoError(t, level.Validate())
+		assert.Equal(t, []string{"controls", "sensors", "hvac"}, level.Layers)
+		assert.Equal(t, []string{"controls", "sensors"}, domain.DefaultLayers)
+	})
 }
 
 func TestPlanValidation(t *testing.T) {
@@ -123,6 +136,197 @@ func TestPlanValidation(t *testing.T) {
 			},
 		}
 		err := invalidZone.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidPlan)
+	})
+
+	t.Run("zone with valid sensors and thresholds passes validation", func(t *testing.T) {
+		minTemp := 18.5
+		maxTemp := 24.0
+		validSensorZone := domain.Zone{
+			ID:             "z-sensor-1",
+			Name:           "Chambre",
+			Color:          "#3b82f6",
+			Points:         validZone.Points,
+			TempSensor:     "sensor.chambre_temperature",
+			TempMin:        &minTemp,
+			TempMax:        &maxTemp,
+			HumiditySensor: "sensor.chambre_humidity",
+		}
+		require.NoError(t, validSensorZone.Validate())
+	})
+
+	t.Run("zone with temp_min greater than temp_max fails validation", func(t *testing.T) {
+		minTemp := 25.0
+		maxTemp := 19.0
+		invalidTempZone := domain.Zone{
+			ID:      "z-temp-inv",
+			Name:    "Salon",
+			Color:   "#3b82f6",
+			Points:  validZone.Points,
+			TempMin: &minTemp,
+			TempMax: &maxTemp,
+		}
+		err := invalidTempZone.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidPlan)
+		assert.True(t, domain.IsDomainError(err))
+	})
+
+	t.Run("zone with temp_min equal to temp_max passes validation", func(t *testing.T) {
+		temp := 21.0
+		equalTempZone := domain.Zone{
+			ID:      "z-temp-eq",
+			Name:    "Bureau",
+			Color:   "#3b82f6",
+			Points:  validZone.Points,
+			TempMin: &temp,
+			TempMax: &temp,
+		}
+		require.NoError(t, equalTempZone.Validate())
+	})
+
+	t.Run("zone with only one threshold passes validation", func(t *testing.T) {
+		temp := 18.0
+		onlyMinZone := domain.Zone{
+			ID:      "z-min-only",
+			Name:    "Cave",
+			Color:   "#3b82f6",
+			Points:  validZone.Points,
+			TempMin: &temp,
+		}
+		require.NoError(t, onlyMinZone.Validate())
+
+		onlyMaxZone := domain.Zone{
+			ID:      "z-max-only",
+			Name:    "Grenier",
+			Color:   "#3b82f6",
+			Points:  validZone.Points,
+			TempMax: &temp,
+		}
+		require.NoError(t, onlyMaxZone.Validate())
+	})
+
+	t.Run("zone with malformed sensor entity ID fails validation", func(t *testing.T) {
+		badTempSensorZone := domain.Zone{
+			ID:         "z-bad-temp",
+			Name:       "Salon",
+			Color:      "#3b82f6",
+			Points:     validZone.Points,
+			TempSensor: "not_a_valid_entity_id",
+		}
+		err := badTempSensorZone.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidPlan)
+		assert.True(t, domain.IsDomainError(err))
+
+		badHumSensorZone := domain.Zone{
+			ID:             "z-bad-hum",
+			Name:           "Salon",
+			Color:          "#3b82f6",
+			Points:         validZone.Points,
+			HumiditySensor: "no_dot",
+		}
+		err = badHumSensorZone.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidPlan)
+		assert.True(t, domain.IsDomainError(err))
+	})
+
+	t.Run("valid wall opening passes validation", func(t *testing.T) {
+		validWindow := domain.WallOpening{
+			ID:     "win-1",
+			Type:   "window",
+			Offset: 50,
+			Width:  30,
+		}
+		require.NoError(t, validWindow.Validate())
+
+		validDoor := domain.WallOpening{
+			ID:     "door-1",
+			Type:   "door",
+			Offset: 20,
+			Width:  25,
+		}
+		require.NoError(t, validDoor.Validate())
+	})
+
+	t.Run("invalid wall opening fails validation", func(t *testing.T) {
+		emptyID := domain.WallOpening{
+			ID:     "",
+			Type:   "window",
+			Offset: 10,
+			Width:  20,
+		}
+		err := emptyID.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidPlan)
+
+		invalidType := domain.WallOpening{
+			ID:     "op-1",
+			Type:   "chimney",
+			Offset: 10,
+			Width:  20,
+		}
+		err = invalidType.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidPlan)
+
+		nonPositiveWidth := domain.WallOpening{
+			ID:     "op-2",
+			Type:   "door",
+			Offset: 10,
+			Width:  0,
+		}
+		err = nonPositiveWidth.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidPlan)
+
+		negativeOffset := domain.WallOpening{
+			ID:     "op-3",
+			Type:   "door",
+			Offset: -5,
+			Width:  20,
+		}
+		err = negativeOffset.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidPlan)
+	})
+
+	t.Run("wall with valid openings passes validation", func(t *testing.T) {
+		wallWithOpenings := validWall
+		wallWithOpenings.Openings = []domain.WallOpening{
+			{
+				ID:     "win-1",
+				Type:   "window",
+				Offset: 30,
+				Width:  20,
+			},
+			{
+				ID:        "door-1",
+				Type:      "door",
+				Offset:    70,
+				Width:     20,
+				FlipSide:  true,
+				FlipHinge: true,
+			},
+		}
+		require.NoError(t, wallWithOpenings.Validate())
+		assert.True(t, wallWithOpenings.Openings[1].FlipSide)
+		assert.True(t, wallWithOpenings.Openings[1].FlipHinge)
+	})
+
+	t.Run("wall with invalid opening fails validation", func(t *testing.T) {
+		wallWithBadOpening := validWall
+		wallWithBadOpening.Openings = []domain.WallOpening{
+			{
+				ID:     "",
+				Type:   "window",
+				Offset: 30,
+				Width:  20,
+			},
+		}
+		err := wallWithBadOpening.Validate()
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidPlan)
 	})

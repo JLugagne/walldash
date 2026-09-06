@@ -43,6 +43,7 @@ func TestDevicesCommandHandler(t *testing.T) {
 			"y":           250.0,
 			"icon":        "lightbulb",
 			"custom_name": "Plafond",
+			"layer":       "sensors",
 		}
 		raw, err := json.Marshal(body)
 		require.NoError(t, err)
@@ -62,6 +63,7 @@ func TestDevicesCommandHandler(t *testing.T) {
 		assert.Equal(t, "success", resp.Status)
 		assert.Equal(t, "saved-p-1", resp.Data.ID)
 		assert.Equal(t, "light.salon", resp.Data.DeviceID)
+		assert.Equal(t, "sensors", resp.Data.Layer)
 	})
 
 	t.Run("POST /api/levels/{id}/placements rejects invalid body", func(t *testing.T) {

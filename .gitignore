@@ -37,3 +37,6 @@ skills-lock.json
 !.env.example
 
 
+/frontend/dist
+.artefacts/
+.scaffor/

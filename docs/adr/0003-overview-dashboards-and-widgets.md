@@ -4,7 +4,7 @@ Date: 2026-09-02
 
 ## Status
 
-Accepted
+Accepted. Le point 2 est amendé par l'ADR 0004 : le type et le mode de rendu d'un Widget sont deux axes distincts, et non un identifiant composé unique.
 
 ## Context
 
@@ -14,7 +14,7 @@ L'utilisateur souhaite pouvoir définir en mode administration des tableaux de b
 
 Modéliser un sous-système de composition de widgets :
 1. Une entité `OverviewDashboard` possède un identifiant, un nom et une collection ordonnée de `Widget`.
-2. Chaque `Widget` possède un type (`automation_list`, `sensor_gauge`, `device_toggle`, etc.) et une configuration dédiée (ex: liste explicite des IDs d'automatisations sélectionnées).
+2. Chaque `Widget` possède un type décrivant ce à quoi il est lié et ce qu'un appui déclenche (`sensor`, `actuator`, `automation_list`), un Display Mode décrivant son rendu, et une configuration dédiée (ex: liste explicite des IDs d'automatisations sélectionnées).
 3. L'administration permet la création/édition des Overviews et de leurs widgets.
 4. L'utilisateur peut basculer entre la vue 3D du bâtiment et les Overview Dashboards.
 

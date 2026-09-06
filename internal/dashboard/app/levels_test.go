@@ -9,6 +9,7 @@ import (
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain"
 	repohealthtest "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/health/healthtest"
 	repolevelstest "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels/levelstest"
+	repoplacementstest "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/placements/placementstest"
 	repoplanstest "github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/plans/planstest"
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/uow/uowtest"
 	svclevelstest "github.com/JLugagne/ha-dash/internal/dashboard/domain/service/levels/levelstest"
@@ -61,6 +62,30 @@ func TestLevelService_Operations(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, created.ID)
 		assert.Equal(t, "Étage 1", created.Name)
+		assert.Equal(t, []string{"controls", "sensors"}, created.Layers)
+	})
+
+	t.Run("CreateLevel preserves custom layers", func(t *testing.T) {
+		mockLevels := &repolevelstest.MockLevelRepository{
+			FindAllFunc: func(ctx context.Context) ([]domain.Level, error) {
+				return []domain.Level{}, nil
+			},
+			CreateFunc: func(ctx context.Context, level domain.Level) (domain.Level, error) {
+				assert.Equal(t, []string{"controls", "custom_layer"}, level.Layers)
+				return level, nil
+			},
+		}
+		mockPlans := &repoplanstest.MockPlanRepository{}
+		mockHealth := &repohealthtest.MockRepository{}
+		mockUow := &uowtest.MockUnitOfWork{}
+
+		service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.1.0")
+		created, err := service.CreateLevel(ctx, actor, domain.Level{
+			Name:   "Étage 1",
+			Layers: []string{"controls", "custom_layer"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"controls", "custom_layer"}, created.Layers)
 	})
 
 	t.Run("CreateLevel rejects empty name", func(t *testing.T) {
@@ -77,6 +102,9 @@ func TestLevelService_Operations(t *testing.T) {
 
 	t.Run("UpdateLevel validates and updates existing level", func(t *testing.T) {
 		mockLevels := &repolevelstest.MockLevelRepository{
+			FindByIDFunc: func(ctx context.Context, id string) (domain.Level, error) {
+				return domain.Level{ID: id, Name: "RDC", Layers: []string{"controls", "sensors"}}, nil
+			},
 			UpdateFunc: func(ctx context.Context, level domain.Level) (domain.Level, error) {
 				return level, nil
 			},
@@ -95,6 +123,46 @@ func TestLevelService_Operations(t *testing.T) {
 		updated, err := service.UpdateLevel(ctx, actor, lvl)
 		require.NoError(t, err)
 		assert.Equal(t, "RDC Renommé", updated.Name)
+	})
+
+	t.Run("UpdateLevel reassigns placements to controls when a layer is removed", func(t *testing.T) {
+		mockLevels := &repolevelstest.MockLevelRepository{
+			FindByIDFunc: func(ctx context.Context, id string) (domain.Level, error) {
+				return domain.Level{
+					ID:     id,
+					Name:   "RDC",
+					Layers: []string{"controls", "sensors", "security"},
+				}, nil
+			},
+			UpdateFunc: func(ctx context.Context, level domain.Level) (domain.Level, error) {
+				return level, nil
+			},
+		}
+		reassignedOld := ""
+		reassignedNew := ""
+		mockPlacements := &repoplacementstest.MockDevicePlacementRepository{
+			ReassignLayerFunc: func(ctx context.Context, levelID string, oldLayer string, newLayer string) error {
+				assert.Equal(t, "lvl-1", levelID)
+				reassignedOld = oldLayer
+				reassignedNew = newLayer
+				return nil
+			},
+		}
+		mockPlans := &repoplanstest.MockPlanRepository{}
+		mockHealth := &repohealthtest.MockRepository{}
+		mockUow := &uowtest.MockUnitOfWork{}
+
+		service := app.New(mockHealth, mockLevels, mockPlans, mockPlacements, nil, nil, nil, mockUow, "0.1.0")
+		lvl := domain.Level{
+			ID:     "lvl-1",
+			Name:   "RDC",
+			Layers: []string{"controls", "sensors"}, // "security" removed
+		}
+		updated, err := service.UpdateLevel(ctx, actor, lvl)
+		require.NoError(t, err)
+		assert.Equal(t, "security", reassignedOld)
+		assert.Equal(t, "controls", reassignedNew)
+		assert.Equal(t, []string{"controls", "sensors"}, updated.Layers)
 	})
 
 	t.Run("DeleteLevel deletes level", func(t *testing.T) {

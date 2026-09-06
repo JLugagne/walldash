@@ -55,7 +55,8 @@ func (a *App) SavePlacement(ctx context.Context, actor domain.Actor, placement d
 	log := logger.LoggerFromContext(ctx)
 
 	// Ensure target level exists
-	if _, err := a.levelsRepo.FindByID(ctx, placement.LevelID); err != nil {
+	level, err := a.levelsRepo.FindByID(ctx, placement.LevelID)
+	if err != nil {
 		log.WithError(err).WithField("level_id", placement.LevelID).Error("level not found for placement")
 		return domain.DevicePlacement{}, err
 	}
@@ -64,8 +65,27 @@ func (a *App) SavePlacement(ctx context.Context, actor domain.Actor, placement d
 		placement.ID = uuid.NewString()
 	}
 
+	if strings.TrimSpace(placement.Layer) == "" {
+		placement.Layer = domain.DefaultPlacementLayer
+	}
+
 	if err := placement.Validate(); err != nil {
 		return domain.DevicePlacement{}, err
+	}
+
+	// Ensure level layers include the placement layer
+	containsLayer := false
+	for _, l := range level.Layers {
+		if l == placement.Layer {
+			containsLayer = true
+			break
+		}
+	}
+	if !containsLayer && len(level.Layers) > 0 {
+		level.Layers = append(level.Layers, placement.Layer)
+		if _, err := a.levelsRepo.Update(ctx, level); err != nil {
+			log.WithError(err).WithField("level_id", level.ID).WithField("layer", placement.Layer).Warn("failed to update level with new layer")
+		}
 	}
 
 	saved, err := a.placementsRepo.SavePlacement(ctx, placement)

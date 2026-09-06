@@ -5,11 +5,13 @@ import { apiFetch } from '../api'
 export function useRealtimeDevices(levelId: string | null) {
   const [deviceMap, setDeviceMap] = useState<Record<string, Device>>({})
   const [placements, setPlacements] = useState<DevicePlacement[]>([])
+  const [pendingDevices, setPendingDevices] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(false)
   const [connected, setConnected] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   // Fetch initial devices list
   const fetchDevices = useCallback(async () => {
@@ -53,6 +55,20 @@ export function useRealtimeDevices(levelId: string | null) {
     }
   }, [])
 
+  // Clear pending state for an entity
+  const clearPending = useCallback((entityId: string) => {
+    if (pendingTimersRef.current[entityId]) {
+      clearTimeout(pendingTimersRef.current[entityId])
+      delete pendingTimersRef.current[entityId]
+    }
+    setPendingDevices((prev) => {
+      if (!prev[entityId]) return prev
+      const copy = { ...prev }
+      delete copy[entityId]
+      return copy
+    })
+  }, [])
+
   // Setup WebSocket connection with auto-reconnection
   useEffect(() => {
     fetchDevices()
@@ -73,12 +89,25 @@ export function useRealtimeDevices(levelId: string | null) {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
+
+          // Real-time confirmed state update from Home Assistant
           if (data.type === 'state_changed' && data.device) {
             const dev = data.device as Device
             setDeviceMap((prev) => ({
               ...prev,
               [dev.id]: dev,
             }))
+            clearPending(dev.id)
+          } else if (data.type === 'action_success' && data.entity_id) {
+            // Action acknowledged by Home Assistant; fetch fresh state if not received via broadcast
+            const entityId = data.entity_id as string
+            setTimeout(() => {
+              fetchDevices().finally(() => clearPending(entityId))
+            }, 600)
+          } else if (data.type === 'error' && data.entity_id) {
+            console.warn(`Home Assistant action failed for ${data.entity_id}:`, data.error)
+            clearPending(data.entity_id as string)
+            fetchDevices()
           }
         } catch (e) {
           console.error('Failed to parse WS message:', e)
@@ -108,8 +137,11 @@ export function useRealtimeDevices(levelId: string | null) {
       if (wsRef.current) {
         wsRef.current.close()
       }
+      for (const t of Object.values(pendingTimersRef.current)) {
+        clearTimeout(t)
+      }
     }
-  }, [fetchDevices])
+  }, [fetchDevices, clearPending])
 
   // Reload placements when levelId changes
   useEffect(() => {
@@ -120,24 +152,27 @@ export function useRealtimeDevices(levelId: string | null) {
     }
   }, [levelId, fetchPlacements])
 
-  // Execute toggle action with optimistic update and WebSocket / REST fallback
+  // Execute action without optimistic state toggle, tracking intermediate pending state
   const toggleDevice = useCallback(
     async (entityId: string) => {
-      // 1. Optimistic update
-      setDeviceMap((prev) => {
-        const current = prev[entityId]
-        if (!current) return prev
-        const nextState = current.state === 'on' ? 'off' : 'on'
-        return {
-          ...prev,
-          [entityId]: {
-            ...current,
-            state: nextState,
-          },
-        }
-      })
+      // Prevent multiple concurrent actions on the same device
+      if (pendingDevices[entityId]) {
+        return
+      }
 
-      // 2. Try WebSocket send first
+      // Mark device as pending (intermediate processing state)
+      setPendingDevices((prev) => ({ ...prev, [entityId]: true }))
+
+      // Safety timeout: reset pending state after 15s if HA or network fails to respond
+      if (pendingTimersRef.current[entityId]) {
+        clearTimeout(pendingTimersRef.current[entityId])
+      }
+      pendingTimersRef.current[entityId] = setTimeout(() => {
+        clearPending(entityId)
+        fetchDevices()
+      }, 15000)
+
+      // 1. Try WebSocket send first
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(
           JSON.stringify({
@@ -149,7 +184,7 @@ export function useRealtimeDevices(levelId: string | null) {
         return
       }
 
-      // 3. REST fallback
+      // 2. REST fallback
       try {
         const res = await apiFetch('/api/actions', {
           method: 'POST',
@@ -162,21 +197,28 @@ export function useRealtimeDevices(levelId: string | null) {
           }),
         })
         if (!res.ok) {
-          console.warn('REST action fallback failed, refreshing devices')
+          console.warn('REST action failed, resetting pending state')
+          clearPending(entityId)
           fetchDevices()
+        } else {
+          // Re-fetch confirmed state from server
+          await fetchDevices()
+          clearPending(entityId)
         }
       } catch (err) {
         console.error('REST action failed:', err)
+        clearPending(entityId)
         fetchDevices()
       }
     },
-    [fetchDevices]
+    [fetchDevices, pendingDevices, clearPending]
   )
 
   return {
     deviceMap,
     devices: Object.values(deviceMap),
     placements,
+    pendingDevices,
     loading,
     connected,
     toggleDevice,

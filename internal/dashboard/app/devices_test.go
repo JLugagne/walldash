@@ -227,6 +227,37 @@ func TestApp_Devices(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, saved.ID)
 		assert.Equal(t, 50.0, saved.X)
+		assert.Equal(t, "controls", saved.Layer)
+	})
+
+	t.Run("SavePlacement auto-appends new layer to level layers if not present", func(t *testing.T) {
+		application, levelsRepo, placementsRepo, _ := setupTestAppWithMocks()
+		levelObj := domain.Level{
+			ID:     "lvl-1",
+			Layers: []string{"controls", "sensors"},
+		}
+		levelsRepo.FindByIDFunc = func(ctx context.Context, id string) (domain.Level, error) {
+			return levelObj, nil
+		}
+		var updatedLevel domain.Level
+		levelsRepo.UpdateFunc = func(ctx context.Context, l domain.Level) (domain.Level, error) {
+			updatedLevel = l
+			return l, nil
+		}
+		placementsRepo.SavePlacementFunc = func(ctx context.Context, p domain.DevicePlacement) (domain.DevicePlacement, error) {
+			return p, nil
+		}
+
+		saved, err := application.SavePlacement(ctx, actor, domain.DevicePlacement{
+			LevelID:  "lvl-1",
+			DeviceID: "light.1",
+			X:        50,
+			Y:        60,
+			Layer:    "hvac",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "hvac", saved.Layer)
+		assert.Contains(t, updatedLevel.Layers, "hvac")
 	})
 
 	t.Run("DeletePlacement returns ErrPlacementNotFound when placement belongs to another level", func(t *testing.T) {

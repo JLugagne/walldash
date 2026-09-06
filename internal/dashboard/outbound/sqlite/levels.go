@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -11,6 +12,28 @@ import (
 	"github.com/JLugagne/ha-dash/internal/dashboard/domain/repositories/levels"
 	"github.com/JLugagne/ha-dash/internal/pkg/logger"
 )
+
+func serializeLayers(layers []string) string {
+	if len(layers) == 0 {
+		layers = domain.DefaultLayers
+	}
+	b, err := json.Marshal(layers)
+	if err != nil {
+		return `["controls","sensors"]`
+	}
+	return string(b)
+}
+
+func deserializeLayers(raw string) []string {
+	if raw == "" {
+		return append([]string(nil), domain.DefaultLayers...)
+	}
+	var layers []string
+	if err := json.Unmarshal([]byte(raw), &layers); err != nil || len(layers) == 0 {
+		return append([]string(nil), domain.DefaultLayers...)
+	}
+	return layers
+}
 
 var _ levels.LevelRepository = (*Adapter)(nil)
 
@@ -32,8 +55,13 @@ func (r *levelRepo) Create(ctx context.Context, level domain.Level) (domain.Leve
 		level.UpdatedAt = now
 	}
 
-	query := `INSERT INTO levels (id, name, "order", is_outdoor, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
-	_, err := r.db.ExecContext(ctx, query, level.ID, level.Name, level.Order, level.IsOutdoor, level.CreatedAt, level.UpdatedAt)
+	if len(level.Layers) == 0 {
+		level.Layers = append([]string(nil), domain.DefaultLayers...)
+	}
+	layersJSON := serializeLayers(level.Layers)
+
+	query := `INSERT INTO levels (id, name, "order", is_outdoor, layers_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	_, err := r.db.ExecContext(ctx, query, level.ID, level.Name, level.Order, level.IsOutdoor, layersJSON, level.CreatedAt, level.UpdatedAt)
 	if err != nil {
 		log.WithError(err).WithField("level_id", level.ID).Error("failed to insert level")
 		return domain.Level{}, errors.Join(domain.ErrDatabaseUnavailable, err)
@@ -44,13 +72,14 @@ func (r *levelRepo) Create(ctx context.Context, level domain.Level) (domain.Leve
 
 func (r *levelRepo) FindByID(ctx context.Context, id string) (domain.Level, error) {
 	log := logger.LoggerFromContext(ctx)
-	query := `SELECT id, name, "order", is_outdoor, created_at, updated_at FROM levels WHERE id = ?`
+	query := `SELECT id, name, "order", is_outdoor, layers_json, created_at, updated_at FROM levels WHERE id = ?`
 	row := r.db.QueryRowContext(ctx, query, id)
 
 	var lvl domain.Level
 	var isOutdoor int
+	var layersJSON string
 	var createdAt, updatedAt time.Time
-	err := row.Scan(&lvl.ID, &lvl.Name, &lvl.Order, &isOutdoor, &createdAt, &updatedAt)
+	err := row.Scan(&lvl.ID, &lvl.Name, &lvl.Order, &isOutdoor, &layersJSON, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Level{}, errors.Join(domain.ErrLevelNotFound, err)
@@ -60,6 +89,7 @@ func (r *levelRepo) FindByID(ctx context.Context, id string) (domain.Level, erro
 	}
 
 	lvl.IsOutdoor = (isOutdoor != 0)
+	lvl.Layers = deserializeLayers(layersJSON)
 	lvl.CreatedAt = createdAt
 	lvl.UpdatedAt = updatedAt
 	return lvl, nil
@@ -67,7 +97,7 @@ func (r *levelRepo) FindByID(ctx context.Context, id string) (domain.Level, erro
 
 func (r *levelRepo) FindAll(ctx context.Context) ([]domain.Level, error) {
 	log := logger.LoggerFromContext(ctx)
-	query := `SELECT id, name, "order", is_outdoor, created_at, updated_at FROM levels ORDER BY "order" ASC, created_at ASC`
+	query := `SELECT id, name, "order", is_outdoor, layers_json, created_at, updated_at FROM levels ORDER BY "order" ASC, created_at ASC`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		log.WithError(err).Error("failed to query all levels")
@@ -79,12 +109,14 @@ func (r *levelRepo) FindAll(ctx context.Context) ([]domain.Level, error) {
 	for rows.Next() {
 		var lvl domain.Level
 		var isOutdoor int
+		var layersJSON string
 		var createdAt, updatedAt time.Time
-		if err := rows.Scan(&lvl.ID, &lvl.Name, &lvl.Order, &isOutdoor, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&lvl.ID, &lvl.Name, &lvl.Order, &isOutdoor, &layersJSON, &createdAt, &updatedAt); err != nil {
 			log.WithError(err).Error("failed to scan level row")
 			return nil, errors.Join(domain.ErrDatabaseUnavailable, err)
 		}
 		lvl.IsOutdoor = (isOutdoor != 0)
+		lvl.Layers = deserializeLayers(layersJSON)
 		lvl.CreatedAt = createdAt
 		lvl.UpdatedAt = updatedAt
 		result = append(result, lvl)
@@ -107,8 +139,13 @@ func (r *levelRepo) Update(ctx context.Context, level domain.Level) (domain.Leve
 	now := time.Now().UTC().Truncate(time.Second)
 	level.UpdatedAt = now
 
-	query := `UPDATE levels SET name = ?, "order" = ?, is_outdoor = ?, updated_at = ? WHERE id = ?`
-	res, err := r.db.ExecContext(ctx, query, level.Name, level.Order, level.IsOutdoor, level.UpdatedAt, level.ID)
+	if len(level.Layers) == 0 {
+		level.Layers = append([]string(nil), domain.DefaultLayers...)
+	}
+	layersJSON := serializeLayers(level.Layers)
+
+	query := `UPDATE levels SET name = ?, "order" = ?, is_outdoor = ?, layers_json = ?, updated_at = ? WHERE id = ?`
+	res, err := r.db.ExecContext(ctx, query, level.Name, level.Order, level.IsOutdoor, layersJSON, level.UpdatedAt, level.ID)
 	if err != nil {
 		log.WithError(err).WithField("level_id", level.ID).Error("failed to update level")
 		return domain.Level{}, errors.Join(domain.ErrDatabaseUnavailable, err)

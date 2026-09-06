@@ -29,7 +29,7 @@ type Client struct {
 func NewClient(baseURL, token string, httpClient *http.Client) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 25 * time.Second,
 		}
 	}
 	return &Client{
@@ -40,90 +40,100 @@ func NewClient(baseURL, token string, httpClient *http.Client) *Client {
 }
 
 type haEntityState struct {
-	EntityID   string         `json:"entity_id"`
-	State      string         `json:"state"`
-	Attributes map[string]any `json:"attributes"`
+	EntityID    string         `json:"entity_id"`
+	State       string         `json:"state"`
+	Attributes  map[string]any `json:"attributes"`
+	LastUpdated time.Time      `json:"last_updated"`
 }
 
 var (
 	defaultLastTriggered1 = time.Now().UTC().Add(-45 * time.Minute)
 	defaultLastTriggered2 = time.Now().UTC().Add(-3 * time.Hour)
 	defaultLastTriggered3 = time.Now().UTC().Add(-12 * time.Minute)
+	fallbackLastUpdated   = time.Now().UTC().Add(-2 * time.Minute)
 
 	fallbackMu      sync.RWMutex
 	fallbackDevices = []domain.Device{
 		{
-			ID:     "light.salon_plafond",
-			Name:   "Plafonnier Salon",
-			Domain: domain.DomainLight,
-			State:  "on",
+			ID:          "light.salon_plafond",
+			Name:        "Plafonnier Salon",
+			Domain:      domain.DomainLight,
+			State:       "on",
+			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
 				"friendly_name": "Plafonnier Salon",
 				"brightness":    255,
 			},
 		},
 		{
-			ID:     "light.cuisine_spot",
-			Name:   "Spots Cuisine",
-			Domain: domain.DomainLight,
-			State:  "off",
+			ID:          "light.cuisine_spot",
+			Name:        "Spots Cuisine",
+			Domain:      domain.DomainLight,
+			State:       "off",
+			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
 				"friendly_name": "Spots Cuisine",
 			},
 		},
 		{
-			ID:     "light.chambre_chevet",
-			Name:   "Lampe Chevet Chambre",
-			Domain: domain.DomainLight,
-			State:  "on",
+			ID:          "light.chambre_chevet",
+			Name:        "Lampe Chevet Chambre",
+			Domain:      domain.DomainLight,
+			State:       "on",
+			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
 				"friendly_name": "Lampe Chevet Chambre",
 				"brightness":    128,
 			},
 		},
 		{
-			ID:     "switch.machine_a_cafe",
-			Name:   "Machine à Café",
-			Domain: domain.DomainSwitch,
-			State:  "on",
+			ID:          "switch.machine_a_cafe",
+			Name:        "Machine à Café",
+			Domain:      domain.DomainSwitch,
+			State:       "on",
+			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
 				"friendly_name": "Machine à Café",
 			},
 		},
 		{
-			ID:     "switch.prise_tv",
-			Name:   "Prise TV Salon",
-			Domain: domain.DomainSwitch,
-			State:  "on",
+			ID:          "switch.prise_tv",
+			Name:        "Prise TV Salon",
+			Domain:      domain.DomainSwitch,
+			State:       "on",
+			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
 				"friendly_name": "Prise TV Salon",
 			},
 		},
 		{
-			ID:     "sensor.temperature_salon",
-			Name:   "Température Salon",
-			Domain: domain.DomainSensor,
-			State:  "21.4",
+			ID:          "sensor.temperature_salon",
+			Name:        "Température Salon",
+			Domain:      domain.DomainSensor,
+			State:       "21.4",
+			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
 				"friendly_name":       "Température Salon",
 				"unit_of_measurement": "°C",
 			},
 		},
 		{
-			ID:     "sensor.humidite_sdb",
-			Name:   "Humidité Salle de Bain",
-			Domain: domain.DomainSensor,
-			State:  "62",
+			ID:          "sensor.humidite_sdb",
+			Name:        "Humidité Salle de Bain",
+			Domain:      domain.DomainSensor,
+			State:       "62",
+			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
 				"friendly_name":       "Humidité Salle de Bain",
 				"unit_of_measurement": "%",
 			},
 		},
 		{
-			ID:     "climate.thermostat_salon",
-			Name:   "Thermostat Salon",
-			Domain: domain.DomainClimate,
-			State:  "heat",
+			ID:          "climate.thermostat_salon",
+			Name:        "Thermostat Salon",
+			Domain:      domain.DomainClimate,
+			State:       "heat",
+			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
 				"friendly_name":       "Thermostat Salon",
 				"current_temperature": 20.8,
@@ -131,10 +141,11 @@ var (
 			},
 		},
 		{
-			ID:     "media_player.enceinte_salon",
-			Name:   "Sonos Salon",
-			Domain: domain.DomainMediaPlayer,
-			State:  "playing",
+			ID:          "media_player.enceinte_salon",
+			Name:        "Sonos Salon",
+			Domain:      domain.DomainMediaPlayer,
+			State:       "playing",
+			LastUpdated: fallbackLastUpdated,
 			Attributes: map[string]any{
 				"friendly_name": "Sonos Salon",
 				"media_title":   "Get Lucky",
@@ -228,11 +239,12 @@ func (c *Client) GetStates(ctx context.Context) ([]domain.Device, error) {
 		}
 
 		devices = append(devices, domain.Device{
-			ID:         raw.EntityID,
-			Name:       name,
-			Domain:     domainStr,
-			State:      raw.State,
-			Attributes: raw.Attributes,
+			ID:          raw.EntityID,
+			Name:        name,
+			Domain:      domainStr,
+			State:       raw.State,
+			Attributes:  raw.Attributes,
+			LastUpdated: raw.LastUpdated.UTC(),
 		})
 	}
 
@@ -301,11 +313,12 @@ func (c *Client) GetState(ctx context.Context, entityID string) (domain.Device, 
 	}
 
 	return domain.Device{
-		ID:         raw.EntityID,
-		Name:       name,
-		Domain:     parts[0],
-		State:      raw.State,
-		Attributes: raw.Attributes,
+		ID:          raw.EntityID,
+		Name:        name,
+		Domain:      parts[0],
+		State:       raw.State,
+		Attributes:  raw.Attributes,
+		LastUpdated: raw.LastUpdated.UTC(),
 	}, nil
 }
 
@@ -337,11 +350,8 @@ func (c *Client) CallService(ctx context.Context, domainStr string, service stri
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		log.WithError(err).Warn("HA API unreachable, falling back to mock mutation")
-		if domainStr == "automation" && service == "trigger" {
-			return c.mutateFallbackAutomation(ctx, entityID)
-		}
-		return c.mutateFallbackDevice(ctx, service, entityID)
+		log.WithError(err).Error("failed to call Home Assistant service")
+		return errors.Join(domain.ErrHealthCheckFailed, err)
 	}
 	defer resp.Body.Close()
 
@@ -522,6 +532,7 @@ func (c *Client) mutateFallbackDevice(ctx context.Context, service, entityID str
 			case "turn_off":
 				fallbackDevices[i].State = "off"
 			}
+			fallbackDevices[i].LastUpdated = time.Now().UTC()
 			log.WithField("entity_id", entityID).WithField("state", fallbackDevices[i].State).Info("fallback device state updated")
 			break
 		}

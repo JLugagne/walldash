@@ -12,6 +12,7 @@ import (
 
 func TestDeviceConverters(t *testing.T) {
 	t.Run("ToPublicDevice converts domain.Device correctly", func(t *testing.T) {
+		now := time.Now().UTC()
 		dev := domain.Device{
 			ID:     "light.kitchen",
 			Name:   "Cuisine",
@@ -20,6 +21,7 @@ func TestDeviceConverters(t *testing.T) {
 			Attributes: map[string]any{
 				"brightness": 200,
 			},
+			LastUpdated: now,
 		}
 
 		pub := converters.ToPublicDevice(dev)
@@ -28,6 +30,7 @@ func TestDeviceConverters(t *testing.T) {
 		assert.Equal(t, dev.Domain, pub.Domain)
 		assert.Equal(t, dev.State, pub.State)
 		assert.Equal(t, dev.Attributes, pub.Attributes)
+		assert.Equal(t, now, pub.LastUpdated)
 	})
 
 	t.Run("ToPublicDevices converts slice and handles empty slice", func(t *testing.T) {
@@ -46,36 +49,53 @@ func TestDeviceConverters(t *testing.T) {
 
 	t.Run("ToDomainSavePlacement converts public request to domain.DevicePlacement", func(t *testing.T) {
 		req := pkgdashboard.SavePlacementRequest{
-			ID:         "p-1",
-			DeviceID:   "light.kitchen",
-			X:          100.5,
-			Y:          200.5,
-			Icon:       "lightbulb",
-			CustomName: "Lumière Cuisine",
+			ID:           "p-1",
+			DeviceID:     "switch.kitchen",
+			X:            100.5,
+			Y:            200.5,
+			Icon:         "lightbulb",
+			RenderDomain: "light",
+			CustomName:   "Lumière Cuisine",
+			Layer:        "sensors",
 		}
 
 		dom := converters.ToDomainSavePlacement("lvl-123", req)
 		assert.Equal(t, "p-1", dom.ID)
 		assert.Equal(t, "lvl-123", dom.LevelID)
-		assert.Equal(t, "light.kitchen", dom.DeviceID)
+		assert.Equal(t, "switch.kitchen", dom.DeviceID)
 		assert.Equal(t, 100.5, dom.X)
 		assert.Equal(t, 200.5, dom.Y)
 		assert.Equal(t, "lightbulb", dom.Icon)
+		assert.Equal(t, "light", dom.RenderDomain)
 		assert.Equal(t, "Lumière Cuisine", dom.CustomName)
+		assert.Equal(t, "sensors", dom.Layer)
+	})
+
+	t.Run("ToDomainSavePlacement defaults empty layer to controls", func(t *testing.T) {
+		req := pkgdashboard.SavePlacementRequest{
+			ID:       "p-1",
+			DeviceID: "switch.kitchen",
+			X:        100.5,
+			Y:        200.5,
+		}
+		dom := converters.ToDomainSavePlacement("lvl-123", req)
+		assert.Equal(t, "controls", dom.Layer)
 	})
 
 	t.Run("ToPublicPlacement converts domain.DevicePlacement correctly", func(t *testing.T) {
 		now := time.Now().UTC()
 		dom := domain.DevicePlacement{
-			ID:         "p-1",
-			LevelID:    "lvl-1",
-			DeviceID:   "sensor.temperature",
-			X:          50.0,
-			Y:          60.0,
-			Icon:       "thermometer",
-			CustomName: "Température",
-			CreatedAt:  now,
-			UpdatedAt:  now,
+			ID:           "p-1",
+			LevelID:      "lvl-1",
+			DeviceID:     "sensor.temperature",
+			X:            50.0,
+			Y:            60.0,
+			Icon:         "thermometer",
+			RenderDomain: "sensor",
+			CustomName:   "Température",
+			Layer:        "sensors",
+			CreatedAt:    now,
+			UpdatedAt:    now,
 		}
 
 		pub := converters.ToPublicPlacement(dom)
@@ -85,9 +105,21 @@ func TestDeviceConverters(t *testing.T) {
 		assert.Equal(t, dom.X, pub.X)
 		assert.Equal(t, dom.Y, pub.Y)
 		assert.Equal(t, dom.Icon, pub.Icon)
+		assert.Equal(t, dom.RenderDomain, pub.RenderDomain)
 		assert.Equal(t, dom.CustomName, pub.CustomName)
+		assert.Equal(t, "sensors", pub.Layer)
 		assert.Equal(t, dom.CreatedAt, pub.CreatedAt)
 		assert.Equal(t, dom.UpdatedAt, pub.UpdatedAt)
+	})
+
+	t.Run("ToPublicPlacement defaults empty layer to controls", func(t *testing.T) {
+		dom := domain.DevicePlacement{
+			ID:       "p-2",
+			LevelID:  "lvl-1",
+			DeviceID: "switch.hall",
+		}
+		pub := converters.ToPublicPlacement(dom)
+		assert.Equal(t, "controls", pub.Layer)
 	})
 
 	t.Run("ToPublicPlacements converts slice and handles empty slice", func(t *testing.T) {
