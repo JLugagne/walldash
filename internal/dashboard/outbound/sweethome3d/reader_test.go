@@ -176,3 +176,23 @@ func TestFromReader(t *testing.T) {
 		assert.Equal(t, "window", plan.Walls[0].Openings[0].Type)
 	})
 }
+
+func TestFromReaderDegenerateGeometry(t *testing.T) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?>
+<home version="7400">
+  <wall id="w1" xStart="0.0" yStart="0.0" xEnd="500.0" yEnd="0.0" thickness="10.0"/>
+  <wall id="w2" xStart="10.0" yStart="50.0" xEnd="11.0" yEnd="50.0" thickness="10.0"/>
+  <wall id="w3" xStart="0.0" yStart="100.0" xEnd="500.0" yEnd="100.0" thickness="1.0"/>
+  <doorOrWindow wall="w1" x="100.0" y="0.0" width="1.0" name="Porte"/>
+  <doorOrWindow wall="w2" x="10.5" y="50.0" width="80.0" name="Porte"/>
+</home>`
+	zipData := buildSh3dZip(xml)
+	plan, err := sweethome3d.FromReader(bytes.NewReader(zipData), "test-level")
+	require.NoError(t, err)
+	require.Len(t, plan.Walls, 2)
+	assert.Equal(t, float64(200), plan.Walls[0].X2)
+	require.Len(t, plan.Walls[0].Openings, 1)
+	assert.Greater(t, plan.Walls[0].Openings[0].Width, float64(0))
+	assert.Greater(t, plan.Walls[1].Thickness, float64(0))
+	require.NoError(t, plan.Validate())
+}

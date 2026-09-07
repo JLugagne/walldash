@@ -93,11 +93,21 @@ func parseXML(data []byte, levelID string) (domain.Plan, error) {
 	}
 
 	walls := make([]domain.WallSegment, 0, len(home.Walls))
+	keptWallIDs := make(map[string]bool, len(home.Walls))
+	wallSourceIDs := make([]string, 0, len(home.Walls))
+	wallsByID := make(map[string]sh3dWall, len(home.Walls))
+	for _, w := range home.Walls {
+		wallsByID[w.ID] = w
+	}
 
 	for _, w := range home.Walls {
 		thickness := w.Thickness
 		if thickness <= 0 {
 			thickness = 10
+		}
+		thicknessUnits := cmToUnits(thickness)
+		if thicknessUnits <= 0 {
+			thicknessUnits = 1
 		}
 
 		seg := domain.WallSegment{
@@ -106,16 +116,21 @@ func parseXML(data []byte, levelID string) (domain.Plan, error) {
 			Y1:        cmToUnits(w.YStart),
 			X2:        cmToUnits(w.XEnd),
 			Y2:        cmToUnits(w.YEnd),
-			Thickness: cmToUnits(thickness),
+			Thickness: thicknessUnits,
 			Openings:  nil,
 		}
+		if seg.X1 == seg.X2 && seg.Y1 == seg.Y2 {
+			continue
+		}
+		keptWallIDs[w.ID] = true
+		wallSourceIDs = append(wallSourceIDs, w.ID)
 		walls = append(walls, seg)
 	}
 
 	for i := range walls {
 		var openings []domain.WallOpening
 		for _, o := range home.Openings {
-			if o.Wall != home.Walls[i].ID {
+			if o.Wall != wallSourceIDs[i] || !keptWallIDs[o.Wall] {
 				continue
 			}
 
@@ -123,9 +138,14 @@ func parseXML(data []byte, levelID string) (domain.Plan, error) {
 			if width <= 0 {
 				width = 80
 			}
+			widthUnits := cmToUnits(width)
+			if widthUnits <= 0 {
+				widthUnits = 1
+			}
 
-			offsetCm := computeOpeningOffset(home.Walls[i], o.X, o.Y)
-			wallLenCm := math.Hypot(home.Walls[i].XEnd-home.Walls[i].XStart, home.Walls[i].YEnd-home.Walls[i].YStart)
+			srcWall := wallsByID[wallSourceIDs[i]]
+			offsetCm := computeOpeningOffset(srcWall, o.X, o.Y)
+			wallLenCm := math.Hypot(srcWall.XEnd-srcWall.XStart, srcWall.YEnd-srcWall.YStart)
 			halfW := width / 2
 			if offsetCm < halfW {
 				offsetCm = halfW
@@ -141,7 +161,7 @@ func parseXML(data []byte, levelID string) (domain.Plan, error) {
 				ID:        nextID(openingType(o.Name)),
 				Type:      openingType(o.Name),
 				Offset:    cmToUnits(offsetCm),
-				Width:     cmToUnits(width),
+				Width:     widthUnits,
 				FlipSide:  false,
 				FlipHinge: false,
 				HideDoor:  false,
