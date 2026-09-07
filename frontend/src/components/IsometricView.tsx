@@ -135,7 +135,12 @@ export function IsometricView({
       <div className="absolute inset-0 w-full h-full">
         <Canvas
           shadows
-          dpr={[1, 2]}
+          // Demand rendering: the scene is static (camera only moves on wheel
+          // input, devices update over WS). Continuous 60fps re-rendering
+          // pegged a CPU core while idled, so only render on invalidate.
+          frameloop="demand"
+          dpr={[1, 1.5]}
+          gl={{ antialias: true, powerPreference: 'high-performance' }}
           camera={{ position: [0, 22, 32], fov: 42, near: 0.5, far: 500 }}
           className="w-full h-full"
         >

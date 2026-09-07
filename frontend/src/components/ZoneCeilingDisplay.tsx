@@ -40,15 +40,34 @@ export function ZoneCeilingDisplay({
   const worldX = toWorldX(centroid.x)
   const worldZ = toWorldZ(centroid.y)
 
-  const hud = useMemo(() => getZoneHUDMetrics(zone, deviceMap), [zone, deviceMap])
+  // Only recompute HUD metrics (and the 1024px canvas texture below) when this
+  // zone's own sensors change. deviceMap gets a new identity on every WS
+  // state_changed for any device; depending on the whole map would repaint
+  // every zone disc on each update.
+  const tempDevice = zone.temp_sensor ? deviceMap[zone.temp_sensor] : undefined
+  const humidityDevice = zone.humidity_sensor ? deviceMap[zone.humidity_sensor] : undefined
+  const hud = useMemo(
+    () => getZoneHUDMetrics(zone, deviceMap),
+    // deviceMap intentionally omitted: it gets a new identity on every WS
+    // update for any device, while tempDevice/humidityDevice only change when
+    // this zone's own sensors change (unchanged entries keep their reference
+    // through the setDeviceMap spread).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [zone, tempDevice, humidityDevice]
+  )
   const diameter = useMemo(() => calculateDiscDiameter(zone), [zone])
 
   const discRef = useRef<THREE.Group>(null)
   const { camera } = useThree()
 
+  // In demand frameloop mode this only runs when a frame is already scheduled
+  // (camera move, data change), which is exactly when re-alignment is needed.
+  // The equality check skips redundant quaternion writes.
   useFrame(() => {
-    if (!discRef.current) return
-    alignBillboardToCamera(discRef.current, camera)
+    const disc = discRef.current
+    if (!disc) return
+    if (disc.quaternion.equals(camera.quaternion)) return
+    alignBillboardToCamera(disc, camera)
   })
 
   // Subtle optical distance compensation for deeper rooms

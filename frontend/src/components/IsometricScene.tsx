@@ -36,7 +36,7 @@ const VIEW_ANGLE_MIN = 0.05
 
 // Front perspective camera that iteratively re-centers and fits the projected house bounds to the viewport
 function PerspectiveSceneCamera({ bounds, viewAngle = 0.6 }: { bounds: PlanBounds; viewAngle?: number }) {
-  const { camera, size } = useThree()
+  const { camera, size, invalidate } = useThree()
 
   useEffect(() => {
     if (!(camera instanceof THREE.PerspectiveCamera)) return
@@ -99,7 +99,10 @@ function PerspectiveSceneCamera({ bounds, viewAngle = 0.6 }: { bounds: PlanBound
     camera.lookAt(target)
     camera.updateMatrixWorld(true)
     camera.updateProjectionMatrix()
-  }, [camera, size.width, size.height, bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ, viewAngle])
+    // In demand mode no frame is scheduled automatically: request one so the
+    // re-fitted camera (and billboards synced to it) actually get drawn.
+    invalidate()
+  }, [camera, invalidate, size.width, size.height, bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ, viewAngle])
 
   return null
 }
@@ -323,7 +326,7 @@ function SceneLighting({ bounds }: { bounds: PlanBounds }) {
         castShadow
         position={[centerX + 6, 40, centerZ + 10]}
         intensity={1.7}
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[1024, 1024]}
         shadow-bias={-0.0004}
         shadow-normalBias={0.03}
       />
