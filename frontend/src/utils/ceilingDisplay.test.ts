@@ -497,7 +497,8 @@ describe('ceilingDisplay utils', () => {
       const result = computeZoneGaugesHidden(
         zones, {}, { sensors: true, controls: false }, deviceMap
       )
-      expect(result['z4']).toBe(false, 'climate sensor maps to controls layer, not sensors')
+      // climate sensor maps to controls layer, not sensors
+      expect(result['z4']).toBe(false)
     })
 
     it('hides zone when controls layer has hide_gauges and zone has climate sensor', () => {
@@ -522,7 +523,8 @@ describe('ceilingDisplay utils', () => {
       const result = computeZoneGaugesHidden(
         zones, placementLayerMap, { sensors: true, controls: true }, deviceMap
       )
-      expect(result['z6']).toBe(true, 'both layers hidden, so hidden regardless')
+      // both layers hidden, so hidden regardless
+      expect(result['z6']).toBe(true)
     })
 
     it('hides zone when ONLY humidity_sensor is on a hidden layer', () => {
@@ -545,7 +547,8 @@ describe('ceilingDisplay utils', () => {
       const result = computeZoneGaugesHidden(
         zones, {}, { sensors: true }, deviceMap
       )
-      expect(result['z8']).toBe(true, 'both sensors on sensors layer which is hidden')
+      // both sensors on sensors layer which is hidden
+      expect(result['z8']).toBe(true)
     })
 
     it('does not include zones without sensors in the result', () => {
@@ -567,9 +570,12 @@ describe('ceilingDisplay utils', () => {
       const result = computeZoneGaugesHidden(
         zones, {}, { sensors: true, controls: false }, deviceMap
       )
-      expect(result['visible']).toBe(false, 'climate → controls, not hidden')
-      expect(result['hidden']).toBe(true, 'sensor → sensors, hidden')
-      expect(result['nosensor']).toBeUndefined('no sensors → not in result')
+      // climate → controls, not hidden
+      expect(result['visible']).toBe(false)
+      // sensor → sensors, hidden
+      expect(result['hidden']).toBe(true)
+      // no sensors → not in result
+      expect(result['nosensor']).toBeUndefined()
     })
 
     it('sensor on both hidden layers still returns true', () => {
@@ -581,7 +587,8 @@ describe('ceilingDisplay utils', () => {
       const result = computeZoneGaugesHidden(
         zones, {}, { sensors: true, controls: true }, deviceMap
       )
-      expect(result['za']).toBe(true, 'temp sensor alone triggers hide on sensors layer')
+      // temp sensor alone triggers hide on sensors layer
+      expect(result['za']).toBe(true)
     })
   })
 })
