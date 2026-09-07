@@ -19,9 +19,9 @@ function App() {
               return prev
             }
             const hash = window.location.hash
-            const match = hash.match(/\/floor\/(.+)/)
+            const match = hash.match(/\/(?:floor|admin)\/([^/?#]+)/)
             if (match) {
-              const urlLevelId = match[1]
+              const urlLevelId = decodeURIComponent(match[1])
               if (payload.data.some((l: Level) => l.id === urlLevelId)) {
                 return urlLevelId
               }

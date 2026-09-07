@@ -149,7 +149,14 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
 
   const handleDelete = async (lvl: Level) => {
     if (!confirm(`Delete "${lvl.name}" along with its plan and placed devices?`)) return
-    await request(`/api/levels/${lvl.id}`, { method: 'DELETE' }, 'Error while deleting the level')
+    // If the deleted level is selected, move the selection to a sibling
+    // *before* the refresh lands so the editor never points at a ghost id
+    // (which would fetch /plan + /placements for a missing level, then get
+    // bounced back by the URL sync).
+    const fallback = sorted.find((l) => l.id !== lvl.id) ?? null
+    if (fallback && lvl.id === activeLevelId) onSelectLevel(fallback.id)
+    const result = await request(`/api/levels/${lvl.id}`, { method: 'DELETE' }, 'Error while deleting the level')
+    if (result && lvl.id === activeLevelId && fallback) onSelectLevel(fallback.id)
   }
 
   const handleMove = async (index: number, direction: -1 | 1) => {
