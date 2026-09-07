@@ -1,0 +1,91 @@
+name: Publish
+
+# Builds the multi-arch Walldash image and pushes it to GHCR using the
+# official Home Assistant builder actions. Per-arch images
+# (ghcr.io/jlugagne/<arch>-walldash) are combined into a multi-arch manifest
+# (ghcr.io/jlugagne/walldash) referenced by the add-on `image:` field, so no
+# Docker build happens on user machines.
+# https://developers.home-assistant.io/docs/apps/publishing
+on:
+  release:
+    types: [published]
+
+env:
+  ARCHITECTURES: '["amd64", "aarch64"]'
+  IMAGE_NAME: walldash
+  # Lowercase explicitly: registries reject the uppercase owner name.
+  REGISTRY_PREFIX: ghcr.io/jlugagne
+
+permissions:
+  contents: read
+
+jobs:
+  init:
+    name: Initialize build
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        run: |
+          VERSION="${GITHUB_EVENT_RELEASE_TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_EVENT_RELEASE_TAG: ${{ github.event.release.tag_name }}
+
+      - name: Get build matrix
+        id: matrix
+        uses: home-assistant/builder/actions/prepare-multi-arch-matrix@2026.06.0
+        with:
+          architectures: ${{ env.ARCHITECTURES }}
+          image-name: ${{ env.IMAGE_NAME }}
+          registry-prefix: ${{ env.REGISTRY_PREFIX }}
+
+  build:
+    name: Build ${{ matrix.arch }} image
+    needs: init
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.init.outputs.matrix) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build image
+        uses: home-assistant/builder/actions/build-image@2026.06.0
+        with:
+          arch: ${{ matrix.arch }}
+          image: ${{ matrix.image }}
+          image-tags: |
+            ${{ needs.init.outputs.version }}
+            latest
+          push: "true"
+          version: ${{ needs.init.outputs.version }}
+
+  manifest:
+    name: Publish multi-arch manifest
+    needs: [init, build]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      packages: write
+    steps:
+      - name: Publish multi-arch manifest
+        uses: home-assistant/builder/actions/publish-multi-arch-manifest@2026.06.0
+        with:
+          architectures: ${{ env.ARCHITECTURES }}
+          image-name: ${{ env.IMAGE_NAME }}
+          registry-prefix: ${{ env.REGISTRY_PREFIX }}
+          image-tags: |
+            ${{ needs.init.outputs.version }}
+            latest

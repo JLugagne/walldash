@@ -1,0 +1,20 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Start the Walldash service (s6-overlay).
+# Add-on options are mapped to environment variables; the binary itself falls
+# back to /data/options.json and the Supervisor API when env vars are unset.
+# https://developers.home-assistant.io/docs/apps/configuration#app-script
+# ==============================================================================
+
+declare log_level
+
+if [[ -f /data/options.json ]]; then
+    log_level=$(bashio::config 'log_level' 'info')
+else
+    log_level='info'
+fi
+
+export LOG_LEVEL="${log_level}"
+
+bashio::log.info "Starting Walldash..."
+exec /usr/bin/walldash

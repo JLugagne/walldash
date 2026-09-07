@@ -19,13 +19,17 @@ import (
 func main() {
 	loadEnvFile(".env")
 
+	options := loadAddonOptions(addonOptionsPath)
 	logrus.SetFormatter(&logrus.JSONFormatter{})
-	logrus.SetLevel(logrus.InfoLevel)
-
-	port := getEnv("PORT", "8080")
-	dbPath := getEnv("DB_PATH", "walldash.db")
-	haURL := getEnv("HA_URL", "http://homeassistant.local:8123")
-	haToken := getEnv("HA_TOKEN", "")
+	logrus.SetLevel(parseLogLevel(configValue("LOG_LEVEL", "log_level", "info", options)))
+	port := configValue("PORT", "port", "8080", options)
+	dbPath := resolveDBPath(configValue("DB_PATH", "db_path", "", options))
+	haURL := configValue("HA_URL", "ha_url", "", options)
+	haToken := configValue("HA_TOKEN", "ha_token", "", options)
+	haURL, haToken = resolveHAConfig(haURL, haToken, os.Getenv(supervisorTokenEnv))
+	if haURL == "" {
+		haURL = "http://homeassistant.local:8123"
+	}
 	frontendDir := os.Getenv("FRONTEND_DIR")
 	allowedOriginsStr := os.Getenv("ALLOWED_ORIGINS")
 	var allowedOrigins []string
@@ -41,7 +45,7 @@ func main() {
 		DBPath:         dbPath,
 		HAUrl:          haURL,
 		HAToken:        haToken,
-		Version:        "0.1.0",
+		Version:        Version,
 		FrontendDir:    frontendDir,
 		AssetsFS:       frontend.FS(),
 		AllowedOrigins: allowedOrigins,

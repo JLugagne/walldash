@@ -5,8 +5,8 @@
 *.so
 *.dylib
 bin/
-ha-dash
-walldash
+/ha-dash
+/walldash
 
 # Test binary, artifacts, coverage
 *.test

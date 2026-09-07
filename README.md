@@ -33,13 +33,22 @@
 - **📦 Zero-Dependency Single Binary**:
   - Pure Go backend using `modernc.org/sqlite` (no CGO required).
   - Frontend assets compiled and embedded directly into the Go binary (`embed.FS`).
-  - Ultra-lightweight Docker image (~9 MB scratch image, zero runtime dependencies).
+  - Home Assistant base image with s6-overlay: the same image runs standalone and as an official-style add-on.
 
 ---
 
 ## 🚀 Quick Start
 
-### Using Docker Compose (Recommended)
+### As a Home Assistant Add-on (Recommended)
+
+1. Add the add-on repository to Home Assistant: **Settings** → **Add-ons** → **Add-on Store** → menu (⋮) → **Repositories**, then add `https://github.com/JLugagne/ha-addons`.
+2. Install **Walldash** from the store and start it. No token setup is required: the add-on connects to Home Assistant through the Supervisor API automatically.
+3. Open the Walldash web UI at `http://<home-assistant-ip>:8080` on your wall tablets. No Home Assistant login is needed on the tablets (direct port access, no Ingress).
+4. Data is stored in the add-on `/data` volume and survives updates and reboots.
+
+See [`docs/home-assistant-add-on.md`](docs/home-assistant-add-on.md) for packaging details, the release process, and the manual token fallback.
+
+### Using Docker Compose (Alternative)
 
 1. Clone the repository:
    ```bash
@@ -81,11 +90,28 @@ To generate a Long-Lived Access Token:
 
 ---
 
+## ⚙️ Configuration Reference
+
+Settings resolve with the following precedence: **environment variable** → **add-on options file** (`/data/options.json`) → **default**.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `8080` | HTTP port the server listens on. |
+| `DB_PATH` | `walldash.db` (or `/data/walldash.db` when the `/data` volume exists) | SQLite database path. |
+| `HA_URL` | `http://homeassistant.local:8123` | Home Assistant base URL. |
+| `HA_TOKEN` | _(empty)_ | Long-lived access token. Not needed when running as an add-on: `SUPERVISOR_TOKEN` is used automatically via `http://supervisor/core/api`. The Supervisor token is never attached to a custom `HA_URL`. |
+| `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error`. |
+| `ALLOWED_ORIGINS` | _(empty)_ | Comma-separated CORS origins. |
+| `FRONTEND_DIR` | _(embedded assets)_ | Serve the frontend from a directory instead of the embedded build. |
+
+---
+
 ## 🏗️ Architecture & Tech Stack
 
 ```
 walldash/
-├── cmd/             # Application entrypoint
+├── cmd/             # Application entrypoint (+ add-on runtime helpers)
+├── rootfs/          # s6-overlay service definitions for the add-on image
 ├── internal/
 │   └── dashboard/   # Hexagonal architecture (Domain, App, Inbound, Outbound)
 │       ├── domain/  # Core business models, interfaces, domain errors
