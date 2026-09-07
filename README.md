@@ -9,6 +9,19 @@
 
 ---
 
+## 📸 Screenshots
+
+![3D Controls view - 1st floor with interactive light toggles](docs/screenshots/controls.png)
+*Live 3D Controls view — isometric floor with per-room ambient halos and touch-friendly light / switch toggles.*
+
+![3D Sensors view - temperature and humidity overlays](docs/screenshots/sensors.png)
+*Live 3D Sensors view — in-space temperature gauges with comfort status plus humidity readouts.*
+
+![2D Floor Plan Editor - zones, devices and room properties](docs/screenshots/devices.png)
+*In-browser 2D Floor Plan Editor — trace walls, define zones across floors, place devices, and tune room color and ambient sensor thresholds.*
+
+---
+
 ## ✨ Features
 
 - **🎮 3D Isometric View**:
@@ -99,10 +112,18 @@ Settings resolve with the following precedence: **environment variable** → **a
 | `PORT` | `8080` | HTTP port the server listens on. |
 | `DB_PATH` | `walldash.db` (or `/data/walldash.db` when the `/data` volume exists) | SQLite database path. |
 | `HA_URL` | `http://homeassistant.local:8123` | Home Assistant base URL. |
-| `HA_TOKEN` | _(empty)_ | Long-lived access token. Not needed when running as an add-on: `SUPERVISOR_TOKEN` is used automatically via `http://supervisor/core/api`. The Supervisor token is never attached to a custom `HA_URL`. |
+| `HA_TOKEN` | _(empty)_ | Long-lived access token. Not needed when running as an add-on: `SUPERVISOR_TOKEN` is used automatically via the Supervisor API proxy. The Supervisor token is never attached to a custom `HA_URL`. |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error`. |
 | `ALLOWED_ORIGINS` | _(empty)_ | Comma-separated CORS origins. |
 | `FRONTEND_DIR` | _(embedded assets)_ | Serve the frontend from a directory instead of the embedded build. |
+
+---
+
+## 🌐 Custom Domain (Reverse Proxy)
+
+To reach Walldash at `https://walldash.domain.tld` with automatic HTTPS, see
+[`docs/reverse-proxy.md`](docs/reverse-proxy.md) (Nginx Proxy Manager setup,
+works for both Docker Compose and the add-on — WebSocket support required).
 
 ---
 
