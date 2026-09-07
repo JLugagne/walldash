@@ -7,8 +7,7 @@ import { ZoneCeilingDisplay } from './ZoneCeilingDisplay'
 import { buildWallGeometry, toWorldX, toWorldZ, WALL_HEIGHT } from './wallGeometry'
 import { createWallMaterial } from './wallMaterial'
 import { getFloorTileTexture } from './floorTexture'
-import { inferLayerFromDevice } from '../utils/layers'
-import { hasConfiguredSensors } from '../utils/ceilingDisplay'
+import { hasConfiguredSensors, computeZoneGaugesHidden } from '../utils/ceilingDisplay'
 
 export { WALL_HEIGHT }
 
@@ -675,24 +674,7 @@ export function IsometricScene({
   // Determine which zones should have their gauges hidden
   // A zone's gauges are hidden if its temp_sensor or humidity_sensor is on a layer with hide_gauges=true
   const zoneGaugesHidden = useMemo(() => {
-    const hidden: Record<string, boolean> = {}
-    for (const zone of zones) {
-      let hiddenForZone = false
-      if (zone.temp_sensor) {
-        const sensorLayer = placementLayerMap[zone.temp_sensor] || inferLayerFromDevice(zone.temp_sensor, deviceMap)
-        if (sensorLayer && layerHideGaugesMap[sensorLayer]) {
-          hiddenForZone = true
-        }
-      }
-      if (!hiddenForZone && zone.humidity_sensor) {
-        const sensorLayer = placementLayerMap[zone.humidity_sensor] || inferLayerFromDevice(zone.humidity_sensor, deviceMap)
-        if (sensorLayer && layerHideGaugesMap[sensorLayer]) {
-          hiddenForZone = true
-        }
-      }
-      hidden[zone.id] = hiddenForZone
-    }
-    return hidden
+    return computeZoneGaugesHidden(zones, placementLayerMap, layerHideGaugesMap, deviceMap)
   }, [zones, placementLayerMap, layerHideGaugesMap, deviceMap])
 
   // Filter placements by active layer (if specified)

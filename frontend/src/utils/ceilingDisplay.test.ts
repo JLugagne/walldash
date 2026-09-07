@@ -8,6 +8,7 @@ import {
   hasConfiguredSensors,
   getZoneHUDMetrics,
   calculateDiscDiameter,
+  computeZoneGaugesHidden,
 } from './ceilingDisplay'
 
 describe('ceilingDisplay utils', () => {
@@ -436,6 +437,151 @@ describe('ceilingDisplay utils', () => {
         ],
       }
       expect(calculateDiscDiameter(largeZone)).toBe(3.0)
+    })
+  })
+
+  describe('computeZoneGaugesHidden', () => {
+    const deviceMap: Record<string, Device> = {
+      'sensor.living_temp': {
+        id: 'sensor.living_temp', name: 'Temp', domain: 'sensor', state: '21.5',
+        attributes: {}, last_updated: '2026-01-01T00:00:00Z',
+      },
+      'sensor.bedroom_hum': {
+        id: 'sensor.bedroom_hum', name: 'Hum', domain: 'sensor', state: '48',
+        attributes: {}, last_updated: '2026-01-01T00:00:00Z',
+      },
+      'climate.thermo': {
+        id: 'climate.thermo', name: 'Thermo', domain: 'climate', state: 'heat',
+        attributes: {}, last_updated: '2026-01-01T00:00:00Z',
+      },
+    }
+
+    it('hides zone when temp_sensor is on a layer with hide_gauges=true (via deviceMap)', () => {
+      const zones: Zone[] = [{
+        id: 'z1', name: 'Living', color: '#fff', points: [],
+        temp_sensor: 'sensor.living_temp',
+      }]
+      const result = computeZoneGaugesHidden(
+        zones, {}, { sensors: true, controls: false }, deviceMap
+      )
+      expect(result['z1']).toBe(true)
+    })
+
+    it('hides zone when temp_sensor is on hidden layer (via entity_id parsing fallback)', () => {
+      const zones: Zone[] = [{
+        id: 'z2', name: 'Kitchen', color: '#fff', points: [],
+        temp_sensor: 'sensor.kitchen_temp',
+      }]
+      const result = computeZoneGaugesHidden(
+        zones, {}, { sensors: true, controls: false }, {} // empty deviceMap
+      )
+      expect(result['z2']).toBe(true)
+    })
+
+    it('shows zone when sensor is on a layer with hide_gauges=false', () => {
+      const zones: Zone[] = [{
+        id: 'z3', name: 'Bedroom', color: '#fff', points: [],
+        temp_sensor: 'sensor.living_temp',
+      }]
+      const result = computeZoneGaugesHidden(
+        zones, {}, { sensors: false, controls: false }, deviceMap
+      )
+      expect(result['z3']).toBe(false)
+    })
+
+    it('hides zone when sensors layer has hide_gauges and zone has climate temp_sensor (controls layer NOT hidden)', () => {
+      const zones: Zone[] = [{
+        id: 'z4', name: 'Office', color: '#fff', points: [],
+        temp_sensor: 'climate.thermo',
+      }]
+      const result = computeZoneGaugesHidden(
+        zones, {}, { sensors: true, controls: false }, deviceMap
+      )
+      expect(result['z4']).toBe(false, 'climate sensor maps to controls layer, not sensors')
+    })
+
+    it('hides zone when controls layer has hide_gauges and zone has climate sensor', () => {
+      const zones: Zone[] = [{
+        id: 'z5', name: 'Study', color: '#fff', points: [],
+        temp_sensor: 'climate.thermo',
+      }]
+      const result = computeZoneGaugesHidden(
+        zones, {}, { sensors: false, controls: true }, deviceMap
+      )
+      expect(result['z5']).toBe(true)
+    })
+
+    it('uses placementLayerMap over inferLayerFromDevice when a placement exists for the sensor', () => {
+      const zones: Zone[] = [{
+        id: 'z6', name: 'Garage', color: '#fff', points: [],
+        temp_sensor: 'sensor.living_temp',
+      }]
+      const placementLayerMap: Record<string, string> = {
+        'sensor.living_temp': 'controls', // explicitly placed on controls
+      }
+      const result = computeZoneGaugesHidden(
+        zones, placementLayerMap, { sensors: true, controls: true }, deviceMap
+      )
+      expect(result['z6']).toBe(true, 'both layers hidden, so hidden regardless')
+    })
+
+    it('hides zone when ONLY humidity_sensor is on a hidden layer', () => {
+      const zones: Zone[] = [{
+        id: 'z7', name: 'Bathroom', color: '#fff', points: [],
+        humidity_sensor: 'sensor.bedroom_hum',
+      }]
+      const result = computeZoneGaugesHidden(
+        zones, {}, { sensors: true }, deviceMap
+      )
+      expect(result['z7']).toBe(true)
+    })
+
+    it('hides zone when EITHER sensor is on a hidden layer (temp hidden, humidity visible)', () => {
+      const zones: Zone[] = [{
+        id: 'z8', name: 'Hall', color: '#fff', points: [],
+        temp_sensor: 'sensor.living_temp',
+        humidity_sensor: 'sensor.bedroom_hum',
+      }]
+      const result = computeZoneGaugesHidden(
+        zones, {}, { sensors: true }, deviceMap
+      )
+      expect(result['z8']).toBe(true, 'both sensors on sensors layer which is hidden')
+    })
+
+    it('does not include zones without sensors in the result', () => {
+      const zones: Zone[] = [{
+        id: 'z9', name: 'Closet', color: '#fff', points: [],
+      }]
+      const result = computeZoneGaugesHidden(
+        zones, {}, { sensors: true }, {}
+      )
+      expect(result['z9']).toBeUndefined()
+    })
+
+    it('handles combination of hidden and visible zones', () => {
+      const zones: Zone[] = [
+        { id: 'visible', name: 'Room A', color: '#fff', points: [], temp_sensor: 'climate.thermo' },
+        { id: 'hidden', name: 'Room B', color: '#fff', points: [], temp_sensor: 'sensor.living_temp' },
+        { id: 'nosensor', name: 'Room C', color: '#fff', points: [] },
+      ]
+      const result = computeZoneGaugesHidden(
+        zones, {}, { sensors: true, controls: false }, deviceMap
+      )
+      expect(result['visible']).toBe(false, 'climate → controls, not hidden')
+      expect(result['hidden']).toBe(true, 'sensor → sensors, hidden')
+      expect(result['nosensor']).toBeUndefined('no sensors → not in result')
+    })
+
+    it('sensor on both hidden layers still returns true', () => {
+      const zones: Zone[] = [{
+        id: 'za', name: 'Dual', color: '#fff', points: [],
+        temp_sensor: 'sensor.living_temp',
+        humidity_sensor: 'climate.thermo',
+      }]
+      const result = computeZoneGaugesHidden(
+        zones, {}, { sensors: true, controls: true }, deviceMap
+      )
+      expect(result['za']).toBe(true, 'temp sensor alone triggers hide on sensors layer')
     })
   })
 })

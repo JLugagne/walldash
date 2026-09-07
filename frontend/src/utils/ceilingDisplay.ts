@@ -1,4 +1,5 @@
 import type { Zone, Device } from '../types'
+import { inferLayerFromDevice } from './layers'
 
 export const CEILING_NEUTRAL_COLOR = '#f1f5f9'
 export const CEILING_COLD_COLOR = '#38bdf8'
@@ -332,5 +333,40 @@ export function calculateDiscDiameter(zone: Zone): number {
   }
 
   return Math.min(DEFAULT_MAX_DIAMETER, Math.max(MIN_DIAMETER, minRoomDim * 1.0))
+}
+
+/**
+ * Determines which zones should have their ceiling HUD gauges hidden.
+ * A zone is hidden when ALL of its configured sensors belong to layers
+ * where hide_gauges is true.
+ * Zones without any configured sensors are never in the result (they
+ * are filtered out at the render site via hasConfiguredSensors).
+ */
+export function computeZoneGaugesHidden(
+  zones: Zone[],
+  placementLayerMap: Record<string, string>,
+  layerHideGaugesMap: Record<string, boolean>,
+  deviceMap: Record<string, Device>
+): Record<string, boolean> {
+  const hidden: Record<string, boolean> = {}
+  for (const zone of zones) {
+    if (!zone.temp_sensor && !zone.humidity_sensor) continue
+    let hiddenForZone = zone.temp_sensor ? isSensorOnHiddenLayer(zone.temp_sensor, placementLayerMap, layerHideGaugesMap, deviceMap) : false
+    if (!hiddenForZone && zone.humidity_sensor) {
+      hiddenForZone = isSensorOnHiddenLayer(zone.humidity_sensor, placementLayerMap, layerHideGaugesMap, deviceMap)
+    }
+    hidden[zone.id] = hiddenForZone
+  }
+  return hidden
+}
+
+function isSensorOnHiddenLayer(
+  entityId: string,
+  placementLayerMap: Record<string, string>,
+  layerHideGaugesMap: Record<string, boolean>,
+  deviceMap: Record<string, Device>
+): boolean {
+  const layer = placementLayerMap[entityId] || inferLayerFromDevice(entityId, deviceMap)
+  return layer !== null && layerHideGaugesMap[layer] === true
 }
 
