@@ -79,7 +79,7 @@ ports:
   8080/tcp: 8080
 ports_description:
   8080/tcp: Walldash web interface (direct access, no Home Assistant login required)
-webui: http://[HOST]:[PORT]/
+webui: http://[HOST]:[PORT:8080]/
 boot: auto
 startup: application
 homeassistant_api: true
