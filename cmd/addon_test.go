@@ -10,7 +10,7 @@ import (
 
 func TestResolveHAConfigUsesSupervisorWhenNothingConfigured(t *testing.T) {
 	url, token := resolveHAConfig("", "", "supervisor-secret")
-	if url != "http://supervisor/core/api" {
+	if url != "http://supervisor/core" {
 		t.Fatalf("expected supervisor URL, got %q", url)
 	}
 	if token != "supervisor-secret" {
@@ -113,6 +113,37 @@ func TestParseLogLevel(t *testing.T) {
 	for input, expected := range cases {
 		if got := parseLogLevel(input); got != expected {
 			t.Fatalf("parseLogLevel(%q) = %v, expected %v", input, got, expected)
+		}
+	}
+}
+
+func TestResolveHAConfigBuildsValidSupervisorStatesURL(t *testing.T) {
+	url, _ := resolveHAConfig("", "", "supervisor-secret")
+	if url+"/api/states" != "http://supervisor/core/api/states" {
+		t.Fatalf("supervisor base must combine with client paths without doubling /api, got %q", url+"/api/states")
+	}
+}
+
+func TestHaSourceLabel(t *testing.T) {
+	if got := haSourceLabel("http://supervisor/core"); got != "supervisor" {
+		t.Fatalf("expected supervisor, got %q", got)
+	}
+	if got := haSourceLabel("http://homeassistant.local:8123"); got != "manual" {
+		t.Fatalf("expected manual, got %q", got)
+	}
+}
+
+func TestHaHost(t *testing.T) {
+	cases := map[string]string{
+		"http://supervisor/core":          "supervisor",
+		"http://192.168.1.50:8123":        "192.168.1.50",
+		"http://homeassistant.local:8123": "homeassistant.local",
+		"://missing-scheme":               "unknown",
+		"":                                "unknown",
+	}
+	for input, expected := range cases {
+		if got := haHost(input); got != expected {
+			t.Fatalf("haHost(%q) = %q, expected %q", input, got, expected)
 		}
 	}
 }

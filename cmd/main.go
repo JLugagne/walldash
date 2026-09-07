@@ -30,6 +30,7 @@ func main() {
 	if haURL == "" {
 		haURL = "http://homeassistant.local:8123"
 	}
+	logrus.WithFields(logrus.Fields{"ha_source": haSourceLabel(haURL), "ha_host": haHost(haURL), "ha_token_set": haToken != ""}).Info("home assistant configuration resolved")
 	frontendDir := os.Getenv("FRONTEND_DIR")
 	allowedOriginsStr := os.Getenv("ALLOWED_ORIGINS")
 	var allowedOrigins []string

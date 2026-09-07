@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -9,12 +10,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var Version = "0.3.0"
+var Version = "0.3.1"
 
 const (
 	// defaultSupervisorURL is the Home Assistant Supervisor API proxy base URL.
 	// It is reachable from inside an add-on container when homeassistant_api is enabled.
-	defaultSupervisorURL = "http://supervisor/core/api"
+	defaultSupervisorURL = "http://supervisor/core"
 	// supervisorTokenEnv carries the Supervisor API token, injected by the Supervisor.
 	supervisorTokenEnv = "SUPERVISOR_TOKEN"
 	// addonOptionsPath is where the Supervisor writes the user configuration of the add-on.
@@ -66,7 +67,7 @@ func configValue(envKey, optionKey, fallback string, options map[string]string) 
 
 // resolveHAConfig selects the Home Assistant endpoint and token.
 // When no URL is configured but a Supervisor token is available (i.e. the app
-// runs as a Home Assistant add-on), the Supervisor API proxy is used so users
+// runs as a Home Assistant add-on), the Supervisor API proxy base is used so users
 // do not have to create a long-lived access token manually.
 // The Supervisor token is never attached to a user-provided URL, as it would
 // only be valid against the Supervisor proxy.
@@ -108,4 +109,24 @@ func parseLogLevel(name string) logrus.Level {
 	default:
 		return logrus.InfoLevel
 	}
+}
+
+// haSourceLabel reports where the Home Assistant endpoint comes from:
+// "supervisor" when using the Supervisor API proxy, "manual" otherwise.
+// It is logged at startup to diagnose connectivity issues (never with tokens).
+func haSourceLabel(haURL string) string {
+	if haURL == defaultSupervisorURL {
+		return "supervisor"
+	}
+	return "manual"
+}
+
+// haHost extracts the hostname from an endpoint URL for safe startup logging.
+// It returns "unknown" when the URL cannot be parsed.
+func haHost(haURL string) string {
+	parsed, err := url.Parse(haURL)
+	if err != nil || parsed.Hostname() == "" {
+		return "unknown"
+	}
+	return parsed.Hostname()
 }
