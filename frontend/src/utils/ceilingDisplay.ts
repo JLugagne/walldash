@@ -1,5 +1,4 @@
 import type { Zone, Device } from '../types'
-import { inferLayerFromDevice } from './layers'
 
 export const CEILING_NEUTRAL_COLOR = '#f1f5f9'
 export const CEILING_COLD_COLOR = '#38bdf8'
@@ -336,24 +335,45 @@ export function calculateDiscDiameter(zone: Zone): number {
 }
 
 /**
+ * Whether the ceiling HUD should be hidden for the currently viewed layer.
+ * Each layer carries its own hide_gauges flag and controls its own view:
+ * when the active layer has hide_gauges=true, all zone ceiling displays
+ * are hidden while that layer is viewed. Other layers are unaffected.
+ */
+export function isCeilingHiddenForActiveLayer(
+  activeLayer: string | undefined | null,
+  layerHideGaugesMap: Record<string, boolean>
+): boolean {
+  if (!activeLayer) return false
+  return layerHideGaugesMap[activeLayer] === true
+}
+
+/**
  * Determines which zones should have their ceiling HUD gauges hidden.
- * A zone is hidden when ALL of its configured sensors belong to layers
- * where hide_gauges is true.
+ * @deprecated Prefer isCeilingHiddenForActiveLayer: ceiling visibility is
+ * driven by the active (viewed) layer's hide_gauges flag, not by where a
+ * zone's sensor entity happens to be placed. Kept for backward
+ * compatibility with existing tests.
+ * Zones don't have their own display layer — a zone's ceiling badge
+ * follows the SAME layer mechanism as devices: it is hidden when the
+ * zone's configured sensor entity (temp_sensor / humidity_sensor) is
+ * itself placed on the plan (DevicePlacement) under a layer that has
+ * hide_gauges=true. A sensor with no placement is treated as being on
+ * the default "controls" layer, exactly like an unplaced DevicePlacement.
  * Zones without any configured sensors are never in the result (they
  * are filtered out at the render site via hasConfiguredSensors).
  */
 export function computeZoneGaugesHidden(
   zones: Zone[],
   placementLayerMap: Record<string, string>,
-  layerHideGaugesMap: Record<string, boolean>,
-  deviceMap: Record<string, Device>
+  layerHideGaugesMap: Record<string, boolean>
 ): Record<string, boolean> {
   const hidden: Record<string, boolean> = {}
   for (const zone of zones) {
     if (!zone.temp_sensor && !zone.humidity_sensor) continue
-    let hiddenForZone = zone.temp_sensor ? isSensorOnHiddenLayer(zone.temp_sensor, placementLayerMap, layerHideGaugesMap, deviceMap) : false
+    let hiddenForZone = zone.temp_sensor ? isSensorOnHiddenLayer(zone.temp_sensor, placementLayerMap, layerHideGaugesMap) : false
     if (!hiddenForZone && zone.humidity_sensor) {
-      hiddenForZone = isSensorOnHiddenLayer(zone.humidity_sensor, placementLayerMap, layerHideGaugesMap, deviceMap)
+      hiddenForZone = isSensorOnHiddenLayer(zone.humidity_sensor, placementLayerMap, layerHideGaugesMap)
     }
     hidden[zone.id] = hiddenForZone
   }
@@ -363,10 +383,9 @@ export function computeZoneGaugesHidden(
 function isSensorOnHiddenLayer(
   entityId: string,
   placementLayerMap: Record<string, string>,
-  layerHideGaugesMap: Record<string, boolean>,
-  deviceMap: Record<string, Device>
+  layerHideGaugesMap: Record<string, boolean>
 ): boolean {
-  const layer = placementLayerMap[entityId] || inferLayerFromDevice(entityId, deviceMap)
-  return layer !== null && layerHideGaugesMap[layer] === true
+  const layer = placementLayerMap[entityId] || 'controls'
+  return layerHideGaugesMap[layer] === true
 }
 

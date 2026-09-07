@@ -7,7 +7,7 @@ import { ZoneCeilingDisplay } from './ZoneCeilingDisplay'
 import { buildWallGeometry, toWorldX, toWorldZ, WALL_HEIGHT } from './wallGeometry'
 import { createWallMaterial } from './wallMaterial'
 import { getFloorTileTexture } from './floorTexture'
-import { hasConfiguredSensors, computeZoneGaugesHidden } from '../utils/ceilingDisplay'
+import { hasConfiguredSensors, isCeilingHiddenForActiveLayer } from '../utils/ceilingDisplay'
 
 export { WALL_HEIGHT }
 
@@ -653,15 +653,6 @@ export function IsometricScene({
   const walls = plan?.walls || []
   const zones = plan?.zones || []
 
-  // Build a map of device_id -> layer for quick lookup
-  const placementLayerMap = useMemo(() => {
-    const map: Record<string, string> = {}
-    for (const p of placements) {
-      map[p.device_id] = p.layer || 'controls'
-    }
-    return map
-  }, [placements])
-
   // Build a map of layer_name -> hide_gauges
   const layerHideGaugesMap = useMemo(() => {
     const map: Record<string, boolean> = {}
@@ -671,11 +662,11 @@ export function IsometricScene({
     return map
   }, [layers])
 
-  // Determine which zones should have their gauges hidden
-  // A zone's gauges are hidden if its temp_sensor or humidity_sensor is on a layer with hide_gauges=true
-  const zoneGaugesHidden = useMemo(() => {
-    return computeZoneGaugesHidden(zones, placementLayerMap, layerHideGaugesMap, deviceMap)
-  }, [zones, placementLayerMap, layerHideGaugesMap, deviceMap])
+  // Ceiling visibility follows the active (viewed) layer: each layer's
+  // hide_gauges flag controls its own view independently.
+  const ceilingHiddenForActiveLayer = useMemo(() => {
+    return isCeilingHiddenForActiveLayer(activeLayer, layerHideGaugesMap)
+  }, [activeLayer, layerHideGaugesMap])
 
   // Filter placements by active layer (if specified)
   const visiblePlacements = useMemo(() => {
@@ -755,9 +746,9 @@ export function IsometricScene({
           <ZoneMesh key={zone.id} zone={zone} />
         ))}
 
-        {/* 3D Ceiling Displays at y = WALL_HEIGHT (always visible regardless of activeLayer) */}
+        {/* 3D Ceiling Displays at y = WALL_HEIGHT (hidden when the active layer has hide_gauges=true) */}
         {zones.map((zone) => {
-          if (zoneGaugesHidden[zone.id] || !hasConfiguredSensors(zone)) return null
+          if (ceilingHiddenForActiveLayer || !hasConfiguredSensors(zone)) return null
           return (
             <ZoneCeilingDisplay
               key={`ceiling-${zone.id}`}
