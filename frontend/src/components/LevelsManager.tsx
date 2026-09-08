@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, Check, Home, Layers, Pencil, Plus, Trash2, Trees, X, Gauge, SlidersHorizontal } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Home, Layers, Pencil, Plus, Trash2, Trees, Upload, X, Gauge, SlidersHorizontal } from 'lucide-react'
 import type { Level } from '../types'
 import { apiFetch } from '../api'
 
@@ -8,9 +8,10 @@ interface LevelsManagerProps {
   activeLevelId: string | null
   onSelectLevel: (id: string) => void
   onRefreshLevels: () => Promise<void>
+  onOpenWizard?: () => void
 }
 
-export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshLevels }: LevelsManagerProps) {
+export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshLevels, onOpenWizard }: LevelsManagerProps) {
   const [name, setName] = useState('')
   const [isOutdoor, setIsOutdoor] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -177,6 +178,18 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
         <Layers className="w-4 h-4 text-indigo-400" />
         <h2 className="text-sm font-semibold text-white flex-1">Levels</h2>
         <span className="text-[11px] text-slate-500">{levels.length} level{levels.length > 1 ? 's' : ''}</span>
+        {onOpenWizard && (
+          <button
+            type="button"
+            onClick={onOpenWizard}
+            disabled={busy}
+            title="Import levels or restore a backup"
+            className="h-7 px-2 rounded-lg flex items-center gap-1 text-[11px] text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-50 cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            Import
+          </button>
+        )}
       </div>
 
       {error && (

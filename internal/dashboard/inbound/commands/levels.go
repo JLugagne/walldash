@@ -180,6 +180,7 @@ func SetupLevelRoutes(r *mux.Router, controller *inbound.Controller, commands sv
 	handler := NewLevelsHandler(controller, commands)
 	r.HandleFunc("/api/levels", handler.CreateLevel).Methods(http.MethodPost)
 	r.HandleFunc("/api/levels/reorder", handler.ReorderLevels).Methods(http.MethodPost)
+	r.HandleFunc("/api/levels/import/sh3d", handler.ImportSh3dLevels).Methods(http.MethodPost)
 	r.HandleFunc("/api/levels/{id}/plan/import", handler.ImportPlan).Methods(http.MethodPost)
 	r.HandleFunc("/api/levels/{id}/plan", handler.SavePlan).Methods(http.MethodPut)
 	r.HandleFunc("/api/levels/{id}", handler.UpdateLevel).Methods(http.MethodPut)
@@ -234,5 +235,28 @@ func (h *LevelsHandler) ImportPlan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := converters.ToPublicPlan(saved)
+	h.controller.SendSuccess(w, r, response)
+}
+
+// ImportSh3dLevels imports a Sweet Home 3D archive, creating one Level per
+// declared level (ordered by elevation), each with its imported plan.
+func (h *LevelsHandler) ImportSh3dLevels(w http.ResponseWriter, r *http.Request) {
+	reader, parseErr := r.MultipartReader()
+	if parseErr != nil {
+		h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidSavePlanRequest, parseErr))
+		return
+	}
+	part, partErr := reader.NextPart()
+	if partErr != nil {
+		h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidSavePlanRequest, partErr))
+		return
+	}
+	actor := domain.ActorFromContext(r.Context())
+	created, err := h.commands.ImportSh3dLevels(r.Context(), actor, part)
+	if err != nil {
+		h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidSavePlanRequest, err))
+		return
+	}
+	response := converters.ToPublicLevels(created)
 	h.controller.SendSuccess(w, r, response)
 }

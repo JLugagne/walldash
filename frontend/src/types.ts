@@ -13,6 +13,14 @@ export interface Level {
   updated_at: string
 }
 
+export interface RestoreSummary {
+  levels: number
+  plans: number
+  placements: number
+  overviews: number
+  widgets: number
+}
+
 export interface Point2D {
   x: number
   y: number

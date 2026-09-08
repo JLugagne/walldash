@@ -2,6 +2,7 @@ package levels
 
 import (
 	"context"
+	"io"
 
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
 )
@@ -21,4 +22,5 @@ type LevelCommands interface {
 	DeleteLevel(ctx context.Context, actor domain.Actor, id string) error
 	ReorderLevels(ctx context.Context, actor domain.Actor, orderedIDs []string) error
 	SavePlan(ctx context.Context, actor domain.Actor, plan domain.Plan) (domain.Plan, error)
+	ImportSh3dLevels(ctx context.Context, actor domain.Actor, r io.Reader) ([]domain.Level, error)
 }

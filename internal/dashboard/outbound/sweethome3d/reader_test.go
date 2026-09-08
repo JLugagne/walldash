@@ -196,3 +196,43 @@ func TestFromReaderDegenerateGeometry(t *testing.T) {
 	assert.Greater(t, plan.Walls[1].Thickness, float64(0))
 	require.NoError(t, plan.Validate())
 }
+
+func TestFromReaderLevels(t *testing.T) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?>
+<home version="7400">
+  <level id="level0" name="Ground floor" elevation="0.0"/>
+  <level id="level1" name="Upstairs" elevation="262.0"/>
+  <level id="level2" name="Attic" elevation="524.0"/>
+  <wall id="w1" level="level1" xStart="0.0" yStart="0.0" xEnd="500.0" yEnd="0.0" thickness="10.0"/>
+  <wall id="w2" level="level0" xStart="0.0" yStart="0.0" xEnd="400.0" yEnd="0.0" thickness="10.0"/>
+  <wall id="w3" xStart="0.0" yStart="50.0" xEnd="300.0" yEnd="50.0" thickness="10.0"/>
+  <room level="level0" name="Kitchen">
+    <point x="10.0" y="10.0"/>
+    <point x="390.0" y="10.0"/>
+    <point x="390.0" y="300.0"/>
+  </room>
+  <room level="level1" name="Bedroom">
+    <point x="10.0" y="10.0"/>
+    <point x="490.0" y="10.0"/>
+    <point x="490.0" y="300.0"/>
+  </room>
+  <doorOrWindow level="level1" wall="w1" x="100.0" y="0.0" width="80.0" name="Door"/>
+</home>`
+	zipData := buildSh3dZip(xml)
+	imported, err := sweethome3d.FromReaderLevels(bytes.NewReader(zipData))
+	require.NoError(t, err)
+	require.Len(t, imported, 3)
+	assert.Equal(t, "Ground floor", imported[0].Name)
+	assert.Equal(t, "Upstairs", imported[1].Name)
+	assert.Equal(t, "Attic", imported[2].Name)
+	require.Len(t, imported[0].Plan.Walls, 2)
+	require.Len(t, imported[1].Plan.Walls, 1)
+	assert.Empty(t, imported[2].Plan.Walls)
+	require.Len(t, imported[0].Plan.Zones, 1)
+	assert.Equal(t, "Kitchen", imported[0].Plan.Zones[0].Name)
+	require.Len(t, imported[1].Plan.Zones, 1)
+	require.Len(t, imported[1].Plan.Walls[0].Openings, 1)
+	for _, lvl := range imported {
+		require.NoError(t, lvl.Plan.Validate())
+	}
+}

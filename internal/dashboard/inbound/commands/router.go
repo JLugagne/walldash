@@ -6,6 +6,7 @@ import (
 	svchealth "github.com/JLugagne/walldash/internal/dashboard/domain/service/health"
 	svclevels "github.com/JLugagne/walldash/internal/dashboard/domain/service/levels"
 	svcoverviews "github.com/JLugagne/walldash/internal/dashboard/domain/service/overviews"
+	restore "github.com/JLugagne/walldash/internal/dashboard/domain/service/restore"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound"
 	"github.com/gorilla/mux"
 )
@@ -26,5 +27,8 @@ func SetupRoutes(r *mux.Router, controller *inbound.Controller, commands svcheal
 
 	if overviewCommands, ok := commands.(svcoverviews.OverviewCommands); ok {
 		SetupOverviewRoutes(r, controller, overviewCommands)
+	}
+	if restoreCommands, ok := commands.(restore.RestoreCommands); ok {
+		SetupRestoreRoutes(r, controller, restoreCommands)
 	}
 }

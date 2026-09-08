@@ -1,6 +1,8 @@
 package app_test
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -248,4 +250,65 @@ func TestLevelService_Operations(t *testing.T) {
 		assert.Equal(t, "lvl-exists", saved.LevelID)
 		assert.Equal(t, 1, len(saved.Walls))
 	})
+}
+
+func TestApp_ImportSh3dLevels(t *testing.T) {
+	ctx := context.Background()
+	actor := domain.Actor{UserID: "admin-1"}
+	sh3dXML := `<?xml version="1.0" encoding="UTF-8"?>
+<home version="7400">
+  <level id="level0" name="Ground floor" elevation="0.0"/>
+  <level id="level1" name="Upstairs" elevation="262.0"/>
+  <wall id="w1" level="level0" xStart="0.0" yStart="0.0" xEnd="400.0" yEnd="0.0" thickness="10.0"/>
+  <wall id="w2" level="level1" xStart="0.0" yStart="0.0" xEnd="500.0" yEnd="0.0" thickness="10.0"/>
+  <room level="level0" name="Kitchen">
+    <point x="10.0" y="10.0"/>
+    <point x="390.0" y="10.0"/>
+    <point x="390.0" y="300.0"/>
+  </room>
+</home>`
+	buf := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(buf)
+	part, err := zipWriter.Create("Home.xml")
+	require.NoError(t, err)
+	_, err = part.Write([]byte(sh3dXML))
+	require.NoError(t, err)
+	require.NoError(t, zipWriter.Close())
+	var createdNames []string
+	savedPlans := make(map[string]domain.Plan)
+	mockLevels := &repolevelstest.MockLevelRepository{
+		FindAllFunc: func(ctx context.Context) ([]domain.Level, error) {
+			return []domain.Level{}, nil
+		},
+		CreateFunc: func(ctx context.Context, level domain.Level) (domain.Level, error) {
+			createdNames = append(createdNames, level.Name)
+			return level, nil
+		},
+		FindByIDFunc: func(ctx context.Context, id string) (domain.Level, error) {
+			return domain.Level{ID: id, Name: "level"}, nil
+		},
+	}
+	mockPlans := &repoplanstest.MockPlanRepository{
+		SaveFunc: func(ctx context.Context, plan domain.Plan) (domain.Plan, error) {
+			savedPlans[plan.LevelID] = plan
+			return plan, nil
+		},
+	}
+	mockHealth := &repohealthtest.MockRepository{}
+	mockUow := &uowtest.MockUnitOfWork{}
+	service := app.New(mockHealth, mockLevels, mockPlans, nil, nil, nil, nil, mockUow, "0.3.0")
+	created, err := service.ImportSh3dLevels(ctx, actor, bytes.NewReader(buf.Bytes()))
+	require.NoError(t, err)
+	require.Len(t, created, 2)
+	assert.Equal(t, []string{"Ground floor", "Upstairs"}, createdNames)
+	for _, lvl := range created {
+		plan, ok := savedPlans[lvl.ID]
+		require.True(t, ok, "plan saved for level %s", lvl.ID)
+		require.NoError(t, plan.Validate())
+	}
+	assert.Len(t, savedPlans[created[0].ID].Walls, 1)
+	assert.Len(t, savedPlans[created[1].ID].Walls, 1)
+	assert.Len(t, savedPlans[created[0].ID].Zones, 1)
+	_, err = service.ImportSh3dLevels(ctx, actor, bytes.NewReader([]byte("not-a-zip")))
+	require.Error(t, err)
 }

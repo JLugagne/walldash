@@ -2,10 +2,13 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Outlet } from 'react-router-dom'
 import type { Level } from './types'
 import type { AppContext } from './useApp'
+import { OnboardingWizard } from './components/OnboardingWizard'
 
 function App() {
   const [levels, setLevels] = useState<Level[]>([])
   const [activeLevelId, setActiveLevelId] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  const [wizardDismissed, setWizardDismissed] = useState(false)
 
   const fetchLevels = useCallback(async () => {
     try {
@@ -32,12 +35,18 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to fetch levels:', err)
+    } finally {
+      setLoaded(true)
     }
   }, [])
 
   useEffect(() => {
     fetchLevels()
   }, [fetchLevels])
+
+  useEffect(() => {
+    if (levels.length > 0) setWizardDismissed(false)
+  }, [levels.length])
 
   const activeLevel = useMemo(
     () => levels.find((l) => l.id === activeLevelId) || null,
@@ -52,8 +61,19 @@ function App() {
     activeLevel,
   }
 
+  const showWizard = loaded && levels.length === 0 && !wizardDismissed
+
   return (
     <div className="h-screen w-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden">
+      {showWizard && (
+        <OnboardingWizard
+          onDone={() => {
+            setWizardDismissed(true)
+            void fetchLevels()
+          }}
+          onClose={() => setWizardDismissed(true)}
+        />
+      )}
       <Outlet context={context} />
     </div>
   )

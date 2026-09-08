@@ -3,9 +3,11 @@ package app
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/outbound/sweethome3d"
 	"github.com/JLugagne/walldash/internal/pkg/logger"
 	"github.com/google/uuid"
 )
@@ -176,4 +178,37 @@ func (a *App) SavePlan(ctx context.Context, actor domain.Actor, plan domain.Plan
 
 	log.WithField("level_id", saved.LevelID).WithField("actor", actor.UserID).Info("plan saved successfully")
 	return saved, nil
+}
+
+// ImportSh3dLevels creates one Level per Sweet Home 3D level found in a .sh3d
+// archive, ordered by elevation ascending, each with its imported plan.
+// Every declared level is created, even without walls; unwanted ones can be
+// deleted afterwards. All plans are validated before anything is created so a
+// malformed archive never leaves half-imported levels behind.
+func (a *App) ImportSh3dLevels(ctx context.Context, actor domain.Actor, r io.Reader) ([]domain.Level, error) {
+	imported, err := sweethome3d.FromReaderLevels(r)
+	if err != nil {
+		return nil, err
+	}
+	for _, lvl := range imported {
+		probe := lvl.Plan
+		probe.LevelID = "probe"
+		if err := probe.Validate(); err != nil {
+			return nil, err
+		}
+	}
+	created := make([]domain.Level, 0, len(imported))
+	for _, lvl := range imported {
+		level, err := a.CreateLevel(ctx, actor, domain.Level{Name: lvl.Name})
+		if err != nil {
+			return nil, err
+		}
+		plan := lvl.Plan
+		plan.LevelID = level.ID
+		if _, err := a.SavePlan(ctx, actor, plan); err != nil {
+			return nil, err
+		}
+		created = append(created, level)
+	}
+	return created, nil
 }

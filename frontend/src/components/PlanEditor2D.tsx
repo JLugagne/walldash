@@ -3,6 +3,7 @@ import { AlertCircle, Cpu, Layers, Loader2, Maximize2, SlidersHorizontal, X, Zoo
 import type { Device, DevicePlacement, Level, Plan, Point2D, SavePlacementRequest, WallOpening, WallSegment, Zone } from '../types'
 import { apiFetch } from '../api'
 import { ImportPlanModal } from './ImportPlanModal'
+import { OnboardingWizard } from './OnboardingWizard'
 import { LevelsManager } from './LevelsManager'
 import { EditorHeader, type SaveState } from './editor/EditorHeader'
 import { ToolRail } from './editor/ToolRail'
@@ -82,6 +83,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [error, setError] = useState<string | null>(null)
   const [showImport, setShowImport] = useState(false)
+  const [showWizard, setShowWizard] = useState(false)
   const [levelsOpen, setLevelsOpen] = useState(false)
   const [layersOpen, setLayersOpen] = useState(true)
 
@@ -1175,6 +1177,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
                 }
               }
             }}
+            onOpenWizard={() => setShowWizard(true)}
           />
         }
         levelsOpen={levelsOpen}
@@ -1360,16 +1363,25 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
                 <div className="space-y-1">
                   <h3 className="text-base font-semibold text-white">No level</h3>
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    Create a first floor or outdoor space to draw its plan and place your devices.
+                    Import a Sweet Home 3D file, restore a backup, or create a first floor or outdoor space.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setLevelsOpen(true)}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg shadow-indigo-500/30 transition-all cursor-pointer"
-                >
-                  Manage levels
-                </button>
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowWizard(true)}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg shadow-indigo-500/30 transition-all cursor-pointer"
+                  >
+                    Import / Restore
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLevelsOpen(true)}
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    Manage levels
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1473,6 +1485,15 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
       </div>
 
       {level && <ImportPlanModal isOpen={showImport} levelId={level.id} onClose={() => setShowImport(false)} onImport={handleImport} />}
+      {showWizard && (
+        <OnboardingWizard
+          onDone={async () => {
+            setShowWizard(false)
+            await onRefreshLevels()
+          }}
+          onClose={() => setShowWizard(false)}
+        />
+      )}
     </div>
   )
 }

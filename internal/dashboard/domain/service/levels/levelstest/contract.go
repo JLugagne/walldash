@@ -2,6 +2,7 @@ package levelstest
 
 import (
 	"context"
+	"io"
 	"testing"
 
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
@@ -40,14 +41,15 @@ func (m *MockLevelQueries) GetPlan(ctx context.Context, levelID string) (domain.
 
 // MockLevelCommands is a function-based mock implementation of levels.LevelCommands.
 type MockLevelCommands struct {
-	ListLevelsFunc    func(ctx context.Context) ([]domain.Level, error)
-	GetLevelFunc      func(ctx context.Context, id string) (domain.Level, error)
-	GetPlanFunc       func(ctx context.Context, levelID string) (domain.Plan, error)
-	CreateLevelFunc   func(ctx context.Context, actor domain.Actor, level domain.Level) (domain.Level, error)
-	UpdateLevelFunc   func(ctx context.Context, actor domain.Actor, level domain.Level) (domain.Level, error)
-	DeleteLevelFunc   func(ctx context.Context, actor domain.Actor, id string) error
-	ReorderLevelsFunc func(ctx context.Context, actor domain.Actor, orderedIDs []string) error
-	SavePlanFunc      func(ctx context.Context, actor domain.Actor, plan domain.Plan) (domain.Plan, error)
+	ListLevelsFunc       func(ctx context.Context) ([]domain.Level, error)
+	GetLevelFunc         func(ctx context.Context, id string) (domain.Level, error)
+	GetPlanFunc          func(ctx context.Context, levelID string) (domain.Plan, error)
+	CreateLevelFunc      func(ctx context.Context, actor domain.Actor, level domain.Level) (domain.Level, error)
+	UpdateLevelFunc      func(ctx context.Context, actor domain.Actor, level domain.Level) (domain.Level, error)
+	DeleteLevelFunc      func(ctx context.Context, actor domain.Actor, id string) error
+	ReorderLevelsFunc    func(ctx context.Context, actor domain.Actor, orderedIDs []string) error
+	SavePlanFunc         func(ctx context.Context, actor domain.Actor, plan domain.Plan) (domain.Plan, error)
+	ImportSh3dLevelsFunc func(ctx context.Context, actor domain.Actor, r io.Reader) ([]domain.Level, error)
 }
 
 func (m *MockLevelCommands) ListLevels(ctx context.Context) ([]domain.Level, error) {
@@ -127,4 +129,11 @@ func LevelQueriesContractTesting(t *testing.T, queries levels.LevelQueries) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrPlanNotFound)
 	})
+}
+
+func (m *MockLevelCommands) ImportSh3dLevels(ctx context.Context, actor domain.Actor, r io.Reader) ([]domain.Level, error) {
+	if m.ImportSh3dLevelsFunc == nil {
+		panic("called not defined ImportSh3dLevelsFunc")
+	}
+	return m.ImportSh3dLevelsFunc(ctx, actor, r)
 }
