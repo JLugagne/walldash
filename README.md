@@ -7,32 +7,48 @@
 
 **Walldash** brings your house to life in live 3D. The touch-first home automation dashboard for Home Assistant — zero Blender, zero YAML. Built from the ground up for a seamless, tactile experience on wall-mounted touchscreens and tablets.
 
+📖 **[Read the user manual](https://jlugagne.github.io/walldash/)** — installation, onboarding, the 3D views and the 2D editor.
+
 ---
 
 ## 📸 Screenshots
 
-![3D Controls view - 1st floor with interactive light toggles](docs/screenshots/controls.png)
-*Live 3D Controls view — isometric floor with per-room ambient halos and touch-friendly light / switch toggles.*
+![Walldash house overview - all floors stacked in one isometric model](docs/user-manual/static/images/house-overview.png)
+*House overview — every level stacked into a single isometric model, with active lights glowing per room.*
 
-![3D Sensors view - temperature and humidity overlays](docs/screenshots/sensors.png)
-*Live 3D Sensors view — in-space temperature gauges with comfort status plus humidity readouts.*
+![3D Controls layer with interactive light and switch toggles](docs/user-manual/static/images/floor-controls.png)
+*Live 3D Controls layer — tap lights, switches and appliances; active lights cast an ambient halo around their room.*
 
-![2D Floor Plan Editor - zones, devices and room properties](docs/screenshots/devices.png)
-*In-browser 2D Floor Plan Editor — trace walls, define zones across floors, place devices, and tune room color and ambient sensor thresholds.*
+![3D Sensors layer with temperature and humidity readouts](docs/user-manual/static/images/floor-sensors.png)
+*Live 3D Sensors layer — temperature and humidity projected over each room, with comfort thresholds that pulse when crossed.*
+
+![2D Floor Plan Editor with walls, zones and device placements](docs/user-manual/static/images/plan-editor.png)
+*In-browser 2D editor — trace walls and openings, define zones across levels, and drag devices onto the plan.*
+
+![Overview dashboard with sensor, switch and automation widgets](docs/user-manual/static/images/dashboard.png)
+*Overview dashboards — a touch-friendly grid of gauges, toggles and favorite automations, composed in edit mode.*
+
+*Screenshots captured from the built-in demo devices and a generic example plan — no real installation is shown.*
 
 ---
 
 ## ✨ Features
 
-- **🎮 3D Isometric View**:
-  - Fixed isometric camera projection built with **Three.js** and **React Three Fiber**.
-  - Dynamic room geometry with ceiling status discs and ambient lighting halos around active lights.
+- **🏠 House Overview**:
+  - Every level stacked into a single isometric model, so the whole home is readable at a glance.
+  - Tap a floor to open it; the stacking order follows the level order defined in the editor.
+
+- **🎮 3D Floor View**:
+  - Fixed isometric projection built with **Three.js** and **React Three Fiber**.
+  - Switchable **display layers** — *Controls* (interactive devices) and *Sensors* (passive readouts) — plus custom user layers.
+  - Ambient halos around active lights and ceiling status discs that surface sensor comfort in place.
   - Interactive device toggles (lights, switches, appliances) and real-time sensor readouts directly inside the 3D space.
 
-- **✏️ 2D Floor Plan Editor**:
-  - In-browser vector plan editor to trace walls, define interior rooms and outdoor zones (gardens, patios).
-  - Multi-level management (ground floor, upper floors, basements, outdoor areas).
-  - Drag-and-drop device placement with real-time coordinate mapping onto the 3D view.
+- **✏️ 2D Plan Editor**:
+  - In-browser vector editor to trace walls and openings, and define interior rooms and outdoor zones (gardens, patios).
+  - Multi-level management (ground floors, upper floors, basements, outdoor areas) with reordering used by the house overview.
+  - Drag-and-drop device placement with custom names, icons and per-device render domains.
+  - Import existing **Sweet Home 3D** (`.sh3d`) plans in a single step.
 
 - **📊 Overview Dashboards & Widgets**:
   - Touch-friendly widget grid layouts for quick actions and monitoring.
@@ -87,7 +103,9 @@ See [`docs/home-assistant-add-on.md`](docs/home-assistant-add-on.md) for packagi
    docker compose up -d
    ```
 
-5. Open your browser or tablet display at `http://<server-ip>:9090` (or `8080` depending on port mapping).
+5. Open your browser or tablet display at `http://<server-ip>:9090` (the Compose file maps host port `9090` to the container's `8080`).
+
+> No Home Assistant configured yet? Walldash starts in **demo mode** with built-in example devices, so you can explore the interface before connecting a real instance.
 
 ---
 

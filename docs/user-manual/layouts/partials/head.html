@@ -1,0 +1,22 @@
+{{- $title := .Title -}}
+{{- if .IsHome }}{{ $title = site.Title }}{{ else }}{{ $title = printf "%s · %s" .Title site.Title }}{{ end -}}
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ $title }}</title>
+<meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ site.Params.description }}{{ end }}">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="{{ "favicon.svg" | relURL }}" type="image/svg+xml">
+<link rel="canonical" href="{{ .Permalink }}">
+{{ with .OutputFormats.Get "html" }}<link rel="alternate" hreflang="{{ site.Language.Locale }}" href="{{ .Permalink }}">{{ end }}
+{{ $css := resources.Get "css/main.css" | minify | fingerprint }}
+<link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
+<script>
+  (function () {
+    try {
+      var stored = localStorage.getItem('walldash-theme');
+      if (stored === 'light' || stored === 'dark') {
+        document.documentElement.setAttribute('data-theme', stored);
+      }
+    } catch (e) {}
+  })();
+</script>

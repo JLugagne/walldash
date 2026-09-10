@@ -1,0 +1,13 @@
+{
+  "name": "walldash-manual-tools",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Generates the screenshots used by the Walldash user manual from example data.",
+  "scripts": {
+    "generate": "node generate.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

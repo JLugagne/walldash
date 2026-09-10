@@ -1,0 +1,28 @@
+baseURL = "https://jlugagne.github.io/walldash/"
+locale = "en-US"
+title = "Walldash Manual"
+enableRobotsTXT = true
+disableKinds = ["taxonomy", "term", "RSS", "sitemap"]
+
+[params]
+  description = "User manual for Walldash, the touch-first 3D home dashboard for Home Assistant."
+  version = "0.3.1"
+  repo = "https://github.com/JLugagne/walldash"
+  editBaseURL = "https://github.com/JLugagne/walldash/edit/main/docs/user-manual/content"
+  latestRelease = "https://github.com/JLugagne/walldash/releases/latest"
+
+[markup]
+  [markup.highlight]
+    style = "github-dark"
+    lineNos = false
+  [markup.goldmark.renderer]
+    unsafe = true
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 3
+    ordered = false
+
+[outputs]
+  home = ["HTML"]
+  section = ["HTML"]
+  page = ["HTML"]

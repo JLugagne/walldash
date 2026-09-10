@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="{{ site.Language.Locale }}" data-theme="auto">
+  <head>
+    {{ partial "head.html" . }}
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <div class="layout">
+      {{ partial "sidebar.html" . }}
+      <div class="main">
+        {{ partial "topnav.html" . }}
+        <main id="content" class="content">
+          {{ block "main" . }}{{ end }}
+        </main>
+        {{ partial "footer.html" . }}
+      </div>
+    </div>
+    <div class="scrim" hidden></div>
+    {{ $js := resources.Get "js/main.js" | minify | fingerprint }}
+    <script src="{{ $js.RelPermalink }}" integrity="{{ $js.Data.Integrity }}" defer></script>
+  </body>
+</html>

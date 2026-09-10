@@ -1,0 +1,17 @@
+{{ define "main" }}
+<article class="doc">
+  <header class="doc__header">
+    <h1>{{ .Title }}</h1>
+    {{ with .Description }}<p class="doc__lede">{{ . }}</p>{{ end }}
+  </header>
+
+  {{ with .Content }}
+    {{ if . }}
+      {{ partial "toc.html" $ }}
+    {{ end }}
+    <div class="prose">{{ . }}</div>
+  {{ end }}
+
+  {{ partial "pager.html" . }}
+</article>
+{{ end }}

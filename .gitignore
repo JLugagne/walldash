@@ -41,3 +41,8 @@ skills-lock.json
 /frontend/dist
 .artefacts/
 .scaffor/
+
+# Hugo user manual build output
+docs/user-manual/public/
+docs/user-manual/resources/
+docs/user-manual/.hugo_build.lock

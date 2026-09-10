@@ -1,0 +1,30 @@
+- title: Getting started
+  items:
+    - name: What is Walldash?
+      url: /
+    - name: Installation
+      url: /getting-started/installation/
+    - name: First run & onboarding
+      url: /getting-started/onboarding/
+
+- title: Using Walldash
+  items:
+    - name: House overview
+      url: /using/house-overview/
+    - name: Floor view (3D)
+      url: /using/floor-view/
+    - name: Setup mode
+      url: /using/setup-mode/
+    - name: Plan editor (2D)
+      url: /using/plan-editor/
+    - name: Overview dashboards
+      url: /using/dashboards/
+
+- title: Reference
+  items:
+    - name: Configuration
+      url: /reference/configuration/
+    - name: Custom domain & HTTPS
+      url: /reference/reverse-proxy/
+    - name: Troubleshooting
+      url: /reference/troubleshooting/

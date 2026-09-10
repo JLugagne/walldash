@@ -1,0 +1,42 @@
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar__brand">
+    <a class="brand" href="{{ site.Home.RelPermalink }}">
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 10.5 12 3l9 7.5"></path>
+          <path d="M5 9.5V21h14V9.5"></path>
+          <path d="M9.5 21v-6h5v6"></path>
+        </svg>
+      </span>
+      <span class="brand__text">
+        <span class="brand__name">Walldash</span>
+        <span class="brand__sub">User Manual</span>
+      </span>
+    </a>
+  </div>
+
+  <nav class="sidebar__nav" aria-label="Manual navigation">
+    {{ $page := . }}
+    {{ range hugo.Data.menu }}
+      <div class="nav-group">
+        <div class="nav-group__title">{{ .title }}</div>
+        <ul class="nav-list">
+          {{ range .items }}
+            {{ $url := .url }}
+            {{ if eq $url "/" }}{{ $url = site.Home.RelPermalink }}{{ else }}{{ $url = printf "%s%s" site.Home.RelPermalink (strings.TrimPrefix "/" $url) }}{{ end }}
+            {{ $active := eq $page.RelPermalink $url }}
+            {{ if and (not $active) (ne $url site.Home.RelPermalink) (hasPrefix $page.RelPermalink $url) }}{{ $active = true }}{{ end }}
+            <li>
+              <a class="nav-link{{ if $active }} is-active{{ end }}" href="{{ $url }}"{{ if $active }} aria-current="page"{{ end }}>{{ .name }}</a>
+            </li>
+          {{ end }}
+        </ul>
+      </div>
+    {{ end }}
+  </nav>
+
+  <div class="sidebar__footer">
+    <span class="pill">v{{ site.Params.version }}</span>
+    {{ with site.Params.repo }}<a class="sidebar__link" href="{{ . }}" target="_blank" rel="noopener">GitHub</a>{{ end }}
+  </div>
+</aside>

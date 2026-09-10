@@ -1,0 +1,6 @@
+{{- $href := .Get "href" -}}
+{{- if eq $href "/" }}{{ $href = site.Home.RelPermalink }}{{ else }}{{ $href = printf "%s%s" site.Home.RelPermalink (strings.TrimPrefix "/" $href) }}{{ end -}}
+<a class="card" href="{{ $href }}">
+  <span class="card__title">{{ .Get "title" }}</span>
+  {{ with .Get "desc" }}<span class="card__desc">{{ . }}</span>{{ end }}
+</a>
