@@ -2,18 +2,29 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Device, DevicePlacement } from '../types'
 import { apiFetch } from '../api'
 
-export function useRealtimeDevices(levelId: string | null) {
-  const [deviceMap, setDeviceMap] = useState<Record<string, Device>>({})
-  const [placements, setPlacements] = useState<DevicePlacement[]>([])
-  const [pendingDevices, setPendingDevices] = useState<Record<string, boolean>>({})
-  const [loading, setLoading] = useState(false)
-  const [connected, setConnected] = useState(false)
+interface DeviceStreamMessage {
+  type?: string
+  device?: Device
+  entity_id?: string
+  error?: unknown
+}
 
+/**
+ * Owns the live device-state stream: an initial REST fetch plus a self-healing
+ * WebSocket that keeps the device map in sync with Home Assistant, and exposes
+ * the raw `send`/`refresh` primitives for consumers that manage their own
+ * actions (e.g. read-only views).
+ */
+export function useRealtimeDeviceMap(onMessage?: (message: DeviceStreamMessage) => void) {
+  const [deviceMap, setDeviceMap] = useState<Record<string, Device>>({})
+  const [connected, setConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const onMessageRef = useRef(onMessage)
+  useEffect(() => {
+    onMessageRef.current = onMessage
+  }, [onMessage])
 
-  // Fetch initial devices list
   const fetchDevices = useCallback(async () => {
     try {
       const res = await fetch('/api/devices')
@@ -32,44 +43,15 @@ export function useRealtimeDevices(levelId: string | null) {
     }
   }, [])
 
-  // Fetch placements whenever active level changes
-  const fetchPlacements = useCallback(async (lvlId: string) => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/levels/${lvlId}/placements`)
-      if (res.ok) {
-        const payload = await res.json()
-        if (payload?.status === 'success' && Array.isArray(payload.data)) {
-          setPlacements(payload.data)
-        } else {
-          setPlacements([])
-        }
-      } else {
-        setPlacements([])
-      }
-    } catch (err) {
-      console.error('Failed to fetch placements:', err)
-      setPlacements([])
-    } finally {
-      setLoading(false)
+  const send = useCallback((payload: unknown): boolean => {
+    const ws = wsRef.current
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(payload))
+      return true
     }
+    return false
   }, [])
 
-  // Clear pending state for an entity
-  const clearPending = useCallback((entityId: string) => {
-    if (pendingTimersRef.current[entityId]) {
-      clearTimeout(pendingTimersRef.current[entityId])
-      delete pendingTimersRef.current[entityId]
-    }
-    setPendingDevices((prev) => {
-      if (!prev[entityId]) return prev
-      const copy = { ...prev }
-      delete copy[entityId]
-      return copy
-    })
-  }, [])
-
-  // Setup WebSocket connection with auto-reconnection
   useEffect(() => {
     fetchDevices()
 
@@ -88,25 +70,23 @@ export function useRealtimeDevices(levelId: string | null) {
 
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data)
+          const data = JSON.parse(event.data) as DeviceStreamMessage
 
           // Real-time confirmed state update from Home Assistant
           if (data.type === 'state_changed' && data.device) {
-            const dev = data.device as Device
+            const dev = data.device
             setDeviceMap((prev) => ({
               ...prev,
               [dev.id]: dev,
             }))
-            clearPending(dev.id)
+            onMessageRef.current?.(data)
           } else if (data.type === 'action_success' && data.entity_id) {
-            // Action acknowledged by Home Assistant; fetch fresh state if not received via broadcast
-            const entityId = data.entity_id as string
+            // Acknowledged action: refetch fresh state, then let the consumer settle its pending state
             setTimeout(() => {
-              fetchDevices().finally(() => clearPending(entityId))
+              fetchDevices().finally(() => onMessageRef.current?.(data))
             }, 600)
           } else if (data.type === 'error' && data.entity_id) {
-            console.warn(`Home Assistant action failed for ${data.entity_id}:`, data.error)
-            clearPending(data.entity_id as string)
+            onMessageRef.current?.(data)
             fetchDevices()
           }
         } catch (e) {
@@ -137,20 +117,57 @@ export function useRealtimeDevices(levelId: string | null) {
       if (wsRef.current) {
         wsRef.current.close()
       }
+    }
+  }, [fetchDevices])
+
+  return { deviceMap, connected, send, refreshDevices: fetchDevices }
+}
+
+/**
+ * Live device state plus allow-listed actuator toggling with pending
+ * bookkeeping. Shared by the floor view and the house overview.
+ */
+export function useRealtimeDeviceControl() {
+  const [pendingDevices, setPendingDevices] = useState<Record<string, boolean>>({})
+  const pendingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+
+  // Clear pending state for an entity
+  const clearPending = useCallback((entityId: string) => {
+    if (pendingTimersRef.current[entityId]) {
+      clearTimeout(pendingTimersRef.current[entityId])
+      delete pendingTimersRef.current[entityId]
+    }
+    setPendingDevices((prev) => {
+      if (!prev[entityId]) return prev
+      const copy = { ...prev }
+      delete copy[entityId]
+      return copy
+    })
+  }, [])
+
+  const handleStreamMessage = useCallback(
+    (data: DeviceStreamMessage) => {
+      if (data.type === 'state_changed' && data.device) {
+        clearPending(data.device.id)
+      } else if (data.type === 'action_success' && data.entity_id) {
+        clearPending(data.entity_id)
+      } else if (data.type === 'error' && data.entity_id) {
+        console.warn(`Home Assistant action failed for ${data.entity_id}:`, data.error)
+        clearPending(data.entity_id)
+      }
+    },
+    [clearPending]
+  )
+
+  const { deviceMap, connected, send, refreshDevices } = useRealtimeDeviceMap(handleStreamMessage)
+
+  useEffect(() => {
+    return () => {
       for (const t of Object.values(pendingTimersRef.current)) {
         clearTimeout(t)
       }
     }
-  }, [fetchDevices, clearPending])
-
-  // Reload placements when levelId changes
-  useEffect(() => {
-    if (levelId) {
-      fetchPlacements(levelId)
-    } else {
-      setPlacements([])
-    }
-  }, [levelId, fetchPlacements])
+  }, [])
 
   // Execute action without optimistic state toggle, tracking intermediate pending state
   const toggleDevice = useCallback(
@@ -169,18 +186,11 @@ export function useRealtimeDevices(levelId: string | null) {
       }
       pendingTimersRef.current[entityId] = setTimeout(() => {
         clearPending(entityId)
-        fetchDevices()
+        refreshDevices()
       }, 15000)
 
       // 1. Try WebSocket send first
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(
-          JSON.stringify({
-            type: 'action',
-            entity_id: entityId,
-            action: 'toggle',
-          })
-        )
+      if (send({ type: 'action', entity_id: entityId, action: 'toggle' })) {
         return
       }
 
@@ -199,20 +209,60 @@ export function useRealtimeDevices(levelId: string | null) {
         if (!res.ok) {
           console.warn('REST action failed, resetting pending state')
           clearPending(entityId)
-          fetchDevices()
+          refreshDevices()
         } else {
           // Re-fetch confirmed state from server
-          await fetchDevices()
+          await refreshDevices()
           clearPending(entityId)
         }
       } catch (err) {
         console.error('REST action failed:', err)
         clearPending(entityId)
-        fetchDevices()
+        refreshDevices()
       }
     },
-    [fetchDevices, pendingDevices, clearPending]
+    [pendingDevices, clearPending, refreshDevices, send]
   )
+
+  return { deviceMap, connected, pendingDevices, toggleDevice, refreshDevices }
+}
+
+export function useRealtimeDevices(levelId: string | null) {
+  const { deviceMap, connected, pendingDevices, toggleDevice, refreshDevices } = useRealtimeDeviceControl()
+  const [placements, setPlacements] = useState<DevicePlacement[]>([])
+  const [loading, setLoading] = useState(false)
+
+  // Fetch placements whenever active level changes
+  const fetchPlacements = useCallback(async (lvlId: string) => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/levels/${lvlId}/placements`)
+      if (res.ok) {
+        const payload = await res.json()
+        if (payload?.status === 'success' && Array.isArray(payload.data)) {
+          setPlacements(payload.data)
+        } else {
+          setPlacements([])
+        }
+      } else {
+        setPlacements([])
+      }
+    } catch (err) {
+      console.error('Failed to fetch placements:', err)
+      setPlacements([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Reload placements when levelId changes
+  useEffect(() => {
+    if (levelId) {
+      fetchPlacements(levelId)
+    } else {
+      setPlacements([])
+    }
+  }, [levelId, fetchPlacements])
 
   return {
     deviceMap,
@@ -222,7 +272,9 @@ export function useRealtimeDevices(levelId: string | null) {
     loading,
     connected,
     toggleDevice,
-    refreshPlacements: () => levelId && fetchPlacements(levelId),
-    refreshDevices: fetchDevices,
+    refreshPlacements: () => {
+      if (levelId) void fetchPlacements(levelId)
+    },
+    refreshDevices,
   }
 }

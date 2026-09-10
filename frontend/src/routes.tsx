@@ -9,7 +9,7 @@ export const router = createHashRouter([
   {
     element: <App />,
     children: [
-      { index: true, element: <ThreeDView /> },
+      { index: true, element: <HouseOverviewRoute /> },
       { path: 'floor/:levelId', element: <ThreeDView /> },
       { path: 'house', element: <HouseOverviewRoute /> },
       { path: 'admin', element: <AdminView /> },

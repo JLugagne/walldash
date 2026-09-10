@@ -38,9 +38,9 @@ function mountKindFor(domain: string): MountKind {
 }
 
 // Lights hang from the ceiling, plugs sit near the floor, sensors stick to the closest wall at eye level
-function resolveMount(domain: string, walls: WallSegment[], x: number, z: number, ceilingY: number): Mount {
+function resolveMount(domain: string, walls: WallSegment[], x: number, z: number, ceilingY: number, lightMountHeight?: number): Mount {
   const kind = mountKindFor(domain)
-  if (kind === 'ceiling') return { kind, x, y: ceilingY - 0.05, z, snap: null }
+  if (kind === 'ceiling') return { kind, x, y: lightMountHeight ?? ceilingY - 0.05, z, snap: null }
   if (kind === 'floor') return { kind, x, y: FLOOR_MOUNT_HEIGHT, z, snap: null }
   if (kind === 'wall') {
     const snap = snapToNearestWall(walls, x, z)
@@ -66,13 +66,15 @@ interface DeviceBadge3DProps {
   ceilingY: number
   walls?: WallSegment[]
   interactive?: boolean
+  /** Overrides the mount height for lamp-type devices (used by the house overview). */
+  lightMountHeight?: number
 }
 
-// Warm Three.js point light mounted near the ceiling, illuminating nearby walls/floor
-function CeilingLight({ x, z, ceilingY }: { x: number; z: number; ceilingY: number }) {
+// Warm Three.js point light mounted at the lamp, illuminating nearby walls/floor
+function CeilingLight({ x, y, z }: { x: number; y: number; z: number }) {
   return (
     <pointLight
-      position={[x, ceilingY - 0.3, z]}
+      position={[x, y, z]}
       color="#fbbf24"
       intensity={28}
       distance={8}
@@ -178,14 +180,14 @@ function formatSensorValue(domain: string, device?: Device): string | null {
   return `${device.state}${unit ? ' ' + unit : ''}`
 }
 
-export function DeviceBadge3D({ placement, device, isPending = false, onToggle, ceilingY, walls = [], interactive = true }: DeviceBadge3DProps) {
+export function DeviceBadge3D({ placement, device, isPending = false, onToggle, ceilingY, walls = [], interactive = true, lightMountHeight }: DeviceBadge3DProps) {
   const worldX = toWorldX(placement.x)
   const worldZ = toWorldZ(placement.y)
 
   const domain = placement.render_domain || device?.domain || placement.device_id.split('.')[0] || 'device'
   const mount = useMemo(
-    () => resolveMount(domain, walls, worldX, worldZ, ceilingY),
-    [domain, walls, worldX, worldZ, ceilingY]
+    () => resolveMount(domain, walls, worldX, worldZ, ceilingY, lightMountHeight),
+    [domain, walls, worldX, worldZ, ceilingY, lightMountHeight]
   )
   const state = device?.state || 'off'
   const isOn = state === 'on' || state === 'playing' || state === 'heat'
@@ -219,7 +221,7 @@ export function DeviceBadge3D({ placement, device, isPending = false, onToggle, 
       {/* Light Halo: rendered only when light is confirmed ON and not pending */}
       {domain === 'light' && isOn && !isPending && (
         <>
-          <CeilingLight x={worldX} z={worldZ} ceilingY={ceilingY} />
+          <CeilingLight x={worldX} y={mount.y} z={worldZ} />
           <FloorLightPool x={worldX} z={worldZ} />
         </>
       )}

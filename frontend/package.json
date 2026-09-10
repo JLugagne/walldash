@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsgo -b && vite build",
     "lint": "oxlint src/",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc -b --force"
+    "typecheck": "tsgo -b --force"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",

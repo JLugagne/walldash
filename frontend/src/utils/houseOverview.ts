@@ -58,3 +58,38 @@ export function filterLightPlacements(
 export function orderedLevels(levels: Level[]): Level[] {
   return [...levels].sort((a, b) => a.order - b.order)
 }
+
+export interface HouseCameraState {
+  position: [number, number, number]
+  target: [number, number, number]
+}
+
+const HOUSE_CAMERA_STORAGE_KEY = 'ha_dash_house_camera'
+
+function isVec3(value: unknown): value is [number, number, number] {
+  return (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every((n) => typeof n === 'number' && Number.isFinite(n))
+  )
+}
+
+export function loadHouseCameraState(): HouseCameraState | null {
+  try {
+    const raw = localStorage.getItem(HOUSE_CAMERA_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<HouseCameraState>
+    if (!parsed || !isVec3(parsed.position) || !isVec3(parsed.target)) return null
+    return { position: parsed.position, target: parsed.target }
+  } catch {
+    return null
+  }
+}
+
+export function saveHouseCameraState(state: HouseCameraState) {
+  try {
+    localStorage.setItem(HOUSE_CAMERA_STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // Local storage can be disabled; the camera simply won't be restored.
+  }
+}

@@ -28,6 +28,8 @@ interface IsometricSceneProps {
   showGround?: boolean
   showLighting?: boolean
   solidWalls?: boolean
+  /** Overrides the mount height for lamp-type devices (used by the house overview). */
+  lightMountHeight?: number
 }
 
 interface PlanBounds {
@@ -664,6 +666,7 @@ export function IsometricScene({
   showGround = true,
   showLighting = true,
   solidWalls = false,
+  lightMountHeight,
 }: IsometricSceneProps) {
   const walls = plan?.walls || []
   const zones = plan?.zones || []
@@ -796,6 +799,7 @@ export function IsometricScene({
             interactive={interactiveDevices}
             ceilingY={WALL_HEIGHT}
             walls={walls}
+            lightMountHeight={lightMountHeight}
           />
         ))}
       </group>

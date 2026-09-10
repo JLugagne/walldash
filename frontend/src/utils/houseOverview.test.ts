@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, beforeEach } from 'vitest'
 import type { Device, DevicePlacement, Level } from '../types'
-import { configForLevel, filterLightPlacements, floorElevation, orderedLevels } from './houseOverview'
+import {
+  configForLevel,
+  filterLightPlacements,
+  floorElevation,
+  loadHouseCameraState,
+  orderedLevels,
+  saveHouseCameraState,
+} from './houseOverview'
 
 const placement = (id: string, deviceId: string, renderDomain?: string): DevicePlacement => ({
   id,
@@ -43,5 +50,31 @@ describe('house overview configuration', () => {
       placement('fallback-light', 'light.garden'),
     ]
     expect(filterLightPlacements(placements, devices).map((item) => item.id)).toEqual(['light-placement', 'fallback-light'])
+  })
+})
+
+describe('house overview camera persistence', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('returns null when nothing has been saved', () => {
+    expect(loadHouseCameraState()).toBeNull()
+  })
+
+  it('round-trips a saved camera position and target', () => {
+    saveHouseCameraState({ position: [1, 2, 3], target: [4, 5, 6] })
+    expect(loadHouseCameraState()).toEqual({ position: [1, 2, 3], target: [4, 5, 6] })
+  })
+
+  it('ignores malformed or partially corrupt saved state', () => {
+    localStorage.setItem('ha_dash_house_camera', '{"position":[1,2],"target":[4,5,6]}')
+    expect(loadHouseCameraState()).toBeNull()
+
+    localStorage.setItem('ha_dash_house_camera', '{"position":["a",2,3],"target":[4,5,6]}')
+    expect(loadHouseCameraState()).toBeNull()
+
+    localStorage.setItem('ha_dash_house_camera', 'not json')
+    expect(loadHouseCameraState()).toBeNull()
   })
 })
