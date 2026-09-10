@@ -7,6 +7,7 @@ import (
 	svchealth "github.com/JLugagne/walldash/internal/dashboard/domain/service/health"
 	svclevels "github.com/JLugagne/walldash/internal/dashboard/domain/service/levels"
 	svcoverviews "github.com/JLugagne/walldash/internal/dashboard/domain/service/overviews"
+	svcweather "github.com/JLugagne/walldash/internal/dashboard/domain/service/weather"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound/middleware"
 	"github.com/gorilla/mux"
@@ -32,6 +33,9 @@ func SetupRoutes(r *mux.Router, controller *inbound.Controller, queries svchealt
 		SetupOverviewRoutes(r, controller, overviewQueries)
 	}
 
+	if weatherQueries, ok := queries.(svcweather.WeatherQueries); ok {
+		SetupWeatherRoutes(r, controller, weatherQueries)
+	}
 	levelQueries, lOk := queries.(svclevels.LevelQueries)
 	deviceQueries, dOk := queries.(svcdevices.DeviceQueries)
 	overviewQueries, oOk := queries.(svcoverviews.OverviewQueries)

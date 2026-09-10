@@ -14,4 +14,5 @@ type HomeAssistantRepository interface {
 	GetAutomations(ctx context.Context) ([]domain.Automation, error)
 	GetAutomation(ctx context.Context, entityID string) (domain.Automation, error)
 	TriggerAutomation(ctx context.Context, entityID string) error
+	GetConfig(ctx context.Context) (domain.HomeConfig, error)
 }

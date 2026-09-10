@@ -13,16 +13,18 @@ const (
 	WidgetTypeSensor         = "sensor"
 	WidgetTypeActuator       = "actuator"
 	WidgetTypeAutomationList = "automation_list"
+	WidgetTypeWeather        = "weather"
 )
 
 // Display modes name how a widget draws the data it is bound to.
 // DisplayArc is a dial open at the bottom, never a full circle.
 const (
-	DisplayNumber = "number"
-	DisplayArc    = "arc"
-	DisplayBar    = "bar"
-	DisplayToggle = "toggle"
-	DisplayList   = "list"
+	DisplayNumber  = "number"
+	DisplayArc     = "arc"
+	DisplayBar     = "bar"
+	DisplayToggle  = "toggle"
+	DisplayList    = "list"
+	DisplayWeather = "weather"
 )
 
 // Grid dimensions applied to an Overview Dashboard created without explicit ones.
@@ -39,6 +41,9 @@ type WidgetSize struct {
 }
 
 var widgetDisplayMatrix = map[string]map[string]WidgetSize{
+	WidgetTypeWeather: {
+		DisplayWeather: {Cols: 2, Rows: 2},
+	},
 	WidgetTypeSensor: {
 		DisplayNumber: {Cols: 1, Rows: 1},
 		DisplayBar:    {Cols: 2, Rows: 1},
@@ -76,12 +81,18 @@ func IsSupportedWidgetType(widgetType string) bool {
 // zero, which a temperature arc needs. Labels renames the bound devices for this widget
 // only; it never touches DevicePlacement.CustomName.
 type WidgetConfig struct {
-	EntityIDs []string          `json:"entity_ids,omitempty"`
-	Display   string            `json:"display"`
-	Labels    map[string]string `json:"labels,omitempty"`
-	Min       *float64          `json:"min,omitempty"`
-	Max       *float64          `json:"max,omitempty"`
-	Unit      string            `json:"unit,omitempty"`
+	EntityIDs    []string          `json:"entity_ids,omitempty"`
+	Display      string            `json:"display"`
+	Labels       map[string]string `json:"labels,omitempty"`
+	Min          *float64          `json:"min,omitempty"`
+	Max          *float64          `json:"max,omitempty"`
+	Unit         string            `json:"unit,omitempty"`
+	WeatherMode  string            `json:"weather_mode,omitempty"`
+	WeatherDays  int               `json:"weather_days,omitempty"`
+	Latitude     *float64          `json:"latitude,omitempty"`
+	Longitude    *float64          `json:"longitude,omitempty"`
+	LocationName string            `json:"location_name,omitempty"`
+	Units        string            `json:"units,omitempty"`
 }
 
 // Widget represents an interactive visual component anchored in the Widget Grid of an
@@ -138,6 +149,9 @@ func (w Widget) Validate() error {
 	if err := w.validateEntities(); err != nil {
 		return err
 	}
+	if err := w.validateWeatherConfig(); err != nil {
+		return err
+	}
 	return w.validateBounds()
 }
 
@@ -175,6 +189,10 @@ func (w Widget) validateEntities() error {
 	case WidgetTypeAutomationList:
 		if len(w.Config.EntityIDs) == 0 {
 			return errors.Join(ErrInvalidWidget, errors.New("widget type "+w.Type+" requires at least one entity"))
+		}
+	case WidgetTypeWeather:
+		if len(w.Config.EntityIDs) != 0 {
+			return errors.Join(ErrInvalidWidget, errors.New("widget type "+w.Type+" requires no entities"))
 		}
 	}
 
@@ -219,14 +237,22 @@ func quoteDisplay(display string) string {
 // Cols and Rows are the Widget Grid dimensions, persisted per dashboard so that changing
 // the default never rearranges an already composed dashboard.
 type OverviewDashboard struct {
-	ID        string
-	Name      string
-	Order     int
-	Cols      int
-	Rows      int
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Widgets   []Widget
+	ID    string
+	Name  string
+	Order int
+	Cols  int
+	Rows  int
+	// BackgroundImage is a URL path rendered behind the Widget Grid, or empty for none.
+	BackgroundImage string
+	// BackgroundOpacity is the image opacity in percent (0-100).
+	BackgroundOpacity int
+	// BackgroundBlur is the image blur radius in pixels (0-32).
+	BackgroundBlur int
+	// BackgroundDim is the opacity in percent of the scrim drawn over the image (0-100).
+	BackgroundDim int
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Widgets       []Widget
 }
 
 // Validate checks identity, strictly positive grid dimensions, then every widget against
@@ -243,6 +269,15 @@ func (o OverviewDashboard) Validate() error {
 		return errors.Join(ErrInvalidOverview, errors.New("overview grid dimensions must be strictly positive"))
 	}
 
+	if o.BackgroundOpacity < 0 || o.BackgroundOpacity > 100 {
+		return errors.Join(ErrInvalidOverview, errors.New("overview background opacity must be between 0 and 100"))
+	}
+	if o.BackgroundBlur < 0 || o.BackgroundBlur > 32 {
+		return errors.Join(ErrInvalidOverview, errors.New("overview background blur must be between 0 and 32"))
+	}
+	if o.BackgroundDim < 0 || o.BackgroundDim > 100 {
+		return errors.Join(ErrInvalidOverview, errors.New("overview background dim must be between 0 and 100"))
+	}
 	for _, w := range o.Widgets {
 		if err := w.ValidateIn(o.Cols, o.Rows); err != nil {
 			return err
@@ -286,5 +321,29 @@ func (a Automation) Validate() error {
 	if !strings.HasPrefix(trimmed, "automation.") {
 		return errors.Join(ErrAutomationNotFound, errors.New("automation id must start with 'automation.' prefix"))
 	}
+	return nil
+}
+
+func (w Widget) validateWeatherConfig() error {
+	if w.Type != WidgetTypeWeather {
+		return nil
+	}
+
+	switch w.Config.WeatherMode {
+	case WeatherModeCurrent, WeatherModeToday, WeatherModeTomorrow:
+	case WeatherModeNDays:
+		if w.Config.WeatherDays < 1 || w.Config.WeatherDays > 14 {
+			return errors.Join(ErrInvalidWidget, errors.New("weather widget with mode ndays requires weather_days between 1 and 14"))
+		}
+	default:
+		return errors.Join(ErrInvalidWidget, errors.New("unsupported weather mode: "+w.Config.WeatherMode))
+	}
+
+	switch w.Config.Units {
+	case "", WeatherUnitsMetric, WeatherUnitsImperial:
+	default:
+		return errors.Join(ErrInvalidWidget, errors.New("unsupported weather units: "+w.Config.Units))
+	}
+
 	return nil
 }

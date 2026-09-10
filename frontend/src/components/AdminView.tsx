@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../useApp'
 import { PlanEditor2D } from './PlanEditor2D'
-import { ViewModeMenu } from './ViewModeMenu'
 import { resolveParamLevelId } from '../utils/levelSync'
 import type { Plan } from '../types'
 import { loadHouseOverviewConfig, saveHouseOverviewConfig, type HouseOverviewConfig } from '../utils/houseOverview'
@@ -11,6 +10,8 @@ export function AdminView() {
   const { levels, activeLevelId, setActiveLevelId, fetchLevels, activeLevel } = useApp()
   const { levelId } = useParams<{ levelId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const basePath = location.pathname.startsWith('/setup/plans') ? '/setup/plans' : '/admin'
   const [alignMode, setAlignMode] = useState(false)
   const [overviewPlans, setOverviewPlans] = useState<Record<string, Plan>>({})
   const [overviewConfig, setOverviewConfig] = useState<HouseOverviewConfig>(() => loadHouseOverviewConfig())
@@ -34,9 +35,9 @@ export function AdminView() {
 
   useEffect(() => {
     if (activeLevelId && activeLevelId !== levelId) {
-      navigate(`/admin/${activeLevelId}`, { replace: true })
+      navigate(`${basePath}/${activeLevelId}`, { replace: true })
     }
-  }, [activeLevelId, levelId, navigate])
+  }, [activeLevelId, levelId, navigate, basePath])
 
   useEffect(() => {
     if (!alignMode) return
@@ -62,7 +63,6 @@ export function AdminView() {
         levels={levels}
         onSelectLevel={setActiveLevelId}
         onRefreshLevels={fetchLevels}
-        viewModeMenu={<ViewModeMenu />}
         alignMode={alignMode}
         onToggleAlignMode={() => setAlignMode((value) => !value)}
         overviewPlans={overviewPlans}

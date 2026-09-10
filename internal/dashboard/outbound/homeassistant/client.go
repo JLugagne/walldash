@@ -582,3 +582,64 @@ func copyFallbackAutomations() []domain.Automation {
 	copy(res, fallbackAutomations)
 	return res
 }
+
+type haConfig struct {
+	Latitude     float64 `json:"latitude"`
+	Longitude    float64 `json:"longitude"`
+	LocationName string  `json:"location_name"`
+	UnitSystem   struct {
+		Temperature string `json:"temperature"`
+		Length      string `json:"length"`
+	} `json:"unit_system"`
+}
+
+// GetConfig fetches the Home Assistant instance location and unit system.
+// When the instance is unconfigured or unreachable it returns a zero location and
+// the metric defaults, with Configured=false.
+func (c *Client) GetConfig(ctx context.Context) (domain.HomeConfig, error) {
+	log := logger.LoggerFromContext(ctx)
+	fallback := domain.HomeConfig{
+		TemperatureUnit: "°C",
+		LengthUnit:      "km",
+	}
+
+	if c.baseURL == "" || c.token == "" {
+		log.Info("HA URL or token unconfigured, using fallback config")
+		return fallback, nil
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/config", nil)
+	if err != nil {
+		log.WithError(err).Error("failed to create HA config request")
+		return fallback, nil
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		log.WithError(err).Warn("HA API unreachable, falling back to config defaults")
+		return fallback, nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.WithField("status_code", resp.StatusCode).Warn("HA API returned non-200 for config, falling back to defaults")
+		return fallback, nil
+	}
+
+	var raw haConfig
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		log.WithError(err).Error("failed to decode HA config JSON")
+		return fallback, nil
+	}
+
+	return domain.HomeConfig{
+		Configured:      true,
+		Latitude:        raw.Latitude,
+		Longitude:       raw.Longitude,
+		LocationName:    raw.LocationName,
+		TemperatureUnit: raw.UnitSystem.Temperature,
+		LengthUnit:      raw.UnitSystem.Length,
+	}, nil
+}

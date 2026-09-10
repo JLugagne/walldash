@@ -34,24 +34,24 @@ export const BarWidget: React.FC<BarWidgetProps> = ({ label, value, min, max, un
       label={label}
       stale={stale}
       dense={dense}
-      icon={<BarChart3 className="text-cyan-400" />}
+      icon={<BarChart3 className="text-[#4bb8c9]" />}
       trailing={
         <span className="flex items-baseline gap-0.5 whitespace-nowrap">
-          <span className="text-xs leading-none font-bold text-white tabular-nums">{formatted.text}</span>
+          <span className="text-xs leading-none font-semibold tracking-tight text-white tabular-nums">{formatted.text}</span>
           {formatted.unit && <span className="text-[10px] leading-none font-medium text-slate-400">{formatted.unit}</span>}
         </span>
       }
       bodyClassName="flex flex-col justify-center gap-1"
     >
       <div
-        className="w-full h-2 rounded-full bg-slate-800 border border-slate-700 overflow-hidden"
+        className="w-full h-2 rounded-md bg-slate-800 border border-slate-700 overflow-hidden"
         role="meter"
         aria-label={label}
         aria-valuemin={min}
         aria-valuemax={max}
         aria-valuenow={value ?? undefined}
       >
-        <div className="h-full rounded-full bg-cyan-500 transition-[width] duration-300" style={{ width: `${ratio * 100}%` }} />
+        <div className="h-full rounded-md bg-[#4bb8c9] transition-[width] duration-300" style={{ width: `${ratio * 100}%` }} />
       </div>
       {!dense && (
         <div className="flex justify-between text-[9px] leading-none text-slate-500 tabular-nums">

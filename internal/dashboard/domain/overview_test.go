@@ -540,3 +540,46 @@ func TestAutomationValidation(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrAutomationNotFound)
 	})
 }
+
+func TestOverviewDashboardValidateBackground(t *testing.T) {
+	valid := func() domain.OverviewDashboard {
+		return domain.OverviewDashboard{
+			ID:   "ov-1",
+			Name: "Home",
+			Cols: domain.DefaultGridCols,
+			Rows: domain.DefaultGridRows,
+		}
+	}
+
+	t.Run("accepts in-range background settings", func(t *testing.T) {
+		o := valid()
+		o.BackgroundImage = "/backgrounds/desert-night.jpg"
+		o.BackgroundOpacity = 0
+		o.BackgroundBlur = 32
+		o.BackgroundDim = 100
+		require.NoError(t, o.Validate())
+	})
+
+	rejections := map[string]domain.OverviewDashboard{}
+	o := valid()
+	o.BackgroundOpacity = 101
+	rejections["opacity above range"] = o
+	o = valid()
+	o.BackgroundOpacity = -1
+	rejections["opacity below range"] = o
+	o = valid()
+	o.BackgroundBlur = 33
+	rejections["blur above range"] = o
+	o = valid()
+	o.BackgroundDim = -1
+	rejections["dim below range"] = o
+
+	for name, candidate := range rejections {
+		t.Run(name+" returns ErrInvalidOverview", func(t *testing.T) {
+			err := candidate.Validate()
+			require.Error(t, err)
+			assert.ErrorIs(t, err, domain.ErrInvalidOverview)
+			assert.True(t, domain.IsDomainError(err))
+		})
+	}
+}

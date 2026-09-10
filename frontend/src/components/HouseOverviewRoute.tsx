@@ -3,7 +3,6 @@ import { Canvas } from '@react-three/fiber'
 import { useNavigate } from 'react-router-dom'
 import { HouseOverviewScene } from './HouseOverviewScene'
 import { ViewTopSelectors } from './ViewTopSelectors'
-import { ViewModeMenu } from './ViewModeMenu'
 import { useApp } from '../useApp'
 import { useRealtimeDeviceControl } from '../hooks/useRealtimeDevices'
 import type { DevicePlacement, Plan } from '../types'
@@ -69,9 +68,6 @@ export function HouseOverviewRoute({ onClose }: { onClose?: () => void }) {
         overviewActive
         onToggleOverview={closeOverview}
       />
-      <div className="absolute bottom-6 right-6 z-20 pointer-events-none">
-        <ViewModeMenu direction="up" />
-      </div>
       <Canvas frameloop="demand" camera={{ position: [24, 24, 30], fov: 42, near: 0.5, far: 500 }} className="h-full w-full">
         <HouseOverviewScene
           levels={levels}

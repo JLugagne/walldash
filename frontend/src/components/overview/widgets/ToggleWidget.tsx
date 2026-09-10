@@ -22,7 +22,7 @@ export const ToggleWidget: React.FC<ToggleWidgetProps> = ({ label, on, pending, 
   }
 
   return (
-    <WidgetFrame label={label} stale={stale} dense={dense} icon={<Power className="text-indigo-400" />}>
+    <WidgetFrame label={label} stale={stale} dense={dense} icon={<Power className="text-[#6d76e8]" />}>
       <button
         type="button"
         disabled={pending}
@@ -31,14 +31,14 @@ export const ToggleWidget: React.FC<ToggleWidgetProps> = ({ label, on, pending, 
         title={pending ? `${label} • En cours de traitement (Home Assistant)...` : `${label} • ${on ? 'ON' : 'OFF'}`}
         className={`absolute inset-0 rounded-lg border-2 flex items-center justify-center transition-colors duration-200 select-none outline-none ${
           pending
-            ? 'cursor-wait bg-slate-800/90 border-indigo-400/70 text-indigo-300'
+            ? 'cursor-wait bg-slate-800/90 border-[#6d76e8]/70 text-[#8b93ee]'
             : on
-            ? 'cursor-pointer bg-indigo-500 border-indigo-300 text-white shadow-lg shadow-indigo-500/40 active:bg-indigo-400'
+            ? 'cursor-pointer bg-[#6d76e8] border-[#8b93ee] text-white active:bg-[#7b83ea]'
             : 'cursor-pointer bg-slate-800/90 border-slate-600 text-slate-400 active:bg-slate-700'
         }`}
       >
         {pending && (
-          <span className="absolute inset-1 rounded-md border-2 border-indigo-400 border-t-transparent animate-spin pointer-events-none" />
+          <span className="absolute inset-1 rounded-md border-2 border-[#8b93ee] border-t-transparent animate-spin pointer-events-none" />
         )}
         <Power className={dense ? 'w-6 h-6' : 'w-8 h-8'} />
       </button>

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { LayoutDashboard, Plus, RefreshCw, Settings } from 'lucide-react'
 import type { Device, Widget } from '../types'
 import { AutomationListWidget } from './overview/widgets/AutomationListWidget'
+import { WeatherWidget } from './overview/widgets/WeatherWidget'
 import { AddWidgetModal, type NewWidgetInput, type WidgetContentInput } from './AddWidgetModal'
 import { apiFetch, readApiError } from '../api'
 import { useRealtimeDevices } from '../hooks/useRealtimeDevices'
@@ -13,12 +14,17 @@ import { OverviewHeader } from './overview/OverviewHeader'
 import { WidgetGrid } from './overview/WidgetGrid'
 import { Toast } from './overview/Toast'
 import { useOverviewData } from './overview/useOverviewData'
+import { OverviewBackgroundPanel, type BackgroundConfig } from './overview/OverviewBackgroundPanel'
+import {
+  DEFAULT_BACKGROUND_BLUR,
+  DEFAULT_BACKGROUND_DIM,
+  DEFAULT_BACKGROUND_OPACITY,
+} from './overview/backgroundSamples'
 import { widgetsToRects } from './overview/format'
 import type { Rect } from './overview/grid'
 
 interface OverviewsViewProps {
   initialIsAdmin?: boolean
-  viewModeMenu?: React.ReactNode
 }
 
 const STALE_MS = 30 * 60 * 1000
@@ -40,10 +46,7 @@ function isStaleDevice(device: Device | undefined): boolean {
   return Date.now() - updatedAt > STALE_MS
 }
 
-export const OverviewsView: React.FC<OverviewsViewProps> = ({
-  initialIsAdmin = false,
-  viewModeMenu,
-}) => {
+export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = false }) => {
   const [activeOverviewId, setActiveOverviewId] = useState<string | null>(null)
   const { overviews, automations, loading, fetchOverviews, fetchAutomations } =
     useOverviewData(setActiveOverviewId)
@@ -52,6 +55,9 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
   const [isAddWidgetOpen, setIsAddWidgetOpen] = useState(false)
   const [editingWidget, setEditingWidget] = useState<Widget | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [isBackgroundOpen, setIsBackgroundOpen] = useState(false)
+  const [previewBackground, setPreviewBackground] = useState<BackgroundConfig | null>(null)
+  const backgroundTimerRef = useRef<number | null>(null)
 
   const [lastKnownValues, setLastKnownValues] = useState<Record<string, number>>({})
 
@@ -80,6 +86,38 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
 
   const activeOverview = overviews.find((o) => o.id === activeOverviewId) || null
 
+  const backgroundConfig: BackgroundConfig | null =
+    previewBackground ??
+    (activeOverview
+      ? {
+          image: activeOverview.background_image,
+          opacity: activeOverview.background_opacity,
+          blur: activeOverview.background_blur,
+          dim: activeOverview.background_dim,
+        }
+      : null)
+
+  useEffect(() => {
+    setPreviewBackground(null)
+    setIsBackgroundOpen(false)
+    if (activeOverviewId && window.sessionStorage.getItem('walldash:open-background') === '1') {
+      window.sessionStorage.removeItem('walldash:open-background')
+      setIsBackgroundOpen(true)
+    }
+  }, [activeOverviewId])
+
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    const handler = () => setIsBackgroundOpen((v) => !v)
+    window.addEventListener('walldash:open-background', handler)
+    return () => window.removeEventListener('walldash:open-background', handler)
+  }, [])
+
   const toastTimerRef = useRef<number | null>(null)
 
   const showToast = useCallback((message: string) => {
@@ -94,8 +132,45 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
   useEffect(() => {
     return () => {
       if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+      if (backgroundTimerRef.current !== null) window.clearTimeout(backgroundTimerRef.current)
     }
   }, [])
+
+  const persistBackground = useCallback(
+    (config: BackgroundConfig) => {
+      if (!activeOverview) return
+      setPreviewBackground(config)
+      if (backgroundTimerRef.current !== null) window.clearTimeout(backgroundTimerRef.current)
+      backgroundTimerRef.current = window.setTimeout(async () => {
+        backgroundTimerRef.current = null
+        try {
+          const res = await apiFetch(`/api/overviews/${activeOverview.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: activeOverview.name,
+              order: activeOverview.order,
+              cols: activeOverview.cols,
+              rows: activeOverview.rows,
+              background_image: config.image,
+              background_opacity: config.opacity,
+              background_blur: config.blur,
+              background_dim: config.dim,
+            }),
+          })
+          if (res.ok) {
+            await fetchOverviews()
+          } else {
+            showToast(await readApiError(res))
+          }
+        } catch (err) {
+          console.error('Failed to save dashboard background:', err)
+          showToast(NETWORK_ERROR_MESSAGE)
+        }
+      }, 350)
+    },
+    [activeOverview, fetchOverviews, showToast]
+  )
 
   const persistLayout = useCallback(
     async (rects: Rect[]): Promise<string | null> => {
@@ -132,7 +207,13 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
       const res = await apiFetch('/api/overviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Overview', order: 0 }),
+        body: JSON.stringify({
+          name: 'Overview',
+          order: 0,
+          background_opacity: DEFAULT_BACKGROUND_OPACITY,
+          background_blur: DEFAULT_BACKGROUND_BLUR,
+          background_dim: DEFAULT_BACKGROUND_DIM,
+        }),
       })
       if (res.ok) {
         const payload = await res.json()
@@ -172,7 +253,13 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
     const res = await apiFetch('/api/overviews', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, order: overviews.length }),
+      body: JSON.stringify({
+        name,
+        order: overviews.length,
+        background_opacity: DEFAULT_BACKGROUND_OPACITY,
+        background_blur: DEFAULT_BACKGROUND_BLUR,
+        background_dim: DEFAULT_BACKGROUND_DIM,
+      }),
     })
     if (!res.ok) {
       throw new Error(await readApiError(res))
@@ -186,7 +273,16 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
     const res = await apiFetch(`/api/overviews/${activeOverviewId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, order: activeOverview?.order || 0 }),
+      body: JSON.stringify({
+        name,
+        order: activeOverview?.order || 0,
+        cols: activeOverview?.cols || 0,
+        rows: activeOverview?.rows || 0,
+        background_image: activeOverview?.background_image ?? '',
+        background_opacity: activeOverview?.background_opacity ?? DEFAULT_BACKGROUND_OPACITY,
+        background_blur: activeOverview?.background_blur ?? DEFAULT_BACKGROUND_BLUR,
+        background_dim: activeOverview?.background_dim ?? DEFAULT_BACKGROUND_DIM,
+      }),
     })
     if (!res.ok) {
       throw new Error(await readApiError(res))
@@ -265,6 +361,10 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
       )
     }
 
+    if (widget.type === 'weather') {
+      return <WeatherWidget widget={widget} />
+    }
+
     const entityId = widget.config.entity_ids?.[0]
     const device = entityId ? deviceMap[entityId] : undefined
     const label =
@@ -326,25 +426,58 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
     return null
   }
 
+  const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  const date = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
-      <OverviewHeader
-        overviews={overviews}
-        activeOverviewId={activeOverviewId}
-        isAdmin={isAdmin}
-        isEditMode={isEditMode}
-        viewModeMenu={viewModeMenu}
-        onSelectOverview={setActiveOverviewId}
-        onCreateOverview={handleCreateOverview}
-        onRenameOverview={handleRenameOverview}
-        onDeleteOverview={handleDeleteOverview}
-        onToggleEditMode={() => setIsEditMode((v) => !v)}
-        onAddWidget={() => setIsAddWidgetOpen(true)}
-        onToggleAdmin={() => setIsAdmin((v) => !v)}
-      />
+      <div className="relative z-20 h-14 shrink-0 select-none flex items-center justify-between px-4">
+        <div className="flex items-baseline gap-3">
+          <span className="text-3xl font-semibold tracking-tight tabular-nums text-white">{time}</span>
+          <span className="text-sm text-slate-400">{date}</span>
+        </div>
+        <OverviewHeader
+          overviews={overviews}
+          activeOverviewId={activeOverviewId}
+          isAdmin={isAdmin}
+          isEditMode={isEditMode}
+          onSelectOverview={setActiveOverviewId}
+          onCreateOverview={handleCreateOverview}
+          onRenameOverview={handleRenameOverview}
+          onDeleteOverview={handleDeleteOverview}
+          onToggleEditMode={() => setIsEditMode((v) => !v)}
+          onAddWidget={() => setIsAddWidgetOpen(true)}
+          onToggleBackground={() => setIsBackgroundOpen((v) => !v)}
+          onToggleAdmin={() => setIsAdmin((v) => !v)}
+        />
+      </div>
 
       <main className="flex-1 min-h-0 relative overflow-hidden p-3">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(1200px_500px_at_50%_-10%,rgba(109,118,232,0.06),transparent_70%)]"
+        />
+        {backgroundConfig?.image && (
+          <>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-cover bg-center"
+              style={{
+                backgroundImage: `url(${backgroundConfig.image})`,
+                filter: `blur(${backgroundConfig.blur}px)`,
+                opacity: backgroundConfig.opacity / 100,
+                transform: 'scale(1.1)',
+              }}
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-slate-950"
+              style={{ opacity: backgroundConfig.dim / 100 }}
+            />
+          </>
+        )}
         {toastMessage && <Toast message={toastMessage} />}
+        <div className="relative z-10 h-full">
         {loading ? (
           <div className="h-full flex items-center justify-center text-slate-400">
             <RefreshCw className="w-6 h-6 animate-spin mr-2" />
@@ -352,7 +485,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
           </div>
         ) : overviews.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8">
-            <div className="p-4 rounded-2xl bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 mb-4 shadow-xl">
+            <div className="p-4 rounded-xl bg-[#6d76e8]/10 text-[#8b93ee] border border-[#6d76e8]/20 mb-4">
               <LayoutDashboard className="w-10 h-10" />
             </div>
             <h2 className="text-lg font-bold text-white mb-2">No Overview Dashboard</h2>
@@ -363,7 +496,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
             <button
               type="button"
               onClick={handleCreateDefaultOverview}
-              className="flex items-center space-x-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xl shadow-indigo-600/30 transition-all"
+              className="flex items-center space-x-2 px-5 py-2.5 bg-[#6d76e8] hover:bg-[#7b83ea] active:scale-95 text-white text-xs font-bold rounded-lg transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>Create my first Overview</span>
@@ -375,7 +508,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
           </div>
         ) : activeOverview.widgets.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8">
-            <div className="p-3 rounded-xl bg-slate-800 text-slate-400 mb-3">
+            <div className="p-3 rounded-xl bg-slate-900/55 border border-slate-800/80 text-slate-400 mb-3">
               <Settings className="w-8 h-8" />
             </div>
             <h3 className="text-base font-bold text-white mb-1">
@@ -389,7 +522,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsAddWidgetOpen(true)}
-                className="flex items-center space-x-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all"
+                className="flex items-center space-x-1.5 px-4 py-2 bg-[#6d76e8] hover:bg-[#7b83ea] active:scale-95 text-white text-xs font-bold rounded-lg transition-all"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add a Widget</span>
@@ -407,6 +540,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
             onMessage={showToast}
           />
         )}
+        </div>
       </main>
 
       <AddWidgetModal
@@ -425,6 +559,17 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({
         onCreate={handleCreateWidget}
         onUpdate={handleUpdateWidgetContent}
       />
+
+      {isBackgroundOpen && activeOverview && backgroundConfig && (
+        <OverviewBackgroundPanel
+          value={backgroundConfig}
+          onChange={persistBackground}
+          onClose={() => {
+            setIsBackgroundOpen(false)
+            setPreviewBackground(null)
+          }}
+        />
+      )}
     </div>
   )
 }

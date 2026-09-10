@@ -5,7 +5,6 @@ import { Layers, Edit3, Maximize2, Minimize2 } from 'lucide-react'
 import type { Level, Plan } from '../types'
 import { IsometricScene } from './IsometricScene'
 import { ViewTopSelectors } from './ViewTopSelectors'
-import { ViewModeMenu } from './ViewModeMenu'
 import { useRealtimeDevices } from '../hooks/useRealtimeDevices'
 import { DEFAULT_LAYERS, resolveActiveLayer } from '../utils/layers'
 
@@ -181,7 +180,7 @@ export function IsometricView({
             onClick={toggleFullscreen}
             title={isFullscreen ? 'Exit full screen' : 'Full screen'}
             aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
-            className="w-12 h-12 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-800/80 shadow-2xl shadow-black/50 flex items-center justify-center text-indigo-400 hover:text-white hover:bg-slate-800/90 active:scale-95 transition-all cursor-pointer"
+            className="w-12 h-12 rounded-xl bg-slate-900/70 backdrop-blur-md border border-slate-800/80 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/60 active:scale-95 transition-all cursor-pointer"
           >
             {isFullscreen ? (
               <Minimize2 className="w-5 h-5" />
@@ -189,7 +188,6 @@ export function IsometricView({
               <Maximize2 className="w-5 h-5" />
             )}
           </button>
-          <ViewModeMenu direction="up" />
         </div>
       </div>
 
@@ -208,11 +206,11 @@ export function IsometricView({
             </div>
             <button
               type="button"
-              onClick={() => navigate('/admin')}
+              onClick={() => navigate('/setup/plans')}
               className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg shadow-indigo-500/30 transition-all flex items-center justify-center space-x-2"
             >
               <Edit3 className="w-4 h-4" />
-              <span>Open 2D Editor (Admin)</span>
+              <span>Open Setup editor</span>
             </button>
           </div>
         </div>
@@ -235,7 +233,7 @@ export function IsometricView({
             </div>
             <button
               type="button"
-              onClick={() => navigate('/admin')}
+              onClick={() => navigate('/setup/plans')}
               className="shrink-0 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-md transition-all flex items-center space-x-1.5"
             >
               <Edit3 className="w-3.5 h-3.5" />

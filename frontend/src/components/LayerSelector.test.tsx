@@ -52,7 +52,7 @@ describe('LayerSelector', () => {
     const controlsBtn = screen.getByRole('button', { name: /controls/i })
 
     expect(sensorsBtn.getAttribute('aria-pressed')).toBe('true')
-    expect(sensorsBtn.className).toContain('bg-indigo-600')
+    expect(sensorsBtn.className).toContain('bg-[#6d76e8]')
     expect(sensorsBtn.className).toContain('text-white')
 
     expect(controlsBtn.getAttribute('aria-pressed')).toBe('false')

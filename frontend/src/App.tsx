@@ -1,10 +1,13 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import type { Level } from './types'
 import type { AppContext } from './useApp'
 import { OnboardingWizard } from './components/OnboardingWizard'
+import { AppTopBar } from './components/AppTopBar'
+import { TopBarSlotProvider } from './components/TopBarSlot'
 
 function App() {
+  const location = useLocation()
   const [levels, setLevels] = useState<Level[]>([])
   const [activeLevelId, setActiveLevelId] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -22,7 +25,7 @@ function App() {
               return prev
             }
             const hash = window.location.hash
-            const match = hash.match(/\/(?:floor|admin)\/([^/?#]+)/)
+            const match = hash.match(/\/(?:floor|admin|plans)\/([^/?#]+)/)
             if (match) {
               const urlLevelId = decodeURIComponent(match[1])
               if (payload.data.some((l: Level) => l.id === urlLevelId)) {
@@ -62,6 +65,7 @@ function App() {
   }
 
   const showWizard = loaded && levels.length === 0 && !wizardDismissed
+  const isSetup = location.pathname.startsWith('/setup')
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden">
@@ -74,7 +78,10 @@ function App() {
           onClose={() => setWizardDismissed(true)}
         />
       )}
-      <Outlet context={context} />
+      <TopBarSlotProvider>
+        {!isSetup && <AppTopBar />}
+        <Outlet context={context} />
+      </TopBarSlotProvider>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Check,
   Eraser,
@@ -16,6 +17,7 @@ import {
   Download,
 } from 'lucide-react'
 import type { Level } from '../../types'
+import { useTopBarSlot } from '../TopBarSlot'
 
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
@@ -96,11 +98,16 @@ export function EditorHeader({
           ? 'Save'
           : 'Up to date'
 
-  return (
-    <header className="relative z-30 h-14 shrink-0 bg-slate-900/90 border-b border-slate-800 flex items-center px-3 gap-3 select-none">
-      {viewModeMenu && <div className="shrink-0 -ml-1">{viewModeMenu}</div>}
+  const slot = useTopBarSlot()
 
-      <div className="h-6 w-px bg-slate-800 shrink-0" />
+  const content = (
+    <>
+      {viewModeMenu && (
+        <>
+          <div className="shrink-0 -ml-1">{viewModeMenu}</div>
+          <div className="h-6 w-px bg-slate-800/80 shrink-0" />
+        </>
+      )}
 
       <div ref={levelsRef} className="relative flex items-center gap-1 min-w-0 flex-1">
         <div className="flex items-center gap-1 overflow-x-auto min-w-0 py-1 [scrollbar-width:none]">
@@ -117,11 +124,11 @@ export function EditorHeader({
                 onClick={() => onSelectLevel(lvl.id)}
                 className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
                   active
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    ? 'bg-[#6d76e8] text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${active ? 'text-white' : lvl.is_outdoor ? 'text-emerald-400' : 'text-indigo-400'}`} />
+                <Icon className={`w-3.5 h-3.5 ${active ? 'text-white' : lvl.is_outdoor ? 'text-[#42a67d]' : 'text-slate-400'}`} />
                 <span className="truncate max-w-[10rem]">{lvl.name}</span>
               </button>
             )
@@ -133,14 +140,14 @@ export function EditorHeader({
           title="Manage levels"
           aria-expanded={levelsOpen}
           className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
-            levelsOpen ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            levelsOpen ? 'bg-slate-800/60 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
         >
           <Settings2 className="w-4 h-4" />
         </button>
 
         {levelsOpen && (
-          <div className="absolute top-full left-0 mt-2 z-40 w-[22rem] max-h-[70vh] bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden flex flex-col">
+          <div className="absolute top-full left-0 mt-2 z-40 w-[22rem] max-h-[70vh] bg-slate-900/70 backdrop-blur-md border border-slate-800/80 rounded-2xl shadow-2xl shadow-black/60 overflow-hidden flex flex-col">
             {levelsManager}
           </div>
         )}
@@ -153,7 +160,7 @@ export function EditorHeader({
             title="Align floors for the house overview"
             aria-pressed={alignmentActive}
             className={`h-8 shrink-0 rounded-lg px-2.5 text-xs font-medium transition-all ${
-              alignmentActive ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              alignmentActive ? 'bg-[#6d76e8] text-white' : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
             }`}
           >
             {alignmentActive ? 'Done aligning' : 'Align floors'}
@@ -175,7 +182,7 @@ export function EditorHeader({
           onClick={onImport}
           disabled={disabled}
           title="Import a plan from AI-generated JSON or SweetHome3D file"
-          className="h-8 px-2.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition-all cursor-pointer"
+          className="h-8 px-2.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition-all cursor-pointer"
         >
           <Upload className="w-3.5 h-3.5" />
           <span className="hidden lg:inline">Import</span>
@@ -186,7 +193,7 @@ export function EditorHeader({
           onClick={onExport}
           disabled={disabled}
           title="Download a full backup (levels, plans, placements, overviews)"
-          className="h-8 px-2.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition-all cursor-pointer"
+          className="h-8 px-2.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition-all cursor-pointer"
         >
           <Download className="w-3.5 h-3.5" />
           <span className="hidden lg:inline">Export</span>
@@ -197,14 +204,14 @@ export function EditorHeader({
             <MoreHorizontal className="w-4 h-4" />
           </IconButton>
           {moreOpen && (
-            <div className="absolute right-0 top-full mt-2 z-40 w-56 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl shadow-black/60 p-1.5 flex flex-col">
+            <div className="absolute right-0 top-full mt-2 z-40 w-56 bg-slate-900/70 backdrop-blur-md border border-slate-800/80 rounded-xl shadow-2xl shadow-black/60 p-1.5 flex flex-col">
               <button
                 type="button"
                 onClick={() => {
                   setMoreOpen(false)
                   onReset()
                 }}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-slate-800 text-left cursor-pointer"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 text-left cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Revert to saved version</span>
@@ -231,10 +238,10 @@ export function EditorHeader({
           title="Save plan (Ctrl+S)"
           className={`h-8 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:cursor-not-allowed ml-1 ${
             isDirty
-              ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25'
+              ? 'bg-[#42a67d] hover:bg-[#4bb88b] text-white'
               : saveState === 'error'
                 ? 'bg-rose-600 hover:bg-rose-500 text-white'
-                : 'bg-slate-800 text-slate-400'
+                : 'bg-slate-800/60 text-slate-400'
           }`}
         >
           {saveState === 'saving' ? (
@@ -254,6 +261,19 @@ export function EditorHeader({
           <PanelRight className="w-4 h-4" />
         </IconButton>
       </div>
+    </>
+  )
+
+  if (slot) {
+    return createPortal(
+      <div className="relative z-30 flex h-14 items-center gap-3 select-none">{content}</div>,
+      slot,
+    )
+  }
+
+  return (
+    <header className="relative z-30 h-14 shrink-0 bg-slate-900/70 backdrop-blur-md border-b border-slate-800/80 flex items-center px-3 gap-3 select-none">
+      {content}
     </header>
   )
 }
@@ -278,7 +298,7 @@ function IconButton({
       disabled={disabled}
       title={title}
       className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-        active ? 'bg-slate-700 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-800'
+        active ? 'bg-slate-800/60 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
       }`}
     >
       {children}

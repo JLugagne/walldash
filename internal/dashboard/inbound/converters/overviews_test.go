@@ -182,3 +182,45 @@ func TestOverviewConverters(t *testing.T) {
 		assert.Len(t, pubList, 1)
 	})
 }
+
+func TestOverviewBackgroundConversion(t *testing.T) {
+	t.Run("ToPublicOverview carries background fields", func(t *testing.T) {
+		ov := domain.OverviewDashboard{
+			ID:                "ov-1",
+			Name:              "Home",
+			Cols:              domain.DefaultGridCols,
+			Rows:              domain.DefaultGridRows,
+			BackgroundImage:   "/backgrounds/desert-night.jpg",
+			BackgroundOpacity: 80,
+			BackgroundBlur:    18,
+			BackgroundDim:     40,
+		}
+		pub := converters.ToPublicOverview(ov)
+		assert.Equal(t, "/backgrounds/desert-night.jpg", pub.BackgroundImage)
+		assert.Equal(t, 80, pub.BackgroundOpacity)
+		assert.Equal(t, 18, pub.BackgroundBlur)
+		assert.Equal(t, 40, pub.BackgroundDim)
+	})
+
+	t.Run("ToDomainOverview applies background defaults when omitted", func(t *testing.T) {
+		dom := converters.ToDomainOverview(pkgdashboard.CreateOverviewRequest{Name: "Home"})
+		assert.Equal(t, 95, dom.BackgroundOpacity)
+		assert.Equal(t, 14, dom.BackgroundBlur)
+		assert.Equal(t, 50, dom.BackgroundDim)
+		assert.Equal(t, "/backgrounds/desert-night.jpg", dom.BackgroundImage)
+	})
+
+	t.Run("ToDomainUpdateOverview passes background through", func(t *testing.T) {
+		dom := converters.ToDomainUpdateOverview("ov-1", pkgdashboard.UpdateOverviewRequest{
+			Name:              "Home",
+			BackgroundImage:   "/backgrounds/meadow.jpg",
+			BackgroundOpacity: 60,
+			BackgroundBlur:    0,
+			BackgroundDim:     30,
+		})
+		assert.Equal(t, "/backgrounds/meadow.jpg", dom.BackgroundImage)
+		assert.Equal(t, 60, dom.BackgroundOpacity)
+		assert.Equal(t, 0, dom.BackgroundBlur)
+		assert.Equal(t, 30, dom.BackgroundDim)
+	})
+}

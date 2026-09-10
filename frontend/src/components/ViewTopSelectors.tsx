@@ -39,10 +39,10 @@ export function ViewTopSelectors({
             title={overviewActive ? 'Back to floor view' : 'House overview'}
             aria-label={overviewActive ? 'Back to floor view' : 'House overview'}
             aria-pressed={overviewActive}
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all active:scale-95 ${
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all active:scale-95 ${
               overviewActive
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
-                : 'text-indigo-400 hover:bg-slate-800 hover:text-white'
+                ? 'bg-[#6d76e8] text-white'
+                : 'text-slate-400 hover:bg-slate-800/60 hover:text-white'
             }`}
           >
             <Home className="h-4 w-4" />

@@ -38,8 +38,8 @@ func (r *overviewRepo) CreateOverview(ctx context.Context, overview domain.Overv
 		overview.UpdatedAt = now
 	}
 
-	query := `INSERT INTO overview_dashboards (id, name, "order", cols, rows, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-	_, err := r.db.ExecContext(ctx, query, overview.ID, overview.Name, overview.Order, overview.Cols, overview.Rows, overview.CreatedAt, overview.UpdatedAt)
+	query := `INSERT INTO overview_dashboards (id, name, "order", cols, rows, bg_image, bg_opacity, bg_blur, bg_dim, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := r.db.ExecContext(ctx, query, overview.ID, overview.Name, overview.Order, overview.Cols, overview.Rows, overview.BackgroundImage, overview.BackgroundOpacity, overview.BackgroundBlur, overview.BackgroundDim, overview.CreatedAt, overview.UpdatedAt)
 	if err != nil {
 		log.WithError(err).WithField("overview_id", overview.ID).Error("failed to insert overview dashboard")
 		return domain.OverviewDashboard{}, errors.Join(domain.ErrDatabaseUnavailable, err)
@@ -53,12 +53,12 @@ func (r *overviewRepo) CreateOverview(ctx context.Context, overview domain.Overv
 
 func (r *overviewRepo) FindOverviewByID(ctx context.Context, id string) (domain.OverviewDashboard, error) {
 	log := logger.LoggerFromContext(ctx)
-	query := `SELECT id, name, "order", cols, rows, created_at, updated_at FROM overview_dashboards WHERE id = ?`
+	query := `SELECT id, name, "order", cols, rows, bg_image, bg_opacity, bg_blur, bg_dim, created_at, updated_at FROM overview_dashboards WHERE id = ?`
 	row := r.db.QueryRowContext(ctx, query, id)
 
 	var ov domain.OverviewDashboard
 	var createdAt, updatedAt time.Time
-	err := row.Scan(&ov.ID, &ov.Name, &ov.Order, &ov.Cols, &ov.Rows, &createdAt, &updatedAt)
+	err := row.Scan(&ov.ID, &ov.Name, &ov.Order, &ov.Cols, &ov.Rows, &ov.BackgroundImage, &ov.BackgroundOpacity, &ov.BackgroundBlur, &ov.BackgroundDim, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.OverviewDashboard{}, errors.Join(domain.ErrOverviewNotFound, err)
@@ -82,7 +82,7 @@ func (r *overviewRepo) FindOverviewByID(ctx context.Context, id string) (domain.
 
 func (r *overviewRepo) FindAllOverviews(ctx context.Context) ([]domain.OverviewDashboard, error) {
 	log := logger.LoggerFromContext(ctx)
-	query := `SELECT id, name, "order", cols, rows, created_at, updated_at FROM overview_dashboards ORDER BY "order" ASC, created_at ASC`
+	query := `SELECT id, name, "order", cols, rows, bg_image, bg_opacity, bg_blur, bg_dim, created_at, updated_at FROM overview_dashboards ORDER BY "order" ASC, created_at ASC`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		log.WithError(err).Error("failed to query all overview dashboards")
@@ -96,7 +96,7 @@ func (r *overviewRepo) FindAllOverviews(ctx context.Context) ([]domain.OverviewD
 	for rows.Next() {
 		var ov domain.OverviewDashboard
 		var createdAt, updatedAt time.Time
-		if err := rows.Scan(&ov.ID, &ov.Name, &ov.Order, &ov.Cols, &ov.Rows, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&ov.ID, &ov.Name, &ov.Order, &ov.Cols, &ov.Rows, &ov.BackgroundImage, &ov.BackgroundOpacity, &ov.BackgroundBlur, &ov.BackgroundDim, &createdAt, &updatedAt); err != nil {
 			log.WithError(err).Error("failed to scan overview dashboard row")
 			return nil, errors.Join(domain.ErrDatabaseUnavailable, err)
 		}
@@ -132,8 +132,8 @@ func (r *overviewRepo) UpdateOverview(ctx context.Context, overview domain.Overv
 	now := time.Now().UTC().Truncate(time.Second)
 	overview.UpdatedAt = now
 
-	query := `UPDATE overview_dashboards SET name = ?, "order" = ?, cols = ?, rows = ?, updated_at = ? WHERE id = ?`
-	res, err := r.db.ExecContext(ctx, query, overview.Name, overview.Order, overview.Cols, overview.Rows, overview.UpdatedAt, overview.ID)
+	query := `UPDATE overview_dashboards SET name = ?, "order" = ?, cols = ?, rows = ?, bg_image = ?, bg_opacity = ?, bg_blur = ?, bg_dim = ?, updated_at = ? WHERE id = ?`
+	res, err := r.db.ExecContext(ctx, query, overview.Name, overview.Order, overview.Cols, overview.Rows, overview.BackgroundImage, overview.BackgroundOpacity, overview.BackgroundBlur, overview.BackgroundDim, overview.UpdatedAt, overview.ID)
 	if err != nil {
 		log.WithError(err).WithField("overview_id", overview.ID).Error("failed to update overview dashboard")
 		return domain.OverviewDashboard{}, errors.Join(domain.ErrDatabaseUnavailable, err)

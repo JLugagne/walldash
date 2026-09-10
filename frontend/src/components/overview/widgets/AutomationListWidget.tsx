@@ -105,7 +105,7 @@ export const AutomationListWidget: React.FC<AutomationListWidgetProps> = ({ widg
     <WidgetFrame
       label={label}
       stale={false}
-      icon={<Zap className="text-amber-400" />}
+      icon={<Zap className="text-[#d99a3a]" />}
       trailing={
         <span className="text-[10px] leading-none font-medium text-slate-500 tabular-nums whitespace-nowrap">
           {count}
@@ -129,7 +129,7 @@ export const AutomationListWidget: React.FC<AutomationListWidgetProps> = ({ widg
               <li key={auto.id} className="h-10 flex items-center gap-2 min-w-0">
                 <span
                   className={`w-2 h-2 shrink-0 rounded-full ${
-                    isCurrentlyRunning ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'
+                    isCurrentlyRunning ? 'bg-[#42a67d] animate-pulse' : 'bg-slate-600'
                   }`}
                   aria-hidden="true"
                 />
@@ -137,7 +137,7 @@ export const AutomationListWidget: React.FC<AutomationListWidgetProps> = ({ widg
                   <span className="text-xs font-semibold text-white truncate" title={name}>
                     {name}
                   </span>
-                  <span className="text-[10px] text-slate-400 truncate tabular-nums">
+                  <span className="text-[10px] text-slate-500 truncate tabular-nums">
                     {isCurrentlyRunning ? `Running (${auto.current})` : formatRelativeTime(auto.last_triggered)}
                   </span>
                 </div>
@@ -149,16 +149,16 @@ export const AutomationListWidget: React.FC<AutomationListWidgetProps> = ({ widg
                   title="Trigger"
                   className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-lg transition-colors select-none touch-manipulation ${
                     isTriggered
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-[#42a67d] text-white'
                       : isTriggering
-                        ? 'bg-slate-800 text-indigo-300 cursor-wait'
-                        : 'bg-indigo-600 active:bg-indigo-700 text-white'
+                        ? 'bg-slate-800 text-[#8b93ee] cursor-wait'
+                        : 'bg-[#6d76e8] active:bg-[#5b64d4] text-white'
                   }`}
                 >
                   {isTriggered ? (
                     <Check className="w-4 h-4" />
                   ) : isTriggering ? (
-                    <span className="w-3.5 h-3.5 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                    <span className="w-3.5 h-3.5 border-2 border-[#8b93ee]/30 border-t-[#8b93ee] rounded-full animate-spin" />
                   ) : (
                     <Play className="w-4 h-4 fill-current" />
                   )}

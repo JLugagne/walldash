@@ -105,10 +105,16 @@ export interface SavePlacementRequest {
 }
 
 /** What a Widget is bound to, and therefore what a tap on it does. */
-export type WidgetType = 'sensor' | 'actuator' | 'automation_list'
+export type WidgetType = 'sensor' | 'actuator' | 'automation_list' | 'weather'
 
 /** How a Widget draws its data, independent of what that data is. */
-export type DisplayMode = 'number' | 'arc' | 'bar' | 'toggle' | 'list'
+export type DisplayMode = 'number' | 'arc' | 'bar' | 'toggle' | 'list' | 'weather'
+
+/** Which slice of an Open-Meteo forecast a Weather Widget renders. */
+export type WeatherMode = 'current' | 'today' | 'tomorrow' | 'ndays'
+
+/** Unit system for a Weather Widget; the empty string defers to the server config. */
+export type WeatherUnits = '' | 'metric' | 'imperial'
 
 export interface WidgetConfig {
   entity_ids: string[]
@@ -117,6 +123,12 @@ export interface WidgetConfig {
   min?: number
   max?: number
   unit?: string
+  weather_mode?: WeatherMode
+  weather_days?: number
+  latitude?: number
+  longitude?: number
+  location_name?: string
+  units?: WeatherUnits
 }
 
 export interface Widget {
@@ -140,6 +152,14 @@ export interface OverviewDashboard {
   order: number
   cols: number
   rows: number
+  /** URL path of the background image rendered behind the Widget Grid, or empty for none. */
+  background_image: string
+  /** Image opacity in percent (0-100). */
+  background_opacity: number
+  /** Image blur radius in pixels (0-32). */
+  background_blur: number
+  /** Opacity in percent of the scrim drawn over the image (0-100). */
+  background_dim: number
   created_at: string
   updated_at: string
   widgets: Widget[]

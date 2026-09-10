@@ -52,7 +52,7 @@ export const ArcWidget: React.FC<ArcWidgetProps> = ({ label, value, min, max, un
     <WidgetFrame
       label={label}
       stale={stale}
-      icon={<CircleGauge className="text-cyan-400" />}
+      icon={<CircleGauge className="text-[#4bb8c9]" />}
       bodyClassName="flex items-center justify-center"
     >
       <svg
@@ -62,13 +62,13 @@ export const ArcWidget: React.FC<ArcWidgetProps> = ({ label, value, min, max, un
         aria-label={`${label}: ${formatted.text}${formatted.unit ? ` ${formatted.unit}` : ''}`}
       >
         <path d={trackPath} fill="none" stroke="#1e293b" strokeWidth={9} strokeLinecap="round" />
-        {valuePath && <path d={valuePath} fill="none" stroke="#22d3ee" strokeWidth={9} strokeLinecap="round" />}
+        {valuePath && <path d={valuePath} fill="none" stroke="#4bb8c9" strokeWidth={9} strokeLinecap="round" />}
         <text
           x={CENTER}
           y={CENTER}
           textAnchor="middle"
           dominantBaseline="central"
-          className="fill-white font-extrabold tabular-nums"
+          className="fill-white font-semibold tracking-tight tabular-nums"
           style={{ fontSize: formatted.unit ? 20 : 24 }}
         >
           {formatted.text}

@@ -17,7 +17,7 @@ export function LevelSelector({ levels, activeLevelId, onSelectLevel, leadingAct
     <div
       role="group"
       aria-label="Level selection"
-      className="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-full p-1 shadow-xl flex items-center space-x-1 pointer-events-auto"
+      className="bg-slate-900/70 backdrop-blur-md border border-slate-800/80 rounded-xl p-1 flex items-center gap-1 pointer-events-auto"
     >
       {leadingAction}
       {sortedLevels.map((lvl) => {
@@ -29,10 +29,10 @@ export function LevelSelector({ levels, activeLevelId, onSelectLevel, leadingAct
             onClick={() => onSelectLevel(lvl.id)}
             aria-pressed={isActive}
             aria-label={`Level ${lvl.name}`}
-            className={`px-3.5 py-1 rounded-full text-xs transition-all cursor-pointer whitespace-nowrap select-none ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap select-none ${
               isActive
-                ? 'bg-indigo-600 text-white shadow-md font-semibold'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                ? 'bg-[#6d76e8] text-white font-semibold'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
             }`}
           >
             {lvl.name}

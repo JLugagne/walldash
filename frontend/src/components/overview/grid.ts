@@ -26,6 +26,7 @@ export const MIN_SIZE: Record<DisplayMode, { cols: number; rows: number }> = {
   bar: { cols: 2, rows: 1 },
   toggle: { cols: 1, rows: 1 },
   list: { cols: 2, rows: 2 },
+  weather: { cols: 2, rows: 2 },
 }
 
 /**

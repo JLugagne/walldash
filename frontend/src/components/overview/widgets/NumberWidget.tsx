@@ -39,14 +39,14 @@ export const NumberWidget: React.FC<NumberWidgetProps> = ({ label, value, unit, 
       label={label}
       stale={stale}
       dense={dense}
-      icon={<Gauge className="text-emerald-400" />}
+      icon={<Gauge className="text-[#42a67d]" />}
       bodyClassName="flex items-center justify-center"
     >
       <div
         className="flex items-baseline justify-center gap-1 min-w-0 max-w-full whitespace-nowrap"
         style={{ fontSize: valueFontSize(formatted.text, formatted.unit) }}
       >
-        <span className="min-w-0 font-extrabold text-white leading-none tabular-nums truncate">{formatted.text}</span>
+        <span className="min-w-0 font-semibold tracking-tight text-white leading-none tabular-nums truncate">{formatted.text}</span>
         {formatted.unit && (
           <span className="shrink-0 font-medium text-slate-400 leading-none text-[0.55em]">{formatted.unit}</span>
         )}

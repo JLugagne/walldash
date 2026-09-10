@@ -226,7 +226,7 @@ export const WidgetGrid: React.FC<WidgetGridProps> = ({
           }
           const isDragTarget = dragInfo?.widgetId === widget.id
           const isSelected = selectedWidget?.id === widget.id
-          const radius = rect.rowSpan === 1 ? 'rounded-xl' : 'rounded-2xl'
+          const radius = rect.rowSpan === 1 ? 'rounded-lg' : 'rounded-xl'
 
           return (
             <div
@@ -251,7 +251,7 @@ export const WidgetGrid: React.FC<WidgetGridProps> = ({
                       onPointerDown={(e) => startDrag(widget, 'resize', e)}
                       title="Resize"
                     >
-                      <div className="w-6 h-6 rounded-md bg-indigo-500 border border-indigo-300 shadow-md" />
+                      <div className="w-6 h-6 rounded-md bg-[#6d76e8] border border-[#8b93ee] shadow-sm" />
                     </div>
                   )}
                   {(isSelected || isDragTarget) && (
@@ -270,7 +270,7 @@ export const WidgetGrid: React.FC<WidgetGridProps> = ({
 
       {selectedWidget && (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 h-12 pl-4 pr-1.5 rounded-full bg-slate-900/95 border border-slate-700 shadow-2xl ${
+          className={`absolute left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 h-12 pl-4 pr-1.5 rounded-xl bg-slate-900/70 backdrop-blur-md border border-slate-800/80 shadow-xl ${
             actionBarAtTop ? 'top-4' : 'bottom-4'
           }`}
         >
@@ -281,7 +281,7 @@ export const WidgetGrid: React.FC<WidgetGridProps> = ({
           <button
             type="button"
             onClick={() => onEditWidget(selectedWidget)}
-            className="h-10 px-3 rounded-full flex items-center gap-1.5 text-xs font-semibold text-slate-200 hover:bg-indigo-500/30 active:bg-indigo-500/40 transition-colors"
+            className="h-10 px-3 rounded-lg flex items-center gap-1.5 text-xs font-semibold text-slate-200 hover:bg-[#6d76e8]/30 active:bg-[#6d76e8]/40 transition-colors"
             title="Edit widget content"
           >
             <PencilLine className="w-4 h-4" />
@@ -290,7 +290,7 @@ export const WidgetGrid: React.FC<WidgetGridProps> = ({
           <button
             type="button"
             onClick={() => onDeleteWidget(selectedWidget.id)}
-            className="h-10 px-3 rounded-full flex items-center gap-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 active:bg-rose-500/30 transition-colors"
+            className="h-10 px-3 rounded-lg flex items-center gap-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 active:bg-rose-500/30 transition-colors"
             title="Delete widget"
           >
             <Trash2 className="w-4 h-4" />
@@ -299,7 +299,7 @@ export const WidgetGrid: React.FC<WidgetGridProps> = ({
           <button
             type="button"
             onClick={() => setSelectedWidgetId(null)}
-            className="h-10 w-10 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="h-10 w-10 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             title="Deselect"
             aria-label="Deselect"
           >

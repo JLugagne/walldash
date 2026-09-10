@@ -7,6 +7,8 @@ import (
 
 // ToDomainOverview converts a public CreateOverviewRequest to a domain OverviewDashboard.
 // A zero Cols or Rows is replaced by the default Widget Grid size.
+const defaultBackgroundImage = "/backgrounds/desert-night.jpg"
+
 func ToDomainOverview(req pkgdashboard.CreateOverviewRequest) domain.OverviewDashboard {
 	cols := req.Cols
 	if cols == 0 {
@@ -16,12 +18,24 @@ func ToDomainOverview(req pkgdashboard.CreateOverviewRequest) domain.OverviewDas
 	if rows == 0 {
 		rows = domain.DefaultGridRows
 	}
+	bgImage := req.BackgroundImage
+	if bgImage == "" {
+		bgImage = defaultBackgroundImage
+	}
+	bgOpacity, bgBlur, bgDim := req.BackgroundOpacity, req.BackgroundBlur, req.BackgroundDim
+	if bgOpacity == 0 && bgBlur == 0 && bgDim == 0 {
+		bgOpacity, bgBlur, bgDim = 95, 14, 50
+	}
 	return domain.OverviewDashboard{
-		Name:    req.Name,
-		Order:   req.Order,
-		Cols:    cols,
-		Rows:    rows,
-		Widgets: []domain.Widget{},
+		Name:              req.Name,
+		Order:             req.Order,
+		Cols:              cols,
+		Rows:              rows,
+		BackgroundImage:   bgImage,
+		BackgroundOpacity: bgOpacity,
+		BackgroundBlur:    bgBlur,
+		BackgroundDim:     bgDim,
+		Widgets:           []domain.Widget{},
 	}
 }
 
@@ -30,12 +44,16 @@ func ToDomainOverview(req pkgdashboard.CreateOverviewRequest) domain.OverviewDas
 // against the dashboard's currently stored grid size.
 func ToDomainUpdateOverview(id string, req pkgdashboard.UpdateOverviewRequest) domain.OverviewDashboard {
 	return domain.OverviewDashboard{
-		ID:      id,
-		Name:    req.Name,
-		Order:   req.Order,
-		Cols:    req.Cols,
-		Rows:    req.Rows,
-		Widgets: []domain.Widget{},
+		ID:                id,
+		Name:              req.Name,
+		Order:             req.Order,
+		Cols:              req.Cols,
+		Rows:              req.Rows,
+		BackgroundImage:   req.BackgroundImage,
+		BackgroundOpacity: req.BackgroundOpacity,
+		BackgroundBlur:    req.BackgroundBlur,
+		BackgroundDim:     req.BackgroundDim,
+		Widgets:           []domain.Widget{},
 	}
 }
 
@@ -45,12 +63,18 @@ func toPublicWidgetConfig(c domain.WidgetConfig) pkgdashboard.WidgetConfigDTO {
 		entityIDs = []string{}
 	}
 	return pkgdashboard.WidgetConfigDTO{
-		EntityIDs: entityIDs,
-		Display:   c.Display,
-		Labels:    c.Labels,
-		Min:       c.Min,
-		Max:       c.Max,
-		Unit:      c.Unit,
+		EntityIDs:    entityIDs,
+		Display:      c.Display,
+		Labels:       c.Labels,
+		Min:          c.Min,
+		Max:          c.Max,
+		Unit:         c.Unit,
+		WeatherMode:  c.WeatherMode,
+		WeatherDays:  c.WeatherDays,
+		Latitude:     c.Latitude,
+		Longitude:    c.Longitude,
+		LocationName: c.LocationName,
+		Units:        c.Units,
 	}
 }
 
@@ -59,13 +83,23 @@ func toDomainWidgetConfig(dto pkgdashboard.WidgetConfigDTO) domain.WidgetConfig 
 	if entityIDs == nil {
 		entityIDs = []string{}
 	}
+	weatherMode := dto.WeatherMode
+	if weatherMode == "" && dto.Display == domain.DisplayWeather {
+		weatherMode = domain.WeatherModeCurrent
+	}
 	return domain.WidgetConfig{
-		EntityIDs: entityIDs,
-		Display:   dto.Display,
-		Labels:    dto.Labels,
-		Min:       dto.Min,
-		Max:       dto.Max,
-		Unit:      dto.Unit,
+		EntityIDs:    entityIDs,
+		Display:      dto.Display,
+		Labels:       dto.Labels,
+		Min:          dto.Min,
+		Max:          dto.Max,
+		Unit:         dto.Unit,
+		WeatherMode:  weatherMode,
+		WeatherDays:  dto.WeatherDays,
+		Latitude:     dto.Latitude,
+		Longitude:    dto.Longitude,
+		LocationName: dto.LocationName,
+		Units:        dto.Units,
 	}
 }
 
@@ -144,14 +178,18 @@ func ToDomainWidgetPositions(req pkgdashboard.UpdateLayoutRequest) []domain.Widg
 // ToPublicOverview converts a domain OverviewDashboard to a public OverviewResponse.
 func ToPublicOverview(ov domain.OverviewDashboard) pkgdashboard.OverviewResponse {
 	return pkgdashboard.OverviewResponse{
-		ID:        ov.ID,
-		Name:      ov.Name,
-		Order:     ov.Order,
-		Cols:      ov.Cols,
-		Rows:      ov.Rows,
-		CreatedAt: ov.CreatedAt,
-		UpdatedAt: ov.UpdatedAt,
-		Widgets:   ToPublicWidgets(ov.Widgets),
+		ID:                ov.ID,
+		Name:              ov.Name,
+		Order:             ov.Order,
+		Cols:              ov.Cols,
+		Rows:              ov.Rows,
+		BackgroundImage:   ov.BackgroundImage,
+		BackgroundOpacity: ov.BackgroundOpacity,
+		BackgroundBlur:    ov.BackgroundBlur,
+		BackgroundDim:     ov.BackgroundDim,
+		CreatedAt:         ov.CreatedAt,
+		UpdatedAt:         ov.UpdatedAt,
+		Widgets:           ToPublicWidgets(ov.Widgets),
 	}
 }
 

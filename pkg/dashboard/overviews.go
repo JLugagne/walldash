@@ -9,30 +9,44 @@ import (
 // CreateOverviewRequest contains payload for creating a new overview dashboard.
 // Cols and Rows are optional: a zero value lets the server apply the default Widget Grid size.
 type CreateOverviewRequest struct {
-	Name  string `json:"name" validate:"required,min=1,max=100"`
-	Order int    `json:"order"`
-	Cols  int    `json:"cols,omitempty" validate:"gte=0"`
-	Rows  int    `json:"rows,omitempty" validate:"gte=0"`
+	Name              string `json:"name" validate:"required,min=1,max=100"`
+	Order             int    `json:"order"`
+	Cols              int    `json:"cols,omitempty" validate:"gte=0"`
+	Rows              int    `json:"rows,omitempty" validate:"gte=0"`
+	BackgroundImage   string `json:"background_image,omitempty"`
+	BackgroundOpacity int    `json:"background_opacity,omitempty" validate:"omitempty,gte=0,lte=100"`
+	BackgroundBlur    int    `json:"background_blur,omitempty" validate:"omitempty,gte=0,lte=32"`
+	BackgroundDim     int    `json:"background_dim,omitempty" validate:"omitempty,gte=0,lte=100"`
 }
 
 // UpdateOverviewRequest contains payload for updating an overview dashboard.
 // Cols and Rows are optional: a zero value preserves the dashboard's current Widget Grid size.
 type UpdateOverviewRequest struct {
-	Name  string `json:"name" validate:"required,min=1,max=100"`
-	Order int    `json:"order"`
-	Cols  int    `json:"cols,omitempty" validate:"gte=0"`
-	Rows  int    `json:"rows,omitempty" validate:"gte=0"`
+	Name              string `json:"name" validate:"required,min=1,max=100"`
+	Order             int    `json:"order"`
+	Cols              int    `json:"cols,omitempty" validate:"gte=0"`
+	Rows              int    `json:"rows,omitempty" validate:"gte=0"`
+	BackgroundImage   string `json:"background_image,omitempty"`
+	BackgroundOpacity int    `json:"background_opacity,omitempty" validate:"omitempty,gte=0,lte=100"`
+	BackgroundBlur    int    `json:"background_blur,omitempty" validate:"omitempty,gte=0,lte=32"`
+	BackgroundDim     int    `json:"background_dim,omitempty" validate:"omitempty,gte=0,lte=100"`
 }
 
 // WidgetConfigDTO contains configuration data for a widget in API payloads.
 // Min and Max are pointers so an absent bound stays distinguishable from a bound of zero.
 type WidgetConfigDTO struct {
-	EntityIDs []string          `json:"entity_ids"`
-	Display   string            `json:"display" validate:"required"`
-	Labels    map[string]string `json:"labels,omitempty"`
-	Min       *float64          `json:"min,omitempty"`
-	Max       *float64          `json:"max,omitempty"`
-	Unit      string            `json:"unit,omitempty"`
+	EntityIDs    []string          `json:"entity_ids"`
+	Display      string            `json:"display" validate:"required"`
+	Labels       map[string]string `json:"labels,omitempty"`
+	Min          *float64          `json:"min,omitempty"`
+	Max          *float64          `json:"max,omitempty"`
+	Unit         string            `json:"unit,omitempty"`
+	WeatherMode  string            `json:"weather_mode,omitempty" validate:"omitempty,oneof=current today tomorrow ndays"`
+	WeatherDays  int               `json:"weather_days,omitempty" validate:"omitempty,gte=1,lte=14"`
+	Latitude     *float64          `json:"latitude,omitempty" validate:"omitempty,gte=-90,lte=90"`
+	Longitude    *float64          `json:"longitude,omitempty" validate:"omitempty,gte=-180,lte=180"`
+	LocationName string            `json:"location_name,omitempty" validate:"max=100"`
+	Units        string            `json:"units,omitempty" validate:"omitempty,oneof=metric imperial"`
 }
 
 // CreateWidgetRequest contains payload for adding a new widget to an overview dashboard.
@@ -87,14 +101,18 @@ type WidgetResponse struct {
 
 // OverviewResponse represents an overview dashboard in API responses.
 type OverviewResponse struct {
-	ID        string           `json:"id"`
-	Name      string           `json:"name"`
-	Order     int              `json:"order"`
-	Cols      int              `json:"cols"`
-	Rows      int              `json:"rows"`
-	CreatedAt time.Time        `json:"created_at"`
-	UpdatedAt time.Time        `json:"updated_at"`
-	Widgets   []WidgetResponse `json:"widgets"`
+	ID                string           `json:"id"`
+	Name              string           `json:"name"`
+	Order             int              `json:"order"`
+	Cols              int              `json:"cols"`
+	Rows              int              `json:"rows"`
+	BackgroundImage   string           `json:"background_image"`
+	BackgroundOpacity int              `json:"background_opacity"`
+	BackgroundBlur    int              `json:"background_blur"`
+	BackgroundDim     int              `json:"background_dim"`
+	CreatedAt         time.Time        `json:"created_at"`
+	UpdatedAt         time.Time        `json:"updated_at"`
+	Widgets           []WidgetResponse `json:"widgets"`
 }
 
 // AutomationResponse represents an automation in API responses.
