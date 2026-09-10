@@ -113,11 +113,16 @@ func ToDomainZone(z pkgdashboard.ZoneDTO) domain.Zone {
 			Y: p.Y,
 		}
 	}
+	var labelPosition *domain.Point2D
+	if z.LabelPosition != nil {
+		labelPosition = &domain.Point2D{X: z.LabelPosition.X, Y: z.LabelPosition.Y}
+	}
 	return domain.Zone{
 		ID:             z.ID,
 		Name:           z.Name,
 		Color:          z.Color,
 		Points:         pts,
+		LabelPosition:  labelPosition,
 		TempSensor:     z.TempSensor,
 		TempMin:        z.TempMin,
 		TempMax:        z.TempMax,
@@ -136,11 +141,16 @@ func ToPublicZone(z domain.Zone) pkgdashboard.ZoneDTO {
 			Y: p.Y,
 		}
 	}
+	var labelPosition *pkgdashboard.Point2DDTO
+	if z.LabelPosition != nil {
+		labelPosition = &pkgdashboard.Point2DDTO{X: z.LabelPosition.X, Y: z.LabelPosition.Y}
+	}
 	return pkgdashboard.ZoneDTO{
 		ID:             z.ID,
 		Name:           z.Name,
 		Color:          z.Color,
 		Points:         pts,
+		LabelPosition:  labelPosition,
 		TempSensor:     z.TempSensor,
 		TempMin:        z.TempMin,
 		TempMax:        z.TempMax,

@@ -1,14 +1,19 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../useApp'
 import { PlanEditor2D } from './PlanEditor2D'
 import { ViewModeMenu } from './ViewModeMenu'
 import { resolveParamLevelId } from '../utils/levelSync'
+import type { Plan } from '../types'
+import { loadHouseOverviewConfig, saveHouseOverviewConfig, type HouseOverviewConfig } from '../utils/houseOverview'
 
 export function AdminView() {
   const { levels, activeLevelId, setActiveLevelId, fetchLevels, activeLevel } = useApp()
   const { levelId } = useParams<{ levelId: string }>()
   const navigate = useNavigate()
+  const [alignMode, setAlignMode] = useState(false)
+  const [overviewPlans, setOverviewPlans] = useState<Record<string, Plan>>({})
+  const [overviewConfig, setOverviewConfig] = useState<HouseOverviewConfig>(() => loadHouseOverviewConfig())
 
   // URL -> state only. Deps intentionally exclude activeLevelId: when the user
   // picks a level we set state first and navigate second, so for one render
@@ -33,6 +38,23 @@ export function AdminView() {
     }
   }, [activeLevelId, levelId, navigate])
 
+  useEffect(() => {
+    if (!alignMode) return
+    let cancelled = false
+    Promise.all(levels.map(async (level) => {
+      const response = await fetch(`/api/levels/${level.id}/plan`).catch(() => null)
+      const payload = await response?.json().catch(() => null)
+      return [level.id, { level_id: level.id, walls: payload?.data?.walls || [], zones: payload?.data?.zones || [] }] as const
+    })).then((entries) => {
+      if (!cancelled) setOverviewPlans(Object.fromEntries(entries))
+    })
+    return () => { cancelled = true }
+  }, [alignMode, levels])
+
+  useEffect(() => {
+    saveHouseOverviewConfig(overviewConfig)
+  }, [overviewConfig])
+
   return (
     <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <PlanEditor2D
@@ -41,6 +63,11 @@ export function AdminView() {
         onSelectLevel={setActiveLevelId}
         onRefreshLevels={fetchLevels}
         viewModeMenu={<ViewModeMenu />}
+        alignMode={alignMode}
+        onToggleAlignMode={() => setAlignMode((value) => !value)}
+        overviewPlans={overviewPlans}
+        overviewConfig={overviewConfig}
+        onOverviewConfigChange={setOverviewConfig}
       />
     </main>
   )

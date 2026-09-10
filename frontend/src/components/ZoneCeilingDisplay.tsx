@@ -6,6 +6,7 @@ import { toWorldX, toWorldZ, WALL_HEIGHT } from './wallGeometry'
 import {
   getZoneHUDMetrics,
   calculateDiscDiameter,
+  getZoneLabelPosition,
 } from '../utils/ceilingDisplay'
 
 export interface ZoneCeilingDisplayProps {
@@ -31,14 +32,9 @@ export function ZoneCeilingDisplay({
   deviceMap = {},
   ceilingY = WALL_HEIGHT,
 }: ZoneCeilingDisplayProps) {
-  const centroid = useMemo(() => {
-    const pts = zone.points || []
-    if (pts.length === 0) return { x: 0, y: 0 }
-    const sum = pts.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 })
-    return { x: sum.x / pts.length, y: sum.y / pts.length }
-  }, [zone.points])
-  const worldX = toWorldX(centroid.x)
-  const worldZ = toWorldZ(centroid.y)
+  const labelPosition = useMemo(() => getZoneLabelPosition(zone), [zone])
+  const worldX = toWorldX(labelPosition.x)
+  const worldZ = toWorldZ(labelPosition.y)
 
   // Only recompute HUD metrics (and the 1024px canvas texture below) when this
   // zone's own sensors change. deviceMap gets a new identity on every WS

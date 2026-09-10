@@ -22,6 +22,12 @@ interface IsometricSceneProps {
   onToggleDevice?: (entityId: string) => void
   activeLayer?: string
   layers?: Layer[]
+  onlyLights?: boolean
+  interactiveDevices?: boolean
+  showCamera?: boolean
+  showGround?: boolean
+  showLighting?: boolean
+  solidWalls?: boolean
 }
 
 interface PlanBounds {
@@ -337,10 +343,10 @@ function SceneLighting({ bounds }: { bounds: PlanBounds }) {
 }
 
 // All walls of the level merged into one volume, so overlapping corners never double-blend
-function MergedWalls({ walls, bounds }: { walls: WallSegment[]; bounds: PlanBounds }) {
+function MergedWalls({ walls, bounds, solid }: { walls: WallSegment[]; bounds: PlanBounds; solid?: boolean }) {
   const geometry = useMemo(() => buildWallGeometry(walls), [walls])
-  const sideMat = useMemo(() => createWallMaterial({ color: '#8593a8', capAlpha: 0.55 }), [])
-  const capMat = useMemo(() => createWallMaterial({ color: '#dde5f0', capAlpha: 0.55 }), [])
+  const sideMat = useMemo(() => createWallMaterial({ color: solid ? '#64748b' : '#8593a8', capAlpha: solid ? 0.9 : 0.55, opaque: solid }), [solid])
+  const capMat = useMemo(() => createWallMaterial({ color: solid ? '#cbd5e1' : '#dde5f0', capAlpha: solid ? 0.9 : 0.55, opaque: solid }), [solid])
 
   useEffect(() => {
     for (const { uniforms } of [sideMat, capMat]) {
@@ -585,7 +591,7 @@ function ClosedRoomMesh({ points }: { points: { x: number; y: number }[] }) {
   )
 }
 
-// Tiled floor slab tinted with the zone color, with its label at the pole of inaccessibility
+// Tiled floor slab tinted with the zone color; the editable label is rendered in the 2D editor.
 function ZoneMesh({ zone }: { zone: Zone }) {
   const shape = useMemo(() => {
     if (!zone.points || zone.points.length < 3) return null
@@ -652,6 +658,12 @@ export function IsometricScene({
   onToggleDevice = () => {},
   activeLayer,
   layers = [],
+  onlyLights = false,
+  interactiveDevices = true,
+  showCamera = true,
+  showGround = true,
+  showLighting = true,
+  solidWalls = false,
 }: IsometricSceneProps) {
   const walls = plan?.walls || []
   const zones = plan?.zones || []
@@ -676,6 +688,14 @@ export function IsometricScene({
     if (!activeLayer) return placements
     return placements.filter((p) => (p.layer || 'controls') === activeLayer)
   }, [placements, activeLayer])
+
+  const renderedPlacements = useMemo(() => {
+    if (!onlyLights) return visiblePlacements
+    return visiblePlacements.filter((placement) => {
+      const domain = placement.render_domain || deviceMap[placement.device_id]?.domain || placement.device_id.split('.')[0]
+      return domain === 'light'
+    })
+  }, [deviceMap, onlyLights, visiblePlacements])
 
   // Bounding box dimensions of the plan in 3D world space
   const planBounds = useMemo(() => {
@@ -727,15 +747,17 @@ export function IsometricScene({
 
   return (
     <>
-      <PerspectiveSceneCamera bounds={planBounds} viewAngle={viewAngle} />
+      {showCamera && <PerspectiveSceneCamera bounds={planBounds} viewAngle={viewAngle} />}
 
-      <SceneLighting bounds={planBounds} />
+      {showLighting && <SceneLighting bounds={planBounds} />}
 
       {/* Exterior ground plane */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
-        <planeGeometry args={[2000, 2000]} />
-        <meshStandardMaterial color="#0b0f19" roughness={0.95} />
-      </mesh>
+      {showGround && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+          <planeGeometry args={[2000, 2000]} />
+          <meshStandardMaterial color="#0b0f19" roughness={0.95} />
+        </mesh>
+      )}
 
       {/* House Content */}
       <group position={[pan?.x || 0, 0, pan?.z || 0]}>
@@ -751,7 +773,7 @@ export function IsometricScene({
 
         {/* 3D Ceiling Displays at y = WALL_HEIGHT (hidden when the active layer has hide_gauges=true) */}
         {zones.map((zone) => {
-          if (ceilingHiddenForActiveLayer || !hasConfiguredSensors(zone)) return null
+          if (onlyLights || ceilingHiddenForActiveLayer || !hasConfiguredSensors(zone)) return null
           return (
             <ZoneCeilingDisplay
               key={`ceiling-${zone.id}`}
@@ -761,16 +783,17 @@ export function IsometricScene({
           )
         })}
 
-        <MergedWalls walls={walls} bounds={planBounds} />
+        <MergedWalls walls={walls} bounds={planBounds} solid={solidWalls} />
 
         {/* 3D Device Badges, Sensors & Light Halos */}
-        {visiblePlacements.map((placement) => (
+        {renderedPlacements.map((placement) => (
           <DeviceBadge3D
             key={placement.id}
             placement={placement}
             device={deviceMap[placement.device_id]}
             isPending={!!pendingDevices[placement.device_id]}
             onToggle={onToggleDevice}
+            interactive={interactiveDevices}
             ceilingY={WALL_HEIGHT}
             walls={walls}
           />

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Box, LayoutDashboard, Edit3, Layers, type LucideIcon } from 'lucide-react'
 
-export type ViewMode = '3d' | 'admin' | 'overviews'
+export type ViewMode = '3d' | 'house' | 'admin' | 'overviews'
 
 interface ViewModeOption {
   key: ViewMode
@@ -19,6 +19,7 @@ const OPTIONS: ViewModeOption[] = [
 
 function resolveMode(pathname: string): ViewMode {
   if (pathname.startsWith('/admin')) return 'admin'
+  if (pathname.startsWith('/house')) return 'house'
   if (pathname.startsWith('/overviews')) return 'overviews'
   return '3d'
 }

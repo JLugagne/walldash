@@ -1,12 +1,14 @@
 import type { Level } from '../types'
+import type { ReactNode } from 'react'
 
 interface LevelSelectorProps {
   levels: Level[]
   activeLevelId: string | null
   onSelectLevel: (levelId: string) => void
+  leadingAction?: ReactNode
 }
 
-export function LevelSelector({ levels, activeLevelId, onSelectLevel }: LevelSelectorProps) {
+export function LevelSelector({ levels, activeLevelId, onSelectLevel, leadingAction }: LevelSelectorProps) {
   if (levels.length === 0) return null
 
   const sortedLevels = [...levels].sort((a, b) => a.order - b.order)
@@ -17,6 +19,7 @@ export function LevelSelector({ levels, activeLevelId, onSelectLevel }: LevelSel
       aria-label="Level selection"
       className="bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-full p-1 shadow-xl flex items-center space-x-1 pointer-events-auto"
     >
+      {leadingAction}
       {sortedLevels.map((lvl) => {
         const isActive = lvl.id === activeLevelId
         return (

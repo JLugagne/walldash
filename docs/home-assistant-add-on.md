@@ -74,6 +74,7 @@ arch:
   - amd64
   - aarch64
 init: false
+apparmor: true
 image: ghcr.io/jlugagne/walldash
 ports:
   8080/tcp: 8080
@@ -93,6 +94,72 @@ schema:
 watchdog: http://[HOST]:8080/api/health
 panel_icon: mdi:tablet-dashboard
 stage: experimental
+```
+
+### `walldash/apparmor.txt`
+
+Custom AppArmor profile. `apparmor: true` in `config.yaml` requires this file in the
+add-on directory; the Supervisor loads it under the add-on slug (`walldash`, which must
+match the profile name below) and it earns a better security grade than the default
+profile. The outer profile covers the s6-overlay/bashio plumbing; the nested profile
+confining `/usr/bin/walldash` is the hardened part: read-only options access, SQLite
+database writes, TCP networking, nothing else.
+
+```txt
+#include <tunables/global>
+
+profile walldash flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  file,
+  signal,
+
+  # S6-Overlay & Bashio
+  /init rix,
+  /bin/** ix,
+  /usr/bin/** ix,
+  /etc/s6/** rix,
+  /run/s6/** rwix,
+  /etc/services.d/** rwix,
+  /etc/cont-init.d/** rwix,
+  /etc/cont-finish.d/** rwix,
+  /run/** rwk,
+
+  # Bashio
+  /usr/lib/bashio/** ix,
+  /tmp/** rw,
+
+  # Options file (read by bashio and the app)
+  /data/** rw,
+
+  # Execution program
+  /usr/bin/walldash cx,
+
+  profile /usr/bin/walldash flags=(attach_disconnected,mediate_deleted) {
+    #include <abstractions/base>
+    #include <abstractions/nameservice>
+
+    signal receive,
+
+    /usr/bin/walldash rm,
+
+    # Options and persistent database (SQLite with WAL journaling)
+    /data/options.json r,
+    /data/walldash.db{,-wal,-shm,-journal} rwk,
+
+    # Web server (direct port access) + Home Assistant Supervisor API client
+    network inet stream,
+    network inet6 stream,
+    network inet dgram,
+    network inet6 dgram,
+    network netlink raw,
+
+    # Go runtime: read-only access, no writes to /proc or /sys
+    deny /proc/** wl,
+    deny /sys/** wl,
+    /proc/** r,
+  }
+}
 ```
 
 ### `walldash/translations/en.yaml`
@@ -130,4 +197,7 @@ uninstallation, troubleshooting (port conflict, Supervisor API unreachable, logs
 - [ ] Device toggle from the dashboard reflects in Home Assistant.
 - [ ] Database persists across add-on restart and update.
 - [ ] Version reported by `/api/health` matches the `config.yaml` version.
+- [ ] AppArmor profile enforced: `aa-status` on the host lists the `walldash` profile, and the
+      host kernel log shows no `DENIED` entries for `walldash` after normal use (toggle a device,
+      reload the dashboard page, restart the add-on).
 - [ ] Upgrade from the previous version works without data loss.

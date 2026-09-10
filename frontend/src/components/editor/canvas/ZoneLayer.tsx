@@ -9,16 +9,17 @@ interface ZoneLayerProps {
   interactive: boolean
   upx: number
   onZonePointerDown: (zone: Zone, e: React.PointerEvent) => void
+  onZoneLabelPointerDown: (zone: Zone, e: React.PointerEvent) => void
   onZoneVertexPointerDown: (zone: Zone, index: number, e: React.PointerEvent) => void
 }
 
-export function ZoneLayer({ zones, selection, interactive, upx, onZonePointerDown, onZoneVertexPointerDown }: ZoneLayerProps) {
+export function ZoneLayer({ zones, selection, interactive, upx, onZonePointerDown, onZoneLabelPointerDown, onZoneVertexPointerDown }: ZoneLayerProps) {
   return (
     <g>
       {zones.map((zone) => {
         const selected = selection?.type === 'zone' && selection.id === zone.id
         const pointsStr = zone.points.map((p) => `${p.x},${p.y}`).join(' ')
-        const label = poleOfInaccessibility(zone.points)
+        const label = zone.label_position ?? poleOfInaccessibility(zone.points)
         return (
           <g key={zone.id}>
             <polygon
@@ -37,7 +38,15 @@ export function ZoneLayer({ zones, selection, interactive, upx, onZonePointerDow
                 onZonePointerDown(zone, e)
               }}
             />
-            <ZoneLabel x={label.x} y={label.y} name={zone.name} color={zone.color} upx={upx} />
+            <ZoneLabel
+              x={label.x}
+              y={label.y}
+              name={zone.name}
+              color={zone.color}
+              upx={upx}
+              interactive={interactive}
+              onPointerDown={(e) => onZoneLabelPointerDown(zone, e)}
+            />
             {selected &&
               zone.points.map((p, i) => (
                 <circle
@@ -62,10 +71,18 @@ export function ZoneLayer({ zones, selection, interactive, upx, onZonePointerDow
   )
 }
 
-function ZoneLabel({ x, y, name, color, upx }: { x: number; y: number; name: string; color: string; upx: number }) {
+function ZoneLabel({ x, y, name, color, upx, interactive, onPointerDown }: { x: number; y: number; name: string; color: string; upx: number; interactive: boolean; onPointerDown: (e: React.PointerEvent) => void }) {
   const width = name.length * 6.2 + 26
   return (
-    <g transform={`translate(${x} ${y}) scale(${upx})`} className="pointer-events-none select-none">
+    <g
+      transform={`translate(${x} ${y}) scale(${upx})`}
+      className={`${interactive ? 'cursor-move' : 'pointer-events-none'} select-none`}
+      style={{ pointerEvents: interactive ? 'all' : 'none' }}
+      onPointerDown={(e) => {
+        e.stopPropagation()
+        onPointerDown(e)
+      }}
+    >
       <rect x={-width / 2} y={-10} width={width} height={20} rx={10} fill="#0f172a" fillOpacity={0.85} stroke="#334155" strokeWidth={1} />
       <circle cx={-width / 2 + 10} cy={0} r={3.5} fill={color} stroke="#ffffff" strokeOpacity={0.5} strokeWidth={1} />
       <text x={5} y={3.5} textAnchor="middle" fill={CANVAS.label} fontSize={11} fontWeight={600}>

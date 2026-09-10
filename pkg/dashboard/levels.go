@@ -82,6 +82,7 @@ type ZoneDTO struct {
 	Name           string       `json:"name" validate:"required"`
 	Color          string       `json:"color" validate:"required"`
 	Points         []Point2DDTO `json:"points" validate:"required,min=3,dive"`
+	LabelPosition  *Point2DDTO  `json:"label_position,omitempty"`
 	TempSensor     string       `json:"temp_sensor,omitempty"`
 	TempMin        *float64     `json:"temp_min,omitempty"`
 	TempMax        *float64     `json:"temp_max,omitempty"`

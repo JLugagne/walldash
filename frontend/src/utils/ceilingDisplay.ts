@@ -1,4 +1,5 @@
 import type { Zone, Device } from '../types'
+import { poleOfInaccessibility } from '../components/floorTexture'
 
 export const CEILING_NEUTRAL_COLOR = '#f1f5f9'
 export const CEILING_COLD_COLOR = '#38bdf8'
@@ -129,6 +130,11 @@ export function getZoneCeilingText(zone: Zone, deviceMap: Record<string, Device>
     return formatZoneMetrics(zone, deviceMap) || '--'
   }
   return (zone.name || '').toUpperCase()
+}
+
+/** Returns the shared 2D anchor used by both the editor label and the 3D HUD. */
+export function getZoneLabelPosition(zone: Zone): { x: number; y: number } {
+  return zone.label_position ?? poleOfInaccessibility(zone.points || [])
 }
 
 /**
@@ -388,4 +394,3 @@ function isSensorOnHiddenLayer(
   const layer = placementLayerMap[entityId] || 'controls'
   return layerHideGaugesMap[layer] === true
 }
-

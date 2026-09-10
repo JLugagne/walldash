@@ -4,6 +4,7 @@ import {
   formatZoneMetrics,
   getZoneTemperature,
   getZoneCeilingText,
+  getZoneLabelPosition,
   calculateCeilingColor,
   hasConfiguredSensors,
   getZoneHUDMetrics,
@@ -192,6 +193,31 @@ describe('ceilingDisplay utils', () => {
       }
       expect(getZoneCeilingText(zone, mockDevices)).toBe('21.4°C · 48%')
       expect(getZoneCeilingText(zone, mockDevices)).not.toContain('Salon')
+    })
+  })
+
+  describe('getZoneLabelPosition', () => {
+    it('uses the saved label position when present', () => {
+      const zone: Zone = {
+        id: 'z1',
+        name: 'Living Room',
+        color: '#fff',
+        points: [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 40 }],
+        label_position: { x: 18, y: 27 },
+      }
+
+      expect(getZoneLabelPosition(zone)).toEqual({ x: 18, y: 27 })
+    })
+
+    it('falls back to the pole of inaccessibility for legacy zones', () => {
+      const zone: Zone = {
+        id: 'z1',
+        name: 'Living Room',
+        color: '#fff',
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }],
+      }
+
+      expect(getZoneLabelPosition(zone)).toEqual({ x: 50, y: 50 })
     })
   })
 

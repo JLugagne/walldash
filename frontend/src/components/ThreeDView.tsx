@@ -1,13 +1,15 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../useApp'
 import { IsometricView } from './IsometricView'
+import { HouseOverviewRoute } from './HouseOverviewRoute'
 import { resolveParamLevelId } from '../utils/levelSync'
 
 export function ThreeDView() {
   const { levels, activeLevelId, setActiveLevelId, activeLevel } = useApp()
   const { levelId } = useParams<{ levelId: string }>()
   const navigate = useNavigate()
+  const [houseOverviewOpen, setHouseOverviewOpen] = useState(false)
 
   // Same URL->state contract as AdminView: never re-run on activeLevelId,
   // otherwise a user selection (state set before navigate lands) is reverted
@@ -28,11 +30,16 @@ export function ThreeDView() {
     }
   }, [activeLevelId, levelId, navigate])
 
+  if (houseOverviewOpen) {
+    return <HouseOverviewRoute onClose={() => setHouseOverviewOpen(false)} />
+  }
+
   return (
     <IsometricView
       level={activeLevel}
       levels={levels}
       onSelectLevel={setActiveLevelId}
+      onOpenHouseOverview={() => setHouseOverviewOpen(true)}
     />
   )
 }

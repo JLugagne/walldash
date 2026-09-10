@@ -41,6 +41,8 @@ interface EditorHeaderProps {
   panelOpen: boolean
   onTogglePanel: () => void
   disabled: boolean
+  alignmentActive?: boolean
+  onToggleAlignment?: () => void
 }
 
 export function EditorHeader({
@@ -65,6 +67,8 @@ export function EditorHeader({
   panelOpen,
   onTogglePanel,
   disabled,
+  alignmentActive,
+  onToggleAlignment,
 }: EditorHeaderProps) {
   const [moreOpen, setMoreOpen] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
@@ -141,6 +145,20 @@ export function EditorHeader({
           </div>
         )}
       </div>
+
+      {onToggleAlignment && (
+          <button
+            type="button"
+            onClick={onToggleAlignment}
+            title="Align floors for the house overview"
+            aria-pressed={alignmentActive}
+            className={`h-8 shrink-0 rounded-lg px-2.5 text-xs font-medium transition-all ${
+              alignmentActive ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            {alignmentActive ? 'Done aligning' : 'Align floors'}
+          </button>
+      )}
 
       <div className="flex items-center gap-1 shrink-0">
         <IconButton onClick={onUndo} disabled={disabled || !canUndo} title="Undo (Ctrl+Z)">

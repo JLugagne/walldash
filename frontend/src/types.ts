@@ -54,6 +54,8 @@ export interface Zone {
   name: string
   color: string
   points: Point2D[]
+  /** User-adjustable label anchor; omitted for legacy zones. */
+  label_position?: Point2D
   temp_sensor?: string
   temp_min?: number
   temp_max?: number

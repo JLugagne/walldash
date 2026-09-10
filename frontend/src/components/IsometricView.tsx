@@ -4,8 +4,7 @@ import { Canvas } from '@react-three/fiber'
 import { Layers, Edit3, Maximize2, Minimize2 } from 'lucide-react'
 import type { Level, Plan } from '../types'
 import { IsometricScene } from './IsometricScene'
-import { LevelSelector } from './LevelSelector'
-import { LayerSelector } from './LayerSelector'
+import { ViewTopSelectors } from './ViewTopSelectors'
 import { ViewModeMenu } from './ViewModeMenu'
 import { useRealtimeDevices } from '../hooks/useRealtimeDevices'
 import { DEFAULT_LAYERS, resolveActiveLayer } from '../utils/layers'
@@ -14,12 +13,14 @@ interface IsometricViewProps {
   level: Level | null
   levels: Level[]
   onSelectLevel: (levelId: string) => void
+  onOpenHouseOverview?: () => void
 }
 
 export function IsometricView({
   level,
   levels,
   onSelectLevel,
+  onOpenHouseOverview,
 }: IsometricViewProps) {
   const navigate = useNavigate()
   const [plan, setPlan] = useState<Plan | null>(null)
@@ -158,22 +159,18 @@ export function IsometricView({
         </Canvas>
       </div>
 
-      {/* Top-Center Floating Level & Layer Selectors */}
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none flex flex-col items-center space-y-3">
-        <LevelSelector
-          levels={levels}
-          activeLevelId={level?.id || null}
-          onSelectLevel={onSelectLevel}
-        />
-
-        {level && availableLayers.length > 1 && (
-          <LayerSelector
-            layers={level.layers}
-            activeLayer={activeLayer}
-            onSelectLayer={handleSelectLayer}
-          />
-        )}
-      </div>
+      {/* Top-center house overview, level & layer selectors */}
+      <ViewTopSelectors
+        levels={levels}
+        activeLevelId={level?.id || null}
+        onSelectLevel={onSelectLevel}
+        overviewActive={false}
+        onToggleOverview={() => onOpenHouseOverview?.()}
+        showLayers={!!level && availableLayers.length > 1}
+        layers={availableLayers}
+        activeLayer={activeLayer}
+        onSelectLayer={handleSelectLayer}
+      />
 
       {/* Bottom-Right Floating Controls */}
       <div className="absolute bottom-6 right-6 z-20 pointer-events-none flex flex-col items-end space-y-3">

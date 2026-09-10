@@ -13,9 +13,11 @@ import { DimensionLabel, WallLayer } from './editor/canvas/WallLayer'
 import { ZoneDraft, ZoneLayer } from './editor/canvas/ZoneLayer'
 import { DeviceLayer } from './editor/canvas/DeviceLayer'
 import { LayerPanel } from './editor/LayerPanel'
+import { AlignmentLayer, FloorAlignmentPanel } from './editor/FloorAlignment'
 import { CANVAS, GRID_SIZES, TOOLS, type ToolMode } from './editor/constants'
 import * as geo from './editor/geometry'
 import type { EditorSelection, OpeningDragMode } from './editor/types'
+import { configForLevel, DEFAULT_FLOOR_CONFIG, orderedLevels, type HouseOverviewConfig } from '../utils/houseOverview'
 
 interface PlanEditor2DProps {
   level: Level | null
@@ -23,6 +25,11 @@ interface PlanEditor2DProps {
   onSelectLevel: (id: string) => void
   onRefreshLevels: () => Promise<void>
   viewModeMenu?: ReactNode
+  alignMode?: boolean
+  onToggleAlignMode?: () => void
+  overviewPlans?: Record<string, Plan>
+  overviewConfig?: HouseOverviewConfig
+  onOverviewConfigChange?: (config: HouseOverviewConfig) => void
 }
 
 interface ViewBox {
@@ -57,8 +64,10 @@ type DragState =
   | { kind: 'vertex'; refs: geo.VertexRef[]; selfRef: geo.VertexRef; startPlan: Plan; startClient: Point2D; moved: boolean }
   | { kind: 'opening'; wallId: string; openingId: string; mode: OpeningDragMode; startPlan: Plan; startClient: Point2D; moved: boolean }
   | { kind: 'zone-move'; zoneId: string; startPlan: Plan; startPt: Point2D; startClient: Point2D; moved: boolean }
+  | { kind: 'zone-label'; zoneId: string; startPlan: Plan; startClient: Point2D; moved: boolean }
   | { kind: 'zone-vertex'; zoneId: string; index: number; startPlan: Plan; startClient: Point2D; moved: boolean }
   | { kind: 'device'; placementId: string; startPlacements: DevicePlacement[]; grabOffset: Point2D; startClient: Point2D; moved: boolean }
+  | { kind: 'floor'; levelId: string; startConfig: HouseOverviewConfig; startPt: Point2D; startClient: Point2D; moved: boolean }
 
 function emptyPlan(levelId: string): Plan {
   return { level_id: levelId, walls: [], zones: [] }
@@ -72,7 +81,7 @@ function clonePlan(plan: Plan): Plan {
   return JSON.parse(JSON.stringify(plan))
 }
 
-export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, viewModeMenu }: PlanEditor2DProps) {
+export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, viewModeMenu, alignMode = false, onToggleAlignMode, overviewPlans = {}, overviewConfig = {}, onOverviewConfigChange }: PlanEditor2DProps) {
   const [plan, setPlan] = useState<Plan>(() => emptyPlan(level?.id ?? ''))
   const [savedJson, setSavedJson] = useState(() => serializePlan(emptyPlan('')))
   const [history, setHistory] = useState<Plan[]>([])
@@ -94,6 +103,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
   const [activeLayer, setActiveLayer] = useState<string>('controls')
 
   const [tool, setToolState] = useState<ToolMode>('select')
+  const [alignSelectedId, setAlignSelectedId] = useState<string | null>(null)
   const [snapGrid, setSnapGrid] = useState(true)
   const [gridSize, setGridSize] = useState(20)
   const [settings, setSettings] = useState<ToolSettings>({
@@ -205,6 +215,36 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
   useEffect(() => {
     fitRef.current = fitToBounds
   }, [fitToBounds])
+
+  const prevAlignRef = useRef(false)
+  const alignFittedRef = useRef(false)
+  const alignmentWalls = useCallback(() => {
+    const combined: WallSegment[] = []
+    for (const lvl of orderedLevels(levels)) {
+      const floor = configForLevel(overviewConfig, lvl.id)
+      if (!floor.visible) continue
+      for (const wall of overviewPlans[lvl.id]?.walls || []) {
+        combined.push({ ...wall, x1: wall.x1 + floor.x, y1: wall.y1 + floor.y, x2: wall.x2 + floor.x, y2: wall.y2 + floor.y })
+      }
+    }
+    return combined
+  }, [levels, overviewConfig, overviewPlans])
+
+  useEffect(() => {
+    if (alignMode && !prevAlignRef.current) alignFittedRef.current = false
+    prevAlignRef.current = alignMode
+    if (!alignMode) return
+    setAlignSelectedId((prev) => prev ?? level?.id ?? levels[0]?.id ?? null)
+    if (alignFittedRef.current) return
+    const combined = alignmentWalls()
+    if (combined.length === 0 && levels.length > 0) return
+    alignFittedRef.current = true
+    fitToBounds(combined, [], [])
+  }, [alignMode, alignmentWalls, fitToBounds, level?.id, levels.length])
+
+  const resetAlignment = useCallback(() => {
+    onOverviewConfigChange?.(Object.fromEntries(levels.map((lvl) => [lvl.id, { ...DEFAULT_FLOOR_CONFIG }])))
+  }, [levels, onOverviewConfigChange])
 
   const resetEditing = useCallback(() => {
     setSelection(null)
@@ -547,6 +587,11 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
     }
     if (typing) return
 
+    if (alignMode) {
+      if (e.key === 'Escape') onToggleAlignMode?.()
+      return
+    }
+
     if (e.code === 'Space') {
       e.preventDefault()
       if (!spaceRef.current) {
@@ -634,6 +679,15 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
 
   const clientPoint = (e: React.PointerEvent): Point2D => ({ x: e.clientX, y: e.clientY })
 
+  const handleFloorPointerDown = (levelId: string, e: React.PointerEvent<SVGGElement>) => {
+    if (e.button !== 0) return
+    e.stopPropagation()
+    setAlignSelectedId(levelId)
+    const raw = toSvgPoint(e.clientX, e.clientY)
+    if (!raw) return
+    beginDrag({ kind: 'floor', levelId, startConfig: overviewConfig, startPt: raw, startClient: clientPoint(e), moved: false }, e)
+  }
+
   const handleBackgroundPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     if (e.button === 1 || e.button === 2 || tool === 'pan' || spaceRef.current) {
       e.preventDefault()
@@ -708,6 +762,12 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
     beginDrag({ kind: 'zone-vertex', zoneId: zone.id, index, startPlan: plan, startClient: clientPoint(e), moved: false }, e)
   }
 
+  const handleZoneLabelPointerDown = (zone: Zone, e: React.PointerEvent) => {
+    if (e.button !== 0 || tool !== 'select') return
+    selectElement({ type: 'zone', id: zone.id })
+    beginDrag({ kind: 'zone-label', zoneId: zone.id, startPlan: plan, startClient: clientPoint(e), moved: false }, e)
+  }
+
   const handlePlacementPointerDown = (placement: DevicePlacement, e: React.PointerEvent) => {
     if (e.button !== 0 || deviceToPlace) return
     const raw = toSvgPoint(e.clientX, e.clientY)
@@ -752,6 +812,18 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
     }
 
     switch (drag.kind) {
+      case 'floor': {
+        const floor = configForLevel(drag.startConfig, drag.levelId)
+        onOverviewConfigChange?.({
+          ...drag.startConfig,
+          [drag.levelId]: {
+            ...floor,
+            x: Math.round(floor.x + raw.x - drag.startPt.x),
+            y: Math.round(floor.y + raw.y - drag.startPt.y),
+          },
+        })
+        return
+      }
       case 'press':
         if (drag.pan) panFrom(drag.startView, drag.upx, dxPx, dyPx)
         return
@@ -826,6 +898,13 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
           zones: drag.startPlan.zones.map((z) =>
             z.id === drag.zoneId ? { ...z, points: z.points.map((p, i) => (i === drag.index ? point : p)) } : z
           ),
+        })
+        return
+      }
+      case 'zone-label': {
+        setPlan({
+          ...drag.startPlan,
+          zones: drag.startPlan.zones.map((z) => (z.id === drag.zoneId ? { ...z, label_position: { x: Math.round(raw.x), y: Math.round(raw.y) } } : z)),
         })
         return
       }
@@ -1124,6 +1203,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
             : 'cursor-crosshair'
 
   const statusText = (() => {
+    if (alignMode) return 'Drag a floor to align it · Drag the background to pan · Scroll to zoom'
     if (!level) return 'Select or create a level to get started.'
     if (deviceToPlace) return `Click to place "${deviceToPlace.name}" on layer "${activeLayer}" · Escape to cancel`
     switch (tool) {
@@ -1197,6 +1277,8 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
         panelOpen={panelOpen}
         onTogglePanel={() => setPanelOpen((v) => !v)}
         disabled={!level}
+        alignmentActive={alignMode}
+        onToggleAlignment={onToggleAlignMode}
       />
 
       {error && (
@@ -1210,21 +1292,23 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
       )}
 
       <div className="flex-1 flex min-h-0">
-        <div className="flex">
-          <ToolRail tool={tool} onSelectTool={setTool} snapGrid={snapGrid} onToggleSnap={() => setSnapGrid((v) => !v)} gridSize={gridSize} onCycleGrid={cycleGrid} layersOpen={layersOpen} onToggleLayers={() => setLayersOpen((v) => !v)} />
-          {layersOpen && (
-            <div className="w-52 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col min-h-0">
-              <LayerPanel
-                level={level}
-                placements={placements}
-                activeLayer={activeLayer}
-                onSelectLayer={setActiveLayer}
-                onRefreshLevels={onRefreshLevels}
-                onRefreshPlacements={refreshPlacements}
-              />
-            </div>
-          )}
-        </div>
+        {!alignMode && (
+          <div className="flex">
+            <ToolRail tool={tool} onSelectTool={setTool} snapGrid={snapGrid} onToggleSnap={() => setSnapGrid((v) => !v)} gridSize={gridSize} onCycleGrid={cycleGrid} layersOpen={layersOpen} onToggleLayers={() => setLayersOpen((v) => !v)} />
+            {layersOpen && (
+              <div className="w-52 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col min-h-0">
+                <LayerPanel
+                  level={level}
+                  placements={placements}
+                  activeLayer={activeLayer}
+                  onSelectLayer={setActiveLayer}
+                  onRefreshLevels={onRefreshLevels}
+                  onRefreshPlacements={refreshPlacements}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex-1 relative min-w-0 min-h-0 overflow-hidden" style={{ backgroundColor: CANVAS.background }}>
           <svg
@@ -1270,12 +1354,25 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
             <line x1={viewBox.x} y1={0} x2={viewBox.x + viewBox.w} y2={0} stroke={CANVAS.axis} strokeWidth={upx} strokeDasharray={`${4 * upx} ${4 * upx}`} opacity={0.5} />
             <line x1={0} y1={viewBox.y} x2={0} y2={viewBox.y + viewBox.h} stroke={CANVAS.axis} strokeWidth={upx} strokeDasharray={`${4 * upx} ${4 * upx}`} opacity={0.5} />
 
+            {alignMode && (
+              <AlignmentLayer
+                levels={levels}
+                plans={overviewPlans}
+                config={overviewConfig}
+                activeLevelId={alignSelectedId ?? level?.id ?? null}
+                upx={upx}
+                onFloorPointerDown={handleFloorPointerDown}
+              />
+            )}
+
+            {!alignMode && (<>
             <ZoneLayer
               zones={plan.zones}
               selection={selection}
               interactive={interactive}
               upx={upx}
               onZonePointerDown={handleZonePointerDown}
+              onZoneLabelPointerDown={handleZoneLabelPointerDown}
               onZoneVertexPointerDown={handleZoneVertexPointerDown}
             />
             {tool === 'zone' && <ZoneDraft points={zoneDraft} cursor={cursorSnap?.point ?? null} color={settings.zoneColor} upx={upx} />}
@@ -1346,6 +1443,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
                 />
               </g>
             )}
+            </>)}
           </svg>
 
           {loading && (
@@ -1408,7 +1506,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
             <div className="h-4 w-px bg-slate-700 mx-0.5" />
             <button
               type="button"
-              onClick={() => fitToBounds(plan.walls, plan.zones, placements)}
+              onClick={() => (alignMode ? fitToBounds(alignmentWalls(), [], []) : fitToBounds(plan.walls, plan.zones, placements))}
               title="Fit to plan"
               className="h-8 px-2.5 rounded-lg hover:bg-slate-800 text-indigo-300 hover:text-white text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer"
             >
@@ -1429,8 +1527,19 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
           )}
         </div>
 
-        {panelOpen && (
+        {(alignMode || panelOpen) && (
           <aside className="w-80 shrink-0 bg-slate-900 border-l border-slate-800 flex flex-col min-h-0">
+            {alignMode ? (
+              <FloorAlignmentPanel
+                levels={levels}
+                config={overviewConfig}
+                activeLevelId={alignSelectedId ?? level?.id ?? null}
+                onSelect={setAlignSelectedId}
+                onChange={(config) => onOverviewConfigChange?.(config)}
+                onReset={resetAlignment}
+              />
+            ) : (
+            <>
             <div className="flex items-center border-b border-slate-800 px-2 pt-2 gap-1">
               <PanelTab active={panelTab === 'inspector'} onClick={() => setPanelTab('inspector')} icon={<SlidersHorizontal className="w-3.5 h-3.5" />} label="Properties" />
               <PanelTab
@@ -1480,6 +1589,8 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
                 />
               )}
             </div>
+            </>
+            )}
           </aside>
         )}
       </div>

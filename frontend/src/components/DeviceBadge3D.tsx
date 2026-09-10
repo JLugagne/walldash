@@ -65,6 +65,7 @@ interface DeviceBadge3DProps {
   onToggle: (entityId: string) => void
   ceilingY: number
   walls?: WallSegment[]
+  interactive?: boolean
 }
 
 // Warm Three.js point light mounted near the ceiling, illuminating nearby walls/floor
@@ -177,7 +178,7 @@ function formatSensorValue(domain: string, device?: Device): string | null {
   return `${device.state}${unit ? ' ' + unit : ''}`
 }
 
-export function DeviceBadge3D({ placement, device, isPending = false, onToggle, ceilingY, walls = [] }: DeviceBadge3DProps) {
+export function DeviceBadge3D({ placement, device, isPending = false, onToggle, ceilingY, walls = [], interactive = true }: DeviceBadge3DProps) {
   const worldX = toWorldX(placement.x)
   const worldZ = toWorldZ(placement.y)
 
@@ -204,7 +205,7 @@ export function DeviceBadge3D({ placement, device, isPending = false, onToggle, 
 
   const handleTap = (e: React.SyntheticEvent) => {
     e.stopPropagation()
-    if (isActuator && !isPending) {
+    if (interactive && isActuator && !isPending) {
       onToggle(placement.device_id)
     }
   }
@@ -254,7 +255,7 @@ export function DeviceBadge3D({ placement, device, isPending = false, onToggle, 
             type="button"
             data-interactive="true"
             aria-label={title}
-            disabled={!isActuator || isPending}
+             disabled={!interactive || !isActuator || isPending}
             onClick={handleTap}
             onPointerDown={handlePointerStop}
             onPointerUp={handlePointerStop}
@@ -267,7 +268,7 @@ export function DeviceBadge3D({ placement, device, isPending = false, onToggle, 
             } ${
               isPending
                 ? 'cursor-wait bg-indigo-950/90 border-indigo-400/90 text-indigo-300 shadow-indigo-500/50'
-                : isActuator
+                 : interactive && isActuator
                 ? 'cursor-pointer hover:scale-110 active:scale-95'
                 : 'cursor-default'
             } ${

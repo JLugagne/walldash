@@ -78,6 +78,7 @@ type Zone struct {
 	Name           string
 	Color          string
 	Points         []Point2D
+	LabelPosition  *Point2D
 	TempSensor     string
 	TempMin        *float64
 	TempMax        *float64

@@ -15,6 +15,7 @@ export interface WallFadeUniforms {
 export interface WallMaterialOptions {
   color: string
   capAlpha: number
+  opaque?: boolean
 }
 
 const VARYINGS = `
@@ -52,13 +53,13 @@ export function createWallMaterial(options: WallMaterialOptions): {
 } {
   const uniforms: WallFadeUniforms = {
     uWallHeight: { value: WALL_HEIGHT },
-    uFadeStart: { value: 0.25 },
+    uFadeStart: { value: options.opaque ? 1 : 0.25 },
     uMinZ: { value: -10 },
     uMaxZ: { value: 10 },
     uCapAlpha: { value: options.capAlpha },
-    uBackAlpha: { value: 0.65 },
-    uFrontAlpha: { value: 0.1 },
-    uSideAlpha: { value: 0.92 },
+    uBackAlpha: { value: options.opaque ? 0.9 : 0.65 },
+    uFrontAlpha: { value: options.opaque ? 0.72 : 0.1 },
+    uSideAlpha: { value: options.opaque ? 0.95 : 0.92 },
   }
 
   const material = new THREE.MeshStandardMaterial({
@@ -84,7 +85,7 @@ vWallNormal = normalize(mat3(modelMatrix) * objectNormal);`
       .replace('#include <common>', `#include <common>${VARYINGS}${FRAGMENT_UNIFORMS}`)
       .replace('#include <alphamap_fragment>', `#include <alphamap_fragment>${FADE_SNIPPET}`)
   }
-  material.customProgramCacheKey = () => `wall-fade-${options.capAlpha}`
+  material.customProgramCacheKey = () => `wall-fade-${options.capAlpha}-${options.opaque ? 'solid' : 'fade'}`
 
   return { material, uniforms }
 }
