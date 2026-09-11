@@ -187,14 +187,27 @@ const AUTOMATIONS = [
   'automation.simulation_presence',
 ]
 
-const WIDGETS = [
-  { type: 'sensor', title: 'Hall temperature', config: { entity_ids: ['sensor.temperature_salon'], display: 'arc', min: 10, max: 30, unit: '°C' }, col: 0, row: 0, col_span: 2, row_span: 2 },
-  { type: 'sensor', title: 'Ski shed humidity', config: { entity_ids: ['sensor.humidite_sdb'], display: 'number', unit: '%' }, col: 2, row: 0, col_span: 2, row_span: 1 },
-  { type: 'actuator', title: 'Hall light', config: { entity_ids: ['light.salon_plafond'], display: 'toggle' }, col: 4, row: 0, col_span: 2, row_span: 1 },
-  { type: 'actuator', title: 'Coffee machine', config: { entity_ids: ['switch.machine_a_cafe'], display: 'toggle' }, col: 2, row: 1, col_span: 2, row_span: 1 },
-  { type: 'actuator', title: 'Kitchen lights', config: { entity_ids: ['light.cuisine_spot'], display: 'toggle' }, col: 4, row: 1, col_span: 2, row_span: 1 },
-  { type: 'automation_list', title: 'Automations', config: { entity_ids: AUTOMATIONS, display: 'list' }, col: 0, row: 2, col_span: 3, row_span: 2 },
-  { type: 'sensor', title: 'Office temperature', config: { entity_ids: ['sensor.temperature_salon'], display: 'bar', min: 10, max: 30, unit: '°C' }, col: 3, row: 2, col_span: 3, row_span: 2 },
+// The demo plan is an Alpine hotel, so the showcase dashboards use Chamonix weather.
+const WEATHER_LOCATION = { latitude: 45.9237, longitude: 6.8694, location_name: 'Chamonix' }
+
+const HOME_WIDGETS = [
+  { type: 'sensor', title: 'Hall temperature', config: { entity_ids: ['sensor.temperature_salon'], display: 'arc', min: 10, max: 30, unit: '°C' }, col: 0, row: 0, col_span: 3, row_span: 3 },
+  { type: 'weather', title: 'Chamonix', config: { display: 'weather', weather_mode: 'current', units: 'metric', ...WEATHER_LOCATION }, col: 3, row: 0, col_span: 3, row_span: 3 },
+  { type: 'automation_list', title: 'Scenes', config: { entity_ids: AUTOMATIONS, display: 'list' }, col: 6, row: 0, col_span: 3, row_span: 3 },
+  { type: 'actuator', title: 'Hall lights', config: { entity_ids: ['light.salon_plafond'], display: 'toggle' }, col: 9, row: 0, col_span: 3, row_span: 1 },
+  { type: 'actuator', title: 'Coffee machine', config: { entity_ids: ['switch.machine_a_cafe'], display: 'toggle' }, col: 9, row: 1, col_span: 3, row_span: 1 },
+  { type: 'actuator', title: 'Kitchen lights', config: { entity_ids: ['light.cuisine_spot'], display: 'toggle' }, col: 9, row: 2, col_span: 3, row_span: 1 },
+  { type: 'sensor', title: 'Ski shed humidity', config: { entity_ids: ['sensor.humidite_sdb'], display: 'number', unit: '%' }, col: 0, row: 3, col_span: 3, row_span: 2 },
+  { type: 'sensor', title: 'Office temperature', config: { entity_ids: ['sensor.temperature_salon'], display: 'bar', min: 10, max: 30, unit: '°C' }, col: 3, row: 3, col_span: 3, row_span: 2 },
+  { type: 'weather', title: '5-day forecast', config: { display: 'weather', weather_mode: 'ndays', weather_days: 5, units: 'metric', ...WEATHER_LOCATION }, col: 6, row: 3, col_span: 6, row_span: 2 },
+]
+
+const WEATHER_WIDGETS = [
+  { type: 'weather', title: 'Chamonix', config: { display: 'weather', weather_mode: 'current', units: 'metric', ...WEATHER_LOCATION }, col: 0, row: 0, col_span: 4, row_span: 3 },
+  { type: 'weather', title: '5-day forecast', config: { display: 'weather', weather_mode: 'ndays', weather_days: 5, units: 'metric', ...WEATHER_LOCATION }, col: 4, row: 0, col_span: 8, row_span: 3 },
+  { type: 'sensor', title: 'Ski shed humidity', config: { entity_ids: ['sensor.humidite_sdb'], display: 'number', unit: '%' }, col: 0, row: 3, col_span: 4, row_span: 2 },
+  { type: 'sensor', title: 'Office temperature', config: { entity_ids: ['sensor.temperature_salon'], display: 'bar', min: 10, max: 30, unit: '°C' }, col: 4, row: 3, col_span: 4, row_span: 2 },
+  { type: 'automation_list', title: 'Scenes', config: { entity_ids: AUTOMATIONS, display: 'list' }, col: 8, row: 3, col_span: 4, row_span: 2 },
 ]
 
 function zoneCenter(zone) {
@@ -202,6 +215,31 @@ function zoneCenter(zone) {
   const cx = zone.points.reduce((s, p) => s + p.x, 0) / n
   const cy = zone.points.reduce((s, p) => s + p.y, 0) / n
   return { x: Math.max(cx, 1), y: Math.max(cy, 1) }
+}
+
+async function createOverviewWithWidgets(name, order, backgroundImage, widgets) {
+  const overview = (
+    await api('/api/overviews', {
+      method: 'POST',
+      body: {
+        name,
+        order,
+        cols: 12,
+        rows: 5,
+        background_image: backgroundImage,
+        background_opacity: 95,
+        background_blur: 12,
+        background_dim: 45,
+      },
+    })
+  ).data
+  for (const w of widgets) {
+    await api(`/api/overviews/${overview.id}/widgets`, {
+      method: 'POST',
+      body: { type: w.type, title: w.title, config: w.config, col: w.col, row: w.row, col_span: w.col_span, row_span: w.row_span },
+    })
+  }
+  return overview
 }
 
 async function seed() {
@@ -243,17 +281,10 @@ async function seed() {
   }
   console.log(`  placed ${placed} devices`)
 
-  // 3. Create the example overview dashboard.
-  const overview = (
-    await api('/api/overviews', { method: 'POST', body: { name: 'Home', order: 0, cols: 6, rows: 4 } })
-  ).data
-  for (const w of WIDGETS) {
-    await api(`/api/overviews/${overview.id}/widgets`, {
-      method: 'POST',
-      body: { type: w.type, title: w.title, config: w.config, col: w.col, row: w.row, col_span: w.col_span, row_span: w.row_span },
-    })
-  }
-  console.log(`  created overview "${overview.name}" with ${WIDGETS.length} widgets`)
+  // 3. Create the showcase overview dashboards.
+  const home = await createOverviewWithWidgets('Home', 0, '/backgrounds/mountains-lake.jpg', HOME_WIDGETS)
+  const weather = await createOverviewWithWidgets('Weather', 1, '/backgrounds/desert-night.jpg', WEATHER_WIDGETS)
+  console.log(`  created overviews "${home.name}" and "${weather.name}"`)
 
   return { groundId: ground.id, levels }
 }
