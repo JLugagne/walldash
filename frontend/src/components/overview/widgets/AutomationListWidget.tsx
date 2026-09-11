@@ -128,7 +128,7 @@ export const AutomationListWidget: React.FC<AutomationListWidgetProps> = ({ widg
             return (
               <li key={auto.id} className="h-10 flex items-center gap-2 min-w-0">
                 <span
-                  className={`w-2 h-2 shrink-0 rounded-full ${
+                  className={`w-1.5 h-1.5 shrink-0 rounded-full ${
                     isCurrentlyRunning ? 'bg-[#42a67d] animate-pulse' : 'bg-slate-600'
                   }`}
                   aria-hidden="true"
@@ -147,7 +147,7 @@ export const AutomationListWidget: React.FC<AutomationListWidgetProps> = ({ widg
                   disabled={isTriggering}
                   aria-label={`Trigger ${name}`}
                   title="Trigger"
-                  className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-lg transition-colors select-none touch-manipulation ${
+                  className={`w-8 h-8 shrink-0 flex items-center justify-center rounded-lg transition-colors select-none touch-manipulation ${
                     isTriggered
                       ? 'bg-[#42a67d] text-white'
                       : isTriggering

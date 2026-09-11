@@ -30,6 +30,9 @@ interface OverviewsViewProps {
 const STALE_MS = 30 * 60 * 1000
 const TOAST_MS = 3000
 const NETWORK_ERROR_MESSAGE = 'Unable to reach the server, change not saved.'
+/** Rolling sample window per numeric entity, fed to the sensor sparklines. */
+const HISTORY_LENGTH = 24
+const HISTORY_SAMPLE_MS = 5000
 
 function parseNumericState(state: string | undefined): number | null {
   if (state === undefined) return null
@@ -60,6 +63,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
   const backgroundTimerRef = useRef<number | null>(null)
 
   const [lastKnownValues, setLastKnownValues] = useState<Record<string, number>>({})
+  const [histories, setHistories] = useState<Record<string, number[]>>({})
 
   const { deviceMap, devices, pendingDevices, toggleDevice } = useRealtimeDevices(null)
 
@@ -82,6 +86,31 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
       }
       return changed ? next : prev
     })
+  }, [deviceMap])
+
+  // Roll a bounded per-entity sample window: on every device stream tick, plus a slow heartbeat so
+  // a steady reading still yields a (flat) sparkline instead of a single point. Never fabricates a
+  // value — it only records what the stream reports — and the caller renders nothing below two.
+  useEffect(() => {
+    const sample = () => {
+      setHistories((prev) => {
+        let changed = false
+        const next: Record<string, number[]> = { ...prev }
+        for (const device of Object.values(deviceMap)) {
+          if (device.state === 'unavailable' || device.state === 'unknown') continue
+          const num = parseNumericState(device.state)
+          if (num === null) continue
+          const existing = next[device.id] ?? []
+          next[device.id] = [...existing, num].slice(-HISTORY_LENGTH)
+          changed = true
+        }
+        return changed ? next : prev
+      })
+    }
+
+    sample()
+    const timer = window.setInterval(sample, HISTORY_SAMPLE_MS)
+    return () => window.clearInterval(timer)
   }, [deviceMap])
 
   const activeOverview = overviews.find((o) => o.id === activeOverviewId) || null
@@ -371,13 +400,25 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
       widget.title || (entityId ? widget.config.labels?.[entityId] : undefined) || device?.name || entityId || 'Widget'
     const unit = widget.config.unit || (device?.attributes?.unit_of_measurement as string | undefined) || ''
     const stale = isStaleDevice(device)
+    const history = entityId ? histories[entityId] : undefined
 
     if (widget.type === 'sensor') {
       const live = parseNumericState(device?.state)
       const value = live !== null ? live : entityId ? lastKnownValues[entityId] ?? null : null
       switch (widget.config.display) {
         case 'number':
-          return <NumberWidget label={label} value={value ?? device?.state ?? null} unit={unit} stale={stale} dense={widget.row_span === 1} />
+          return (
+            <NumberWidget
+              label={label}
+              value={value ?? device?.state ?? null}
+              unit={unit}
+              min={widget.config.min}
+              max={widget.config.max}
+              history={history}
+              stale={stale}
+              dense={widget.row_span === 1}
+            />
+          )
         case 'bar':
           return (
             <BarWidget
@@ -386,6 +427,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
               min={widget.config.min ?? 0}
               max={widget.config.max ?? 100}
               unit={unit}
+              history={history}
               stale={stale}
               dense={widget.row_span === 1}
             />
@@ -398,6 +440,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
               min={widget.config.min ?? 0}
               max={widget.config.max ?? 100}
               unit={unit}
+              history={history}
               stale={stale}
             />
           )
