@@ -280,20 +280,27 @@ async function capture({ groundId }) {
 
   async function shot(name, hash, prepare) {
     const file = path.join(IMAGES_DIR, `${name}.png`)
-    try {
+    let lastError = null
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
       const page = await context.newPage()
-      await page.goto(`${BASE}/#${hash}`, { waitUntil: 'load' })
-      await page.waitForSelector('canvas', { timeout: 15000 }).catch(() => {})
-      if (prepare) await prepare(page)
-      await page.waitForTimeout(2800)
-      await page.screenshot({ path: file })
-      await page.close()
-      console.log(`  ✓ ${name}.png`)
-      results.push({ name, ok: true })
-    } catch (err) {
-      console.warn(`  ✗ ${name}.png — ${err.message}`)
-      results.push({ name, ok: false, error: err.message })
+      try {
+        await page.goto(`${BASE}/#${hash}`, { waitUntil: 'load' })
+        await page.waitForSelector('canvas', { timeout: 15000 }).catch(() => {})
+        if (prepare) await prepare(page)
+        await page.waitForTimeout(2800)
+        await page.screenshot({ path: file, timeout: 60000, animations: 'disabled' })
+        await page.close()
+        console.log(`  ✓ ${name}.png`)
+        results.push({ name, ok: true })
+        return
+      } catch (err) {
+        lastError = err
+        await page.close().catch(() => {})
+        await sleep(1000)
+      }
     }
+    console.warn(`  ✗ ${name}.png — ${lastError.message}`)
+    results.push({ name, ok: false, error: lastError.message })
   }
 
   await shot('house-overview', '/')
