@@ -59,6 +59,17 @@ describe('LayerSelector', () => {
     expect(controlsBtn.className).toContain('text-slate-400')
   })
 
+  it('shares the same container and button chrome as the floor selector', () => {
+    render(<LayerSelector activeLayer="controls" onSelectLayer={vi.fn()} />)
+
+    const group = screen.getByRole('group', { name: 'Display Layers' })
+    expect(group.className).toContain('rounded-xl')
+
+    const controlsBtn = screen.getByRole('button', { name: /controls/i })
+    expect(controlsBtn.className).toContain('rounded-lg')
+    expect(controlsBtn.className).toContain('py-1.5')
+  })
+
   it('calls onSelectLayer with the clicked layer name when an inactive button is clicked', () => {
     const handleSelect = vi.fn()
     render(

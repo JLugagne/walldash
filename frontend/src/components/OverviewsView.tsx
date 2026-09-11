@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { LayoutDashboard, Plus, RefreshCw, Settings } from 'lucide-react'
 import type { Device, Widget } from '../types'
 import { AutomationListWidget } from './overview/widgets/AutomationListWidget'
@@ -11,6 +12,7 @@ import { BarWidget } from './overview/widgets/BarWidget'
 import { ArcWidget } from './overview/widgets/ArcWidget'
 import { ToggleWidget } from './overview/widgets/ToggleWidget'
 import { OverviewHeader } from './overview/OverviewHeader'
+import { useTopBarSlot } from './TopBarSlot'
 import { WidgetGrid } from './overview/WidgetGrid'
 import { Toast } from './overview/Toast'
 import { useOverviewData } from './overview/useOverviewData'
@@ -135,11 +137,7 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
     }
   }, [activeOverviewId])
 
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 30_000)
-    return () => window.clearInterval(timer)
-  }, [])
+  const slot = useTopBarSlot()
 
   useEffect(() => {
     const handler = () => setIsBackgroundOpen((v) => !v)
@@ -469,31 +467,35 @@ export const OverviewsView: React.FC<OverviewsViewProps> = ({ initialIsAdmin = f
     return null
   }
 
-  const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  const date = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+  const overviewHeader = (
+    <OverviewHeader
+      overviews={overviews}
+      activeOverviewId={activeOverviewId}
+      isAdmin={isAdmin}
+      isEditMode={isEditMode}
+      onSelectOverview={setActiveOverviewId}
+      onCreateOverview={handleCreateOverview}
+      onRenameOverview={handleRenameOverview}
+      onDeleteOverview={handleDeleteOverview}
+      onToggleEditMode={() => setIsEditMode((v) => !v)}
+      onAddWidget={() => setIsAddWidgetOpen(true)}
+      onToggleBackground={() => setIsBackgroundOpen((v) => !v)}
+      onToggleAdmin={() => setIsAdmin((v) => !v)}
+    />
+  )
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
-      <div className="relative z-20 h-14 shrink-0 select-none flex items-center justify-between px-4">
-        <div className="flex items-baseline gap-3">
-          <span className="text-3xl font-semibold tracking-tight tabular-nums text-white">{time}</span>
-          <span className="text-sm text-slate-400">{date}</span>
+      {slot ? (
+        createPortal(
+          <div className="ml-auto flex h-14 items-center select-none">{overviewHeader}</div>,
+          slot,
+        )
+      ) : (
+        <div className="relative z-20 h-14 shrink-0 select-none flex items-center justify-end px-4">
+          {overviewHeader}
         </div>
-        <OverviewHeader
-          overviews={overviews}
-          activeOverviewId={activeOverviewId}
-          isAdmin={isAdmin}
-          isEditMode={isEditMode}
-          onSelectOverview={setActiveOverviewId}
-          onCreateOverview={handleCreateOverview}
-          onRenameOverview={handleRenameOverview}
-          onDeleteOverview={handleDeleteOverview}
-          onToggleEditMode={() => setIsEditMode((v) => !v)}
-          onAddWidget={() => setIsAddWidgetOpen(true)}
-          onToggleBackground={() => setIsBackgroundOpen((v) => !v)}
-          onToggleAdmin={() => setIsAdmin((v) => !v)}
-        />
-      </div>
+      )}
 
       <main className="flex-1 min-h-0 relative overflow-hidden p-3">
         <div

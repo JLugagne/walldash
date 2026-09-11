@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Box, LayoutDashboard, Image, Settings, type LucideIcon } from 'lucide-react'
 import { useRealtimeDeviceControl } from '../hooks/useRealtimeDevices'
@@ -31,8 +32,16 @@ export function AppTopBar() {
 
   const mode = resolveMode(location.pathname)
 
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  const date = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+
   return (
-    <header className="h-14 shrink-0 bg-slate-900/70 backdrop-blur-md border-b border-slate-800/80 flex items-center px-3 gap-3 select-none">
+    <header className="relative z-30 h-14 shrink-0 bg-slate-900/70 backdrop-blur-md border-b border-slate-800/80 flex items-center px-3 gap-3 select-none">
       <nav
         aria-label="View switcher"
         className="rounded-xl border border-slate-800/80 bg-slate-900/70 p-1 flex gap-1"
@@ -59,7 +68,7 @@ export function AppTopBar() {
         })}
       </nav>
 
-      <div ref={setSlot} className="flex-1 min-w-0 overflow-x-auto" />
+      <div ref={setSlot} className="flex-1 min-w-0 flex items-center" />
 
       {mode === 'overviews' && (
         <button
@@ -73,9 +82,13 @@ export function AppTopBar() {
         </button>
       )}
 
-      <div className="flex items-center gap-1.5 rounded-lg border border-slate-800/80 bg-slate-900/70 px-2.5 py-1 text-[11px] font-semibold text-slate-300">
+      <div
+        className="flex shrink-0 items-center gap-2.5"
+        title={connected ? 'Connected' : 'Offline'}
+      >
         <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-[#42a67d]' : 'bg-slate-500'}`} />
-        <span>{connected ? 'Connected' : 'Offline'}</span>
+        <span className="text-sm font-semibold leading-none tabular-nums text-white">{time}</span>
+        <span className="text-xs leading-none text-slate-400">{date}</span>
       </div>
 
       <button

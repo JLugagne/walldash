@@ -348,14 +348,27 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
           const code = daily.weather_code?.[index]
           return (
             <div key={daily.time?.[index] ?? index} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1">
-              <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-400 truncate max-w-full">
+              <span
+                className="font-semibold uppercase tracking-wider text-slate-400 truncate max-w-full"
+                style={{ fontSize: 'clamp(0.625rem, 8cqh, 0.875rem)' }}
+              >
                 {weekdayLabel(daily.time?.[index])}
               </span>
-              <img src={iconSrc(code ?? -1, true)} alt="" className="h-8 w-8 max-w-full shrink-0 object-contain" />
-              <span className="text-[10px] font-semibold tracking-tight text-white tabular-nums leading-none">
+              <img
+                src={iconSrc(code ?? -1, true)}
+                alt=""
+                className="h-[42cqh] min-h-[24px] w-auto max-w-[80%] shrink-0 object-contain"
+              />
+              <span
+                className="font-semibold tracking-tight text-white tabular-nums leading-none"
+                style={{ fontSize: 'clamp(0.75rem, 11cqh, 1.375rem)' }}
+              >
                 {rounded(daily.temperature_2m_max?.[index])}°
               </span>
-              <span className="text-[9px] text-slate-500 tabular-nums leading-none">
+              <span
+                className="text-slate-500 tabular-nums leading-none"
+                style={{ fontSize: 'clamp(0.5625rem, 7cqh, 0.8125rem)' }}
+              >
                 {rounded(daily.temperature_2m_min?.[index])}°
               </span>
             </div>

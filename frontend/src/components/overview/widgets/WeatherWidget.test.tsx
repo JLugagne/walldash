@@ -182,6 +182,63 @@ describe('WeatherWidget', () => {
     expect(screen.getByText('Sat')).toBeDefined()
   })
 
+  it('scales forecast icons with the widget size instead of a fixed size', async () => {
+    globalThis.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/api/weather/config')) return jsonResponse(CONFIG_UNCONFIGURED)
+      return jsonResponse(OPEN_METEO)
+    }) as unknown as typeof fetch
+
+    render(
+      <WeatherWidget
+        widget={makeWidget({
+          entity_ids: [],
+          display: 'weather',
+          weather_mode: 'ndays',
+          weather_days: 3,
+          latitude: 48.85,
+          longitude: 2.35,
+          units: 'metric',
+        })}
+      />
+    )
+
+    await screen.findByText('Thu', undefined, { timeout: 5000 })
+    const icon = screen.getByText('Thu').closest('div')?.querySelector('img')
+    expect(icon).toBeTruthy()
+    expect(icon?.className).toContain('cqh')
+    expect(icon?.className).not.toContain('h-8')
+  })
+
+  it('scales the forecast weekday and temperatures with the widget size', async () => {
+    globalThis.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/api/weather/config')) return jsonResponse(CONFIG_UNCONFIGURED)
+      return jsonResponse(OPEN_METEO)
+    }) as unknown as typeof fetch
+
+    render(
+      <WeatherWidget
+        widget={makeWidget({
+          entity_ids: [],
+          display: 'weather',
+          weather_mode: 'ndays',
+          weather_days: 3,
+          latitude: 48.85,
+          longitude: 2.35,
+          units: 'metric',
+        })}
+      />
+    )
+
+    await screen.findByText('Thu', undefined, { timeout: 5000 })
+    const column = screen.getByText('Thu').closest('div') as HTMLElement
+    const sizedSpans = Array.from(column.querySelectorAll('span')).filter((span) =>
+      (span as HTMLElement).style.fontSize.includes('cqh'),
+    )
+    expect(sizedSpans).toHaveLength(3)
+  })
+
   it('shows a graceful error when the endpoint is unreachable and there is no override', async () => {
     globalThis.fetch = vi.fn(() => Promise.reject(new Error('offline'))) as unknown as typeof fetch
 

@@ -18,7 +18,7 @@ export function LayerSelector({
     <div
       role="group"
       aria-label="Display Layers"
-      className="rounded-full bg-slate-900/70 backdrop-blur-md border border-slate-800/80 p-1 flex items-center space-x-1 pointer-events-auto"
+      className="bg-slate-900/70 backdrop-blur-md border border-slate-800/80 rounded-xl p-1 flex items-center gap-1 pointer-events-auto"
     >
       {displayLayers.map((layer) => {
         const isActive = layer.name === activeLayer
@@ -31,10 +31,10 @@ export function LayerSelector({
             onClick={() => onSelectLayer(layer.name)}
             aria-pressed={isActive}
             aria-label={`Layer ${label}`}
-            className={`px-3.5 py-1 rounded-full text-xs transition-all cursor-pointer whitespace-nowrap select-none ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap select-none ${
               isActive
                 ? 'bg-[#6d76e8] text-white font-semibold'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
             }`}
           >
             {label}

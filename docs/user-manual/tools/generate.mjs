@@ -294,13 +294,15 @@ async function seed() {
 // ---------------------------------------------------------------------------
 
 const IPAD_LANDSCAPE = { width: 1194, height: 834 }
+// Screenshots are captured at CSS-pixel size: deviceScaleFactor 1 keeps the PNGs small.
+const DEVICE_SCALE_FACTOR = 1
 
 async function capture({ groundId }) {
   await mkdir(IMAGES_DIR, { recursive: true })
   const browser = await launchBrowser()
   const context = await browser.newContext({
     viewport: IPAD_LANDSCAPE,
-    deviceScaleFactor: 2,
+    deviceScaleFactor: DEVICE_SCALE_FACTOR,
     isMobile: false,
     hasTouch: true,
     colorScheme: 'dark',
@@ -441,7 +443,7 @@ async function captureEmptyOnboarding() {
   const browser = await launchBrowser()
   const context = await browser.newContext({
     viewport: IPAD_LANDSCAPE,
-    deviceScaleFactor: 2,
+    deviceScaleFactor: DEVICE_SCALE_FACTOR,
     hasTouch: true,
     colorScheme: 'dark',
     locale: 'en-US',
