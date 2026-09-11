@@ -284,7 +284,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
           <img
             src={iconSrc(current.weather_code, currentIsDay(current))}
             alt=""
-            className="w-[40%] h-auto max-h-[38%] object-contain"
+            className="h-[44cqh] min-h-[40px] w-auto max-w-[85%] shrink-0 object-contain"
           />
           <div className="flex items-start justify-center leading-none">
             <span
@@ -327,7 +327,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
     return (
       <WidgetFrame label={label} stale={stale} dense={dense} icon={frameIcon} bodyClassName="flex items-center justify-center">
         <div className="h-full w-full flex items-center justify-center gap-2 px-1">
-          <img src={iconSrc(code ?? -1, true)} alt="" className="w-[32%] h-auto max-h-[72%] object-contain" />
+          <img src={iconSrc(code ?? -1, true)} alt="" className="h-[62cqh] min-h-[40px] w-auto max-w-[48%] shrink-0 object-contain" />
           <div className="min-w-0 flex flex-col justify-center gap-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 truncate">{weatherLabel(code ?? -1)}</span>
             <span className="text-sm font-semibold tracking-tight text-white tabular-nums leading-none whitespace-nowrap">
@@ -351,7 +351,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({ widget }) => {
               <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-400 truncate max-w-full">
                 {weekdayLabel(daily.time?.[index])}
               </span>
-              <img src={iconSrc(code ?? -1, true)} alt="" className="w-6 h-6 max-w-full object-contain" />
+              <img src={iconSrc(code ?? -1, true)} alt="" className="h-8 w-8 max-w-full shrink-0 object-contain" />
               <span className="text-[10px] font-semibold tracking-tight text-white tabular-nums leading-none">
                 {rounded(daily.temperature_2m_max?.[index])}°
               </span>

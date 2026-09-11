@@ -30,7 +30,7 @@ export function ViewTopSelectors({
     <div className="absolute top-6 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2 pointer-events-none">
       <LevelSelector
         levels={levels}
-        activeLevelId={activeLevelId}
+        activeLevelId={overviewActive ? null : activeLevelId}
         onSelectLevel={onSelectLevel}
         leadingAction={
           <button
