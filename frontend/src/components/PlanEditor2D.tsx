@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useBlocker } from 'react-router-dom'
 import { AlertCircle, Cpu, Layers, Loader2, Maximize2, SlidersHorizontal, X, ZoomIn, ZoomOut } from 'lucide-react'
 import type { Device, DevicePlacement, Level, Plan, Point2D, SavePlacementRequest, WallOpening, WallSegment, Zone } from '../types'
 import { apiFetch } from '../api'
+import { shouldBlockPlanExit } from './editor/navigationGuard'
 import { ImportPlanModal } from './ImportPlanModal'
 import { OnboardingWizard } from './OnboardingWizard'
 import { LevelsManager } from './LevelsManager'
@@ -139,6 +141,24 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, al
   const pinchRef = useRef<{ dist: number; center: Point2D; view: ViewBox } | null>(null)
 
   const isDirty = useMemo(() => serializePlan(plan) !== savedJson, [plan, savedJson])
+
+  // In-app navigation guard: leaving the editor with unsaved changes must be confirmed. Page unload
+  // (refresh/close) is covered by the beforeunload effect below; this covers the SPA routes, the
+  // Exit setup button, Esc and browser back/forward. Level switches stay inside /setup/plans and
+  // are not blocked here — selectLevel already confirms them.
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    shouldBlockPlanExit(currentLocation.pathname, nextLocation.pathname, isDirty),
+  )
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return
+    if (window.confirm('Unsaved modifications. Leaving the editor will discard them. Continue?')) {
+      const timer = window.setTimeout(() => blocker.proceed(), 0)
+      return () => window.clearTimeout(timer)
+    }
+    blocker.reset()
+  }, [blocker])
+
   const placedDeviceIds = useMemo(() => new Set(placements.map((p) => p.device_id)), [placements])
   const visiblePlacements = useMemo(
     () => placements.filter((p) => (p.layer || 'controls') === activeLayer),
@@ -328,6 +348,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, al
     if (!isDirty) return
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
+      e.returnValue = ''
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
