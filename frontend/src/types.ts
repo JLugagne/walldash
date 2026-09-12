@@ -17,7 +17,7 @@ export interface RestoreSummary {
   levels: number
   plans: number
   placements: number
-  overviews: number
+  dashboards: number
   widgets: number
 }
 
@@ -146,7 +146,7 @@ export interface Widget {
   updated_at: string
 }
 
-export interface OverviewDashboard {
+export interface Dashboard {
   id: string
   name: string
   order: number

@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/dashboards/dashboardstest"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/health/healthtest"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/levels/levelstest"
-	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/overviews/overviewstest"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/placements/placementstest"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/plans/planstest"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow/uowtest"
@@ -66,12 +66,12 @@ func TestSQLiteDevicePlacementRepositoryContract(t *testing.T) {
 	placementstest.DevicePlacementRepositoryContractTesting(t, adapter, testLevelID)
 }
 
-func TestSQLiteOverviewRepositoryContract(t *testing.T) {
+func TestSQLiteDashboardRepositoryContract(t *testing.T) {
 	adapter := setupTestDB(t)
-	overviewstest.OverviewRepositoryContractTesting(t, adapter)
+	dashboardstest.DashboardRepositoryContractTesting(t, adapter)
 }
 
 func TestSQLiteWidgetRepositoryContract(t *testing.T) {
 	adapter := setupTestDB(t)
-	overviewstest.WidgetRepositoryContractTesting(t, adapter, adapter)
+	dashboardstest.WidgetRepositoryContractTesting(t, adapter, adapter)
 }

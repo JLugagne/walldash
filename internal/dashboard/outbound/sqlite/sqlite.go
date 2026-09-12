@@ -10,9 +10,9 @@ import (
 	"sort"
 
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/dashboards"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/health"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/levels"
-	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/overviews"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/placements"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/plans"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow"
@@ -40,8 +40,8 @@ var (
 	_ levels.LevelRepository               = (*Adapter)(nil)
 	_ plans.PlanRepository                 = (*Adapter)(nil)
 	_ placements.DevicePlacementRepository = (*Adapter)(nil)
-	_ overviews.OverviewRepository         = (*Adapter)(nil)
-	_ overviews.WidgetRepository           = (*Adapter)(nil)
+	_ dashboards.DashboardRepository       = (*Adapter)(nil)
+	_ dashboards.WidgetRepository          = (*Adapter)(nil)
 	_ uow.UnitOfWork                       = (*Adapter)(nil)
 )
 
@@ -109,7 +109,7 @@ func (a *Adapter) Do(ctx context.Context, fn func(repos uow.Repositories) error)
 		Levels:     &levelRepo{db: tx},
 		Plans:      &planRepo{db: tx},
 		Placements: &placementRepo{db: tx},
-		Overviews:  &overviewRepo{db: tx},
+		Dashboards: &dashboardRepo{db: tx},
 		Widgets:    &widgetRepo{db: tx},
 	}
 

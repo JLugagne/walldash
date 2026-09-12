@@ -6,18 +6,18 @@ import (
 	"time"
 
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	repodashboards "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/dashboards"
 	repoha "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/ha"
 	repohealth "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/health"
 	repolevels "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/levels"
-	repooverviews "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/overviews"
 	repoplacements "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/placements"
 	repoplans "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/plans"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow"
 	svcactions "github.com/JLugagne/walldash/internal/dashboard/domain/service/actions"
+	svcdashboards "github.com/JLugagne/walldash/internal/dashboard/domain/service/dashboards"
 	svcdevices "github.com/JLugagne/walldash/internal/dashboard/domain/service/devices"
 	svchealth "github.com/JLugagne/walldash/internal/dashboard/domain/service/health"
 	svclevels "github.com/JLugagne/walldash/internal/dashboard/domain/service/levels"
-	svcoverviews "github.com/JLugagne/walldash/internal/dashboard/domain/service/overviews"
 	"github.com/JLugagne/walldash/internal/pkg/logger"
 )
 
@@ -28,8 +28,8 @@ type App struct {
 	plansRepo      repoplans.PlanRepository
 	placementsRepo repoplacements.DevicePlacementRepository
 	haRepo         repoha.HomeAssistantRepository
-	overviewsRepo  repooverviews.OverviewRepository
-	widgetsRepo    repooverviews.WidgetRepository
+	dashboardsRepo repodashboards.DashboardRepository
+	widgetsRepo    repodashboards.WidgetRepository
 	uow            uow.UnitOfWork
 	broadcaster    domain.DeviceBroadcaster
 	version        string
@@ -37,15 +37,15 @@ type App struct {
 
 // Ensure App implements domain service interfaces.
 var (
-	_ svchealth.HealthQueries       = (*App)(nil)
-	_ svchealth.HealthCommands      = (*App)(nil)
-	_ svclevels.LevelQueries        = (*App)(nil)
-	_ svclevels.LevelCommands       = (*App)(nil)
-	_ svcdevices.DeviceQueries      = (*App)(nil)
-	_ svcdevices.DeviceCommands     = (*App)(nil)
-	_ svcactions.ActionCommands     = (*App)(nil)
-	_ svcoverviews.OverviewQueries  = (*App)(nil)
-	_ svcoverviews.OverviewCommands = (*App)(nil)
+	_ svchealth.HealthQueries         = (*App)(nil)
+	_ svchealth.HealthCommands        = (*App)(nil)
+	_ svclevels.LevelQueries          = (*App)(nil)
+	_ svclevels.LevelCommands         = (*App)(nil)
+	_ svcdevices.DeviceQueries        = (*App)(nil)
+	_ svcdevices.DeviceCommands       = (*App)(nil)
+	_ svcactions.ActionCommands       = (*App)(nil)
+	_ svcdashboards.DashboardQueries  = (*App)(nil)
+	_ svcdashboards.DashboardCommands = (*App)(nil)
 )
 
 // SetBroadcaster configures the device state broadcaster (e.g. WebSocket hub).
@@ -60,8 +60,8 @@ func New(
 	plansRepo repoplans.PlanRepository,
 	placementsRepo repoplacements.DevicePlacementRepository,
 	haRepo repoha.HomeAssistantRepository,
-	overviewsRepo repooverviews.OverviewRepository,
-	widgetsRepo repooverviews.WidgetRepository,
+	dashboardsRepo repodashboards.DashboardRepository,
+	widgetsRepo repodashboards.WidgetRepository,
 	uow uow.UnitOfWork,
 	version string,
 ) *App {
@@ -74,7 +74,7 @@ func New(
 		plansRepo:      plansRepo,
 		placementsRepo: placementsRepo,
 		haRepo:         haRepo,
-		overviewsRepo:  overviewsRepo,
+		dashboardsRepo: dashboardsRepo,
 		widgetsRepo:    widgetsRepo,
 		uow:            uow,
 		version:        version,

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../useApp'
 import { PlanEditor2D } from './PlanEditor2D'
 import { resolveParamLevelId } from '../utils/levelSync'
@@ -10,8 +10,7 @@ export function AdminView() {
   const { levels, activeLevelId, setActiveLevelId, fetchLevels, activeLevel } = useApp()
   const { levelId } = useParams<{ levelId: string }>()
   const navigate = useNavigate()
-  const location = useLocation()
-  const basePath = location.pathname.startsWith('/setup/plans') ? '/setup/plans' : '/admin'
+  const basePath = '/setup/plans'
   const [alignMode, setAlignMode] = useState(false)
   const [overviewPlans, setOverviewPlans] = useState<Record<string, Plan>>({})
   const [overviewConfig, setOverviewConfig] = useState<HouseOverviewConfig>(() => loadHouseOverviewConfig())

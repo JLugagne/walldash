@@ -57,7 +57,7 @@ func (h *RestoreHandler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 	input := converters.ToDomainRestoreInput(req)
 	summary, err := h.commands.RestoreBackup(r.Context(), actor, input)
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidLevel) || errors.Is(err, domain.ErrInvalidPlan) || errors.Is(err, domain.ErrInvalidPlacement) || errors.Is(err, domain.ErrInvalidOverview) || errors.Is(err, domain.ErrInvalidWidget) {
+		if errors.Is(err, domain.ErrInvalidLevel) || errors.Is(err, domain.ErrInvalidPlan) || errors.Is(err, domain.ErrInvalidPlacement) || errors.Is(err, domain.ErrInvalidDashboard) || errors.Is(err, domain.ErrInvalidWidget) {
 			h.controller.SendFail(w, r, nil, err)
 			return
 		}

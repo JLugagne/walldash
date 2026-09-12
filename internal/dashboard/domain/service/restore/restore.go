@@ -12,7 +12,7 @@ type RestoreInput struct {
 	Levels         []domain.Level
 	Plans          []domain.Plan
 	Placements     []domain.DevicePlacement
-	Overviews      []domain.OverviewDashboard
+	Dashboards     []domain.Dashboard
 	IncludeDevices bool
 }
 
@@ -21,7 +21,7 @@ type RestoreSummary struct {
 	Levels     int
 	Plans      int
 	Placements int
-	Overviews  int
+	Dashboards int
 	Widgets    int
 }
 

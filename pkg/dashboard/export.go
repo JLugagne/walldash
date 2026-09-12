@@ -1,11 +1,11 @@
 package dashboard
 
 // ExportResponse contains a full snapshot of every level, its plan with
-// walls/zones, device placements, and all overview dashboards.
+// walls/zones, device placements, and all dashboards.
 type ExportResponse struct {
-	Version   string             `json:"version"`
-	Levels    []ExportedLevel    `json:"levels"`
-	Overviews []OverviewResponse `json:"overviews"`
+	Version    string              `json:"version"`
+	Levels     []ExportedLevel     `json:"levels"`
+	Dashboards []DashboardResponse `json:"dashboards"`
 }
 
 // ExportedLevel bundles a level, its 2D plan, and its device placements.

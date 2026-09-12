@@ -28,7 +28,6 @@ interface EditorHeaderProps {
   levelsManager: ReactNode
   levelsOpen: boolean
   onToggleLevels: (open: boolean) => void
-  viewModeMenu?: ReactNode
   canUndo: boolean
   canRedo: boolean
   onUndo: () => void
@@ -54,7 +53,6 @@ export function EditorHeader({
   levelsManager,
   levelsOpen,
   onToggleLevels,
-  viewModeMenu,
   canUndo,
   canRedo,
   onUndo,
@@ -102,13 +100,6 @@ export function EditorHeader({
 
   const content = (
     <>
-      {viewModeMenu && (
-        <>
-          <div className="shrink-0 -ml-1">{viewModeMenu}</div>
-          <div className="h-6 w-px bg-slate-800/80 shrink-0" />
-        </>
-      )}
-
       <div ref={levelsRef} className="relative flex items-center gap-1 min-w-0 flex-1">
         <div className="flex items-center gap-1 overflow-x-auto min-w-0 py-1 [scrollbar-width:none]">
           {sortedLevels.length === 0 && (

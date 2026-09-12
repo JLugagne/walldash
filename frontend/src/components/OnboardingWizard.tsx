@@ -13,7 +13,7 @@ interface OnboardingWizardProps {
 interface BackupDocument {
   version?: unknown
   levels?: unknown
-  overviews?: unknown
+  dashboards?: unknown
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -94,7 +94,7 @@ export function OnboardingWizard({ onDone, onClose }: OnboardingWizardProps) {
         body: JSON.stringify({
           version: '1',
           levels: Array.isArray(doc.levels) ? doc.levels : [],
-          overviews: Array.isArray(doc.overviews) ? doc.overviews : [],
+          dashboards: Array.isArray(doc.dashboards) ? doc.dashboards : [],
           include_devices: includeDevices,
         }),
       })
@@ -110,7 +110,7 @@ export function OnboardingWizard({ onDone, onClose }: OnboardingWizardProps) {
       }
       finish(
         `${summary.levels} level${summary.levels > 1 ? 's' : ''} restored`,
-        `${summary.plans} plans · ${summary.placements} devices · ${summary.overviews} overviews · ${summary.widgets} widgets`
+        `${summary.plans} plans · ${summary.placements} devices · ${summary.dashboards} dashboards · ${summary.widgets} widgets`
       )
     } catch {
       setError('Unable to reach the server')

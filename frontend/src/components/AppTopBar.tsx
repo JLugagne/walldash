@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Box, LayoutDashboard, Image, Settings, type LucideIcon } from 'lucide-react'
+import { Box, LayoutDashboard, Settings, type LucideIcon } from 'lucide-react'
 import { useRealtimeDeviceControl } from '../hooks/useRealtimeDevices'
 import { useSetTopBarSlot } from './TopBarSlot'
 
-type ViewMode = '3d' | 'house' | 'overviews'
+type ViewMode = '3d' | 'house' | 'dashboards'
 
 interface ViewSegment {
   key: ViewMode
@@ -15,22 +15,40 @@ interface ViewSegment {
 
 const SEGMENTS: ViewSegment[] = [
   { key: '3d', label: '3D View', icon: Box, to: '/' },
-  { key: 'overviews', label: 'Overviews', icon: LayoutDashboard, to: '/overviews' },
+  { key: 'dashboards', label: 'Dashboards', icon: LayoutDashboard, to: '/dashboards' },
 ]
 
 function resolveMode(pathname: string): ViewMode {
   if (pathname.startsWith('/house')) return 'house'
-  if (pathname.startsWith('/overviews')) return 'overviews'
+  if (pathname.startsWith('/dashboards')) return 'dashboards'
   return '3d'
 }
 
-export function AppTopBar() {
+interface AppTopBarProps {
+  activeLevelId: string | null
+}
+
+export function AppTopBar({ activeLevelId }: AppTopBarProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const { connected } = useRealtimeDeviceControl()
   const setSlot = useSetTopBarSlot()
 
   const mode = resolveMode(location.pathname)
+
+  const openSetup = () => {
+    if (mode === 'dashboards') {
+      let activeDashboardId: string | null = null
+      try {
+        activeDashboardId = window.sessionStorage.getItem('walldash:active-dashboard')
+      } catch {
+        activeDashboardId = null
+      }
+      navigate(activeDashboardId ? `/setup/dashboards/${activeDashboardId}` : '/setup/dashboards')
+      return
+    }
+    navigate(mode === '3d' && activeLevelId ? `/setup/plans/${activeLevelId}` : '/setup/plans')
+  }
 
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -70,18 +88,6 @@ export function AppTopBar() {
 
       <div ref={setSlot} className="flex-1 min-w-0 flex items-center" />
 
-      {mode === 'overviews' && (
-        <button
-          type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent('walldash:open-background'))}
-          title="Dashboard background"
-          aria-label="Dashboard background"
-          className="h-9 w-9 shrink-0 rounded-lg border border-slate-800/80 bg-slate-900/70 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer"
-        >
-          <Image className="w-4 h-4" />
-        </button>
-      )}
-
       <div
         className="flex shrink-0 items-center gap-2.5"
         title={connected ? 'Connected' : 'Offline'}
@@ -93,7 +99,7 @@ export function AppTopBar() {
 
       <button
         type="button"
-        onClick={() => navigate('/setup')}
+        onClick={openSetup}
         title="Open setup mode"
         className="h-9 shrink-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-3 flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer"
       >

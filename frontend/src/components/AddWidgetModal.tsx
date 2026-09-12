@@ -10,10 +10,10 @@ import type {
   WidgetConfig,
   WidgetType,
 } from '../types'
-import { MIN_SIZE, findFreeArea, type Rect } from './overview/grid'
+import { MIN_SIZE, findFreeArea, type Rect } from './dashboard/grid'
 
 // Mirrors the legal Widget Type / Display Mode matrix from ADR 0004 and the
-// Go domain (internal/dashboard/domain/overview.go). The Go matrix stays the
+// Go domain (internal/dashboard/domain/dashboard.go). The Go matrix stays the
 // single source of truth; this table only keeps the UI honest and lets the
 // modal offer the right choices before the server ever sees a request.
 const DISPLAY_OPTIONS_BY_TYPE: Record<WidgetType, DisplayMode[]> = {

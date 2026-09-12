@@ -3,9 +3,9 @@ package uow
 import (
 	"context"
 
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/dashboards"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/health"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/levels"
-	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/overviews"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/placements"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/plans"
 )
@@ -16,8 +16,8 @@ type Repositories struct {
 	Levels     levels.LevelRepository
 	Plans      plans.PlanRepository
 	Placements placements.DevicePlacementRepository
-	Overviews  overviews.OverviewRepository
-	Widgets    overviews.WidgetRepository
+	Dashboards dashboards.DashboardRepository
+	Widgets    dashboards.WidgetRepository
 }
 
 // UnitOfWork defines the contract for executing business logic within a single transaction.

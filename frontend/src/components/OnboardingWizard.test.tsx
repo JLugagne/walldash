@@ -46,7 +46,7 @@ describe('OnboardingWizard', () => {
   it('restores a backup with the devices checkbox', async () => {
     mockFetchOnce({
       status: 'success',
-      data: { levels: 1, plans: 1, placements: 2, overviews: 1, widgets: 3 },
+      data: { levels: 1, plans: 1, placements: 2, dashboards: 1, widgets: 3 },
     })
     render(<OnboardingWizard onDone={() => {}} onClose={() => {}} />)
     fireEvent.click(screen.getByText('Restore a backup'))
@@ -54,10 +54,10 @@ describe('OnboardingWizard', () => {
     fireEvent.click(checkbox)
     expect(checkbox.checked).toBe(true)
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
-    const backup = JSON.stringify({ version: '1', levels: [], overviews: [] })
+    const backup = JSON.stringify({ version: '1', levels: [], dashboards: [] })
     fireEvent.change(input, { target: { files: [new File([backup], 'backup.json', { type: 'application/json' })] } })
     await waitFor(() => expect(screen.getByText('1 level restored')).toBeDefined())
-    expect(screen.getByText('1 plans · 2 devices · 1 overviews · 3 widgets')).toBeDefined()
+    expect(screen.getByText('1 plans · 2 devices · 1 dashboards · 3 widgets')).toBeDefined()
   })
 
   it('shows server errors without leaving the step', async () => {

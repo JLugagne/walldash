@@ -8,7 +8,7 @@ import (
 	"github.com/JLugagne/walldash/internal/dashboard/domain/service/restore"
 )
 
-// RestoreBackup replaces all levels, plans, placements, overviews and widgets
+// RestoreBackup replaces all levels, plans, placements, dashboards and widgets
 // with a validated backup snapshot, inside a single transaction: either the
 // whole snapshot is replayed or nothing changes. Device placements are only
 // replayed when input.IncludeDevices is set, so restores can skip entity
@@ -32,8 +32,8 @@ func (a *App) RestoreBackup(ctx context.Context, actor domain.Actor, input resto
 			}
 		}
 	}
-	for _, overview := range input.Overviews {
-		if err := overview.Validate(); err != nil {
+	for _, dashboard := range input.Dashboards {
+		if err := dashboard.Validate(); err != nil {
 			return summary, err
 		}
 	}
@@ -56,15 +56,15 @@ func (a *App) RestoreBackup(ctx context.Context, actor domain.Actor, input resto
 				return err
 			}
 		}
-		existingOverviews, err := repos.Overviews.FindAllOverviews(ctx)
+		existingDashboards, err := repos.Dashboards.FindAllDashboards(ctx)
 		if err != nil {
 			return err
 		}
-		for _, overview := range existingOverviews {
-			if err := repos.Widgets.DeleteWidgetsByDashboardID(ctx, overview.ID); err != nil {
+		for _, dashboard := range existingDashboards {
+			if err := repos.Widgets.DeleteWidgetsByDashboardID(ctx, dashboard.ID); err != nil {
 				return err
 			}
-			if err := repos.Overviews.DeleteOverview(ctx, overview.ID); err != nil {
+			if err := repos.Dashboards.DeleteDashboard(ctx, dashboard.ID); err != nil {
 				return err
 			}
 		}
@@ -88,14 +88,14 @@ func (a *App) RestoreBackup(ctx context.Context, actor domain.Actor, input resto
 				summary.Placements++
 			}
 		}
-		for _, overview := range input.Overviews {
-			dashboard := overview
-			dashboard.Widgets = nil
-			if _, err := repos.Overviews.CreateOverview(ctx, dashboard); err != nil {
+		for _, dashboard := range input.Dashboards {
+			parent := dashboard
+			parent.Widgets = nil
+			if _, err := repos.Dashboards.CreateDashboard(ctx, parent); err != nil {
 				return err
 			}
-			summary.Overviews++
-			for _, widget := range overview.Widgets {
+			summary.Dashboards++
+			for _, widget := range dashboard.Widgets {
 				if _, err := repos.Widgets.CreateWidget(ctx, widget); err != nil {
 					return err
 				}

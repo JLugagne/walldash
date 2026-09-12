@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AlertCircle, Cpu, Layers, Loader2, Maximize2, SlidersHorizontal, X, ZoomIn, ZoomOut } from 'lucide-react'
 import type { Device, DevicePlacement, Level, Plan, Point2D, SavePlacementRequest, WallOpening, WallSegment, Zone } from '../types'
 import { apiFetch } from '../api'
@@ -24,7 +24,6 @@ interface PlanEditor2DProps {
   levels: Level[]
   onSelectLevel: (id: string) => void
   onRefreshLevels: () => Promise<void>
-  viewModeMenu?: ReactNode
   alignMode?: boolean
   onToggleAlignMode?: () => void
   overviewPlans?: Record<string, Plan>
@@ -81,7 +80,7 @@ function clonePlan(plan: Plan): Plan {
   return JSON.parse(JSON.stringify(plan))
 }
 
-export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, viewModeMenu, alignMode = false, onToggleAlignMode, overviewPlans = {}, overviewConfig = {}, onOverviewConfigChange }: PlanEditor2DProps) {
+export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, alignMode = false, onToggleAlignMode, overviewPlans = {}, overviewConfig = {}, onOverviewConfigChange }: PlanEditor2DProps) {
   const [plan, setPlan] = useState<Plan>(() => emptyPlan(level?.id ?? ''))
   const [savedJson, setSavedJson] = useState(() => serializePlan(emptyPlan('')))
   const [history, setHistory] = useState<Plan[]>([])
@@ -183,13 +182,23 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
       for (const entry of entries) {
         const width = Math.max(1, entry.contentRect.width)
         const height = Math.max(1, entry.contentRect.height)
-        setSvgSize({ width, height })
-        setViewBox((prev) => ({ ...prev, h: (prev.w * height) / width }))
+        setSvgSize((prev) =>
+          prev.width === width && prev.height === height ? prev : { width, height },
+        )
       }
     })
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+
+  // Lock the viewBox aspect ratio to the rendered SVG (before paint) so the canvas and its grid
+  // can never stretch: grid cells stay square whatever the window or side-panel geometry.
+  useLayoutEffect(() => {
+    setViewBox((prev) => {
+      const targetH = (prev.w * svgSize.height) / svgSize.width
+      return Math.abs(targetH - prev.h) < 0.5 ? prev : { ...prev, h: targetH }
+    })
+  }, [svgSize.width, svgSize.height, viewBox.w])
 
   const fitToBounds = useCallback(
     (walls: WallSegment[], zones: Zone[], plcs: DevicePlacement[]) => {
@@ -1262,7 +1271,6 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, vi
         }
         levelsOpen={levelsOpen}
         onToggleLevels={setLevelsOpen}
-        viewModeMenu={viewModeMenu}
         canUndo={history.length > 0}
         canRedo={redoStack.length > 0}
         onUndo={undo}

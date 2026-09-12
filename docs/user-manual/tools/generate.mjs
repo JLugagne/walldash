@@ -219,7 +219,7 @@ function zoneCenter(zone) {
 
 async function createOverviewWithWidgets(name, order, backgroundImage, widgets) {
   const overview = (
-    await api('/api/overviews', {
+    await api('/api/dashboards', {
       method: 'POST',
       body: {
         name,
@@ -234,7 +234,7 @@ async function createOverviewWithWidgets(name, order, backgroundImage, widgets) 
     })
   ).data
   for (const w of widgets) {
-    await api(`/api/overviews/${overview.id}/widgets`, {
+    await api(`/api/dashboards/${overview.id}/widgets`, {
       method: 'POST',
       body: { type: w.type, title: w.title, config: w.config, col: w.col, row: w.row, col_span: w.col_span, row_span: w.row_span },
     })
@@ -286,7 +286,7 @@ async function seed() {
   const weather = await createOverviewWithWidgets('Weather', 1, '/backgrounds/desert-night.jpg', WEATHER_WIDGETS)
   console.log(`  created overviews "${home.name}" and "${weather.name}"`)
 
-  return { groundId: ground.id, levels }
+  return { groundId: ground.id, levels, dashboardId: home.id }
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +297,7 @@ const IPAD_LANDSCAPE = { width: 1194, height: 834 }
 // Screenshots are captured at CSS-pixel size: deviceScaleFactor 1 keeps the PNGs small.
 const DEVICE_SCALE_FACTOR = 1
 
-async function capture({ groundId }) {
+async function capture({ groundId, dashboardId }) {
   await mkdir(IMAGES_DIR, { recursive: true })
   const browser = await launchBrowser()
   const context = await browser.newContext({
@@ -343,15 +343,12 @@ async function capture({ groundId }) {
     await sensors.waitFor({ timeout: 8000 })
     await sensors.click()
   })
-  await shot('plan-editor', `/admin/${groundId}`)
-  await shot('dashboard', '/overviews')
-  await shot('dashboard-edit', '/overviews', async (page) => {
-    const menu = page.locator('[title="Overview menu"]').first()
-    await menu.waitFor({ timeout: 8000 })
-    await menu.click()
-    await page.getByRole('menuitem', { name: 'Admin mode' }).click()
-    await menu.click()
-    await page.getByRole('menuitem', { name: 'Edit layout' }).click()
+  await shot('plan-editor', `/setup/plans/${groundId}`)
+  await shot('dashboard', '/dashboards')
+  await shot('dashboard-edit', `/setup/dashboards/${dashboardId}`, async (page) => {
+    const editLayout = page.getByRole('button', { name: 'Edit layout' }).first()
+    await editLayout.waitFor({ timeout: 8000 })
+    await editLayout.click()
   })
   await shot('setup-devices', '/setup/devices')
   await shot('setup-dashboards', '/setup/dashboards')

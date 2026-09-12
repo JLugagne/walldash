@@ -4,9 +4,8 @@ import { ChevronRight, Image, Info, SlidersHorizontal } from 'lucide-react'
 export function SettingsPanel() {
   const navigate = useNavigate()
 
-  const openBackgroundPicker = () => {
-    window.sessionStorage.setItem('walldash:open-background', '1')
-    navigate('/overviews')
+  const openDashboards = () => {
+    navigate('/setup/dashboards')
   }
 
   return (
@@ -24,19 +23,19 @@ export function SettingsPanel() {
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
-                Overview background
+                Dashboard backgrounds
               </h2>
               <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                Backgrounds are configured per Overview Dashboard. Open the picker to choose a
-                bundled scene, opacity, blur and dim.
+                Backgrounds are configured per dashboard inside the dashboard editor. Open the
+                dashboards manager to choose a dashboard and edit it.
               </p>
               <button
                 type="button"
-                onClick={openBackgroundPicker}
+                onClick={openDashboards}
                 className="mt-3 flex items-center gap-1.5 rounded-lg bg-[#6d76e8] hover:bg-[#7b83ea] active:scale-95 px-3 py-2 text-xs font-semibold text-white transition-all cursor-pointer"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>Open background picker</span>
+                <span>Open dashboards</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -63,7 +62,7 @@ export function SettingsPanel() {
                 </div>
               </dl>
               <p className="text-[11.5px] text-slate-500 mt-3 leading-relaxed">
-                Floors, devices, placements and Overview Dashboards are served by the local
+                Floors, devices, placements and Dashboards are served by the local
                 backend and are not versioned in the browser.
               </p>
             </div>

@@ -79,7 +79,7 @@ function App() {
         />
       )}
       <TopBarSlotProvider>
-        {!isSetup && <AppTopBar />}
+        {!isSetup && <AppTopBar activeLevelId={activeLevelId} />}
         <Outlet context={context} />
       </TopBarSlotProvider>
     </div>

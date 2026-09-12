@@ -1,12 +1,12 @@
 ---
-title: "Overview dashboards"
+title: "Dashboards"
 description: "Compose grids of widgets for quick actions, device toggles, sensors and favorite automations."
 weight: 40
 ---
 
-**Overview dashboards** are customizable widget grids, designed for touch. Open them from the view switcher → **Overviews**.
+**Dashboards** are customizable widget grids, designed for touch. Open them from the top bar → **Dashboards**.
 
-{{< figure src="/images/dashboard.png" alt="Walldash overview dashboard with sensor, switch and automation widgets" caption="An overview dashboard: sensor cards, a device toggle and a list of favorite automations." >}}
+{{< figure src="/images/dashboard.png" alt="Walldash dashboard with sensor, switch and automation widgets" caption="A dashboard: sensor cards, a device toggle and a list of favorite automations. When more than one dashboard exists, its switcher appears in the top bar." >}}
 
 ## Widgets
 
@@ -20,17 +20,19 @@ A **widget** is a single block anchored in the dashboard grid. It is bound to on
 
 Because the display mode is independent of the data, you can show the same sensor as a number, an arc or a bar.
 
-{{< figure src="/images/dashboard-edit.png" alt="Adding a widget in edit mode" caption="In **edit mode**, add widgets and drag them to rearrange the grid." >}}
+{{< figure src="/images/dashboard-edit.png" alt="Editing a dashboard in Setup mode" caption="Editing a dashboard in **Setup → Dashboards**: add widgets, drag them to rearrange the grid, and change the background." >}}
 
-## Edit mode
+## Viewing vs editing
 
-Only administrators compose dashboards. Open the **`● NAME · LIVE` menu** at the top-right of the Overviews view and pick:
+The dashboard view is **display-only**. A tap on a widget only triggers its **primary action**: toggling the device for an actuator, or nothing at all for a sensor.
 
-1. **Admin mode** to unlock editing.
-2. **Edit layout** or **Add widget** to compose the dashboard, then drag widgets to rearrange the grid. The grid fills exactly the screen, so layouts stay consistent across tablets.
-3. **Change background** to pick an image for this dashboard (also available from **Setup → Settings**).
+Composition happens in **Setup → Dashboards**. The **Setup** button on the dashboard view opens the editor for the dashboard you are currently viewing:
 
-Outside edit mode, a tap on a widget only triggers its **primary action**: toggling the device for an actuator, or nothing at all for a sensor.
+1. **Edit layout** or **Add widget** to compose the dashboard, then drag widgets to rearrange the grid. The grid fills exactly the screen, so layouts stay consistent across tablets.
+2. **Change background** to pick a picture **for this dashboard** — every dashboard has its own background.
+3. **Rename** or **Delete** the current dashboard, or use **+** in the Setup banner to create another one.
+
+While editing, the Setup banner also shows the dashboard switcher so you can jump from one dashboard to another.
 
 ## Stale values
 

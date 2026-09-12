@@ -6,9 +6,9 @@ import (
 
 	"github.com/JLugagne/walldash/internal/dashboard/app"
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
+	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/dashboards/dashboardstest"
 	repohealthtest "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/health/healthtest"
 	repolevelstest "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/levels/levelstest"
-	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/overviews/overviewstest"
 	repoplacementstest "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/placements/placementstest"
 	repoplanstest "github.com/JLugagne/walldash/internal/dashboard/domain/repositories/plans/planstest"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/uow"
@@ -33,7 +33,7 @@ func TestApp_RestoreBackup(t *testing.T) {
 		Placements: []domain.DevicePlacement{
 			{ID: "p1", LevelID: "lvl-1", DeviceID: "light.kitchen", X: 10, Y: 10, Layer: "controls"},
 		},
-		Overviews: []domain.OverviewDashboard{
+		Dashboards: []domain.Dashboard{
 			{ID: "ov-1", Name: "Main", Order: 1, Cols: 4, Rows: 4, Widgets: []domain.Widget{
 				{ID: "w1", DashboardID: "ov-1", Type: domain.WidgetTypeActuator, Title: "Kitchen", Order: 1, Col: 0, Row: 0, ColSpan: 1, RowSpan: 1, Config: domain.WidgetConfig{EntityIDs: []string{"light.kitchen"}, Display: domain.DisplayToggle}},
 			}},
@@ -67,15 +67,15 @@ func TestApp_RestoreBackup(t *testing.T) {
 			return placement, nil
 		},
 	}
-	mockOverviews := &overviewstest.MockOverviewRepository{
-		FindAllOverviewsFunc: func(ctx context.Context) ([]domain.OverviewDashboard, error) {
-			return []domain.OverviewDashboard{}, nil
+	mockDashboards := &dashboardstest.MockDashboardRepository{
+		FindAllDashboardsFunc: func(ctx context.Context) ([]domain.Dashboard, error) {
+			return []domain.Dashboard{}, nil
 		},
-		CreateOverviewFunc: func(ctx context.Context, overview domain.OverviewDashboard) (domain.OverviewDashboard, error) {
-			return overview, nil
+		CreateDashboardFunc: func(ctx context.Context, dashboard domain.Dashboard) (domain.Dashboard, error) {
+			return dashboard, nil
 		},
 	}
-	mockWidgets := &overviewstest.MockWidgetRepository{
+	mockWidgets := &dashboardstest.MockWidgetRepository{
 		DeleteWidgetsByDashboardIDFunc: func(ctx context.Context, dashboardID string) error {
 			return nil
 		},
@@ -89,7 +89,7 @@ func TestApp_RestoreBackup(t *testing.T) {
 		Levels:     mockLevels,
 		Plans:      mockPlans,
 		Placements: mockPlacements,
-		Overviews:  mockOverviews,
+		Dashboards: mockDashboards,
 		Widgets:    mockWidgets,
 	}
 	mockUow := &uowtest.MockUnitOfWork{
@@ -97,13 +97,13 @@ func TestApp_RestoreBackup(t *testing.T) {
 			return fn(txRepos)
 		},
 	}
-	service := app.New(mockHealth, mockLevels, mockPlans, mockPlacements, nil, mockOverviews, mockWidgets, mockUow, "0.3.0")
+	service := app.New(mockHealth, mockLevels, mockPlans, mockPlacements, nil, mockDashboards, mockWidgets, mockUow, "0.3.0")
 	summary, err := service.RestoreBackup(ctx, actor, input)
 	require.NoError(t, err)
 	assert.Equal(t, 1, summary.Levels)
 	assert.Equal(t, 1, summary.Plans)
 	assert.Equal(t, 1, summary.Placements)
-	assert.Equal(t, 1, summary.Overviews)
+	assert.Equal(t, 1, summary.Dashboards)
 	assert.Equal(t, 1, summary.Widgets)
 	assert.Equal(t, 1, createdLevels)
 	assert.Equal(t, 1, createdPlacements)
@@ -141,12 +141,12 @@ func TestApp_RestoreBackupSkipsDevicesWhenOptedOut(t *testing.T) {
 			return placement, nil
 		},
 	}
-	mockOverviews := &overviewstest.MockOverviewRepository{
-		FindAllOverviewsFunc: func(ctx context.Context) ([]domain.OverviewDashboard, error) {
-			return []domain.OverviewDashboard{}, nil
+	mockDashboards := &dashboardstest.MockDashboardRepository{
+		FindAllDashboardsFunc: func(ctx context.Context) ([]domain.Dashboard, error) {
+			return []domain.Dashboard{}, nil
 		},
 	}
-	mockWidgets := &overviewstest.MockWidgetRepository{
+	mockWidgets := &dashboardstest.MockWidgetRepository{
 		DeleteWidgetsByDashboardIDFunc: func(ctx context.Context, dashboardID string) error {
 			return nil
 		},
@@ -156,7 +156,7 @@ func TestApp_RestoreBackupSkipsDevicesWhenOptedOut(t *testing.T) {
 		Levels:     mockLevels,
 		Plans:      mockPlans,
 		Placements: mockPlacements,
-		Overviews:  mockOverviews,
+		Dashboards: mockDashboards,
 		Widgets:    mockWidgets,
 	}
 	mockUow := &uowtest.MockUnitOfWork{
@@ -164,7 +164,7 @@ func TestApp_RestoreBackupSkipsDevicesWhenOptedOut(t *testing.T) {
 			return fn(txRepos)
 		},
 	}
-	service := app.New(mockHealth, mockLevels, mockPlans, mockPlacements, nil, mockOverviews, mockWidgets, mockUow, "0.3.0")
+	service := app.New(mockHealth, mockLevels, mockPlans, mockPlacements, nil, mockDashboards, mockWidgets, mockUow, "0.3.0")
 	summary, err := service.RestoreBackup(ctx, actor, input)
 	require.NoError(t, err)
 	assert.Equal(t, 0, summary.Placements)

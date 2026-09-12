@@ -31,10 +31,10 @@ A level can expose several **display layers**. The two built-in layers are:
 - **Controls** — interactive devices.
 - **Sensors** — passive measurements.
 
-Use the layer selector to switch between them. Administrators can add more layers to a level (for example *Evening* or *Security*) and assign devices to them.
+Use the layer selector to switch between them. You can add more layers to a level in **Setup** (for example *Evening* or *Security*) and assign devices to them.
 
 ## Navigating
 
-- Use the **level selector** to jump to another floor.
-- Use the **view switcher** to move between **3D View** and **Overviews**, and the **Setup** button to configure your home (see [Setup mode](/using/setup-mode/)).
+- Use the **level selector** in the top bar to jump to another floor.
+- Use the **view switcher** in the top bar to move between **3D View** and **Dashboards**, and the **Setup** button to configure your home (see [Setup mode](/using/setup-mode/)).
 - The camera is fixed in an isometric projection: the bottom of the 2D plan always faces the front of the house. This keeps every tablet looking at the same, stable view.

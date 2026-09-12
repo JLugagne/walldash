@@ -90,7 +90,7 @@ func ToDomainRestoreInput(req pkgdashboard.RestoreRequest) restore.RestoreInput 
 			})
 		}
 	}
-	for _, ov := range req.Overviews {
+	for _, ov := range req.Dashboards {
 		widgets := make([]domain.Widget, 0, len(ov.Widgets))
 		for _, w := range ov.Widgets {
 			widgets = append(widgets, domain.Widget{
@@ -121,7 +121,7 @@ func ToDomainRestoreInput(req pkgdashboard.RestoreRequest) restore.RestoreInput 
 				UpdatedAt: w.UpdatedAt,
 			})
 		}
-		input.Overviews = append(input.Overviews, domain.OverviewDashboard{
+		input.Dashboards = append(input.Dashboards, domain.Dashboard{
 			ID:                ov.ID,
 			Name:              ov.Name,
 			Order:             ov.Order,
@@ -145,7 +145,7 @@ func ToPublicRestore(summary restore.RestoreSummary) pkgdashboard.RestoreRespons
 		Levels:     summary.Levels,
 		Plans:      summary.Plans,
 		Placements: summary.Placements,
-		Overviews:  summary.Overviews,
+		Dashboards: summary.Dashboards,
 		Widgets:    summary.Widgets,
 	}
 }

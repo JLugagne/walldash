@@ -11,8 +11,7 @@ The **house overview** is the landing screen. It stacks all your levels on top o
 ## What you can do
 
 - **Tap a floor** to open it in the [3D floor view](/using/floor-view/).
-- **Select a level** using the level selector to focus on it.
-- **Rotate through viewpoints** with the navigation controls to inspect the stacking.
-- **Open the view switcher** (the floating layers button) to jump to the 2D editor or overview dashboards.
+- **Select a level** using the level selector in the top bar to focus on it.
+- Use the top bar to switch to **Dashboards**, or open **Setup** to reach the 2D editor.
 
 The stacking order follows the **level order** you define in the editor — typically ground floor at the bottom, then upper floors, then the attic. Outdoor areas (gardens, patios) are shown alongside the building.

@@ -3,9 +3,9 @@ package queries
 import (
 	"net/http"
 
+	svcdashboards "github.com/JLugagne/walldash/internal/dashboard/domain/service/dashboards"
 	svcdevices "github.com/JLugagne/walldash/internal/dashboard/domain/service/devices"
 	svclevels "github.com/JLugagne/walldash/internal/dashboard/domain/service/levels"
-	svcoverviews "github.com/JLugagne/walldash/internal/dashboard/domain/service/overviews"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
 	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
@@ -14,19 +14,19 @@ import (
 // ExportHandler bundles the three query interfaces required to produce a
 // full data export.
 type ExportHandler struct {
-	controller      *inbound.Controller
-	levelQueries    svclevels.LevelQueries
-	deviceQueries   svcdevices.DeviceQueries
-	overviewQueries svcoverviews.OverviewQueries
+	controller       *inbound.Controller
+	levelQueries     svclevels.LevelQueries
+	deviceQueries    svcdevices.DeviceQueries
+	dashboardQueries svcdashboards.DashboardQueries
 }
 
 // NewExportHandler constructs an ExportHandler.
-func NewExportHandler(controller *inbound.Controller, levelQueries svclevels.LevelQueries, deviceQueries svcdevices.DeviceQueries, overviewQueries svcoverviews.OverviewQueries) *ExportHandler {
+func NewExportHandler(controller *inbound.Controller, levelQueries svclevels.LevelQueries, deviceQueries svcdevices.DeviceQueries, dashboardQueries svcdashboards.DashboardQueries) *ExportHandler {
 	return &ExportHandler{
-		controller:      controller,
-		levelQueries:    levelQueries,
-		deviceQueries:   deviceQueries,
-		overviewQueries: overviewQueries,
+		controller:       controller,
+		levelQueries:     levelQueries,
+		deviceQueries:    deviceQueries,
+		dashboardQueries: dashboardQueries,
 	}
 }
 
@@ -59,15 +59,15 @@ func (h *ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 		exportedLevels = append(exportedLevels, exported)
 	}
 
-	overviewsPublic := []pkgdashboard.OverviewResponse{}
-	if overviews, err := h.overviewQueries.ListOverviews(r.Context()); err == nil {
-		overviewsPublic = converters.ToPublicOverviews(overviews)
+	dashboardsPublic := []pkgdashboard.DashboardResponse{}
+	if dashboards, err := h.dashboardQueries.ListDashboards(r.Context()); err == nil {
+		dashboardsPublic = converters.ToPublicDashboards(dashboards)
 	}
 
 	response := pkgdashboard.ExportResponse{
-		Version:   "1",
-		Levels:    exportedLevels,
-		Overviews: overviewsPublic,
+		Version:    "1",
+		Levels:     exportedLevels,
+		Dashboards: dashboardsPublic,
 	}
 
 	h.controller.SendSuccess(w, r, response)
