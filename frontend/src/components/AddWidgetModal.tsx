@@ -83,8 +83,8 @@ export interface WidgetContentInput {
 
 interface AddWidgetModalProps {
   isOpen: boolean
-  overviewCols: number
-  overviewRows: number
+  dashboardCols: number
+  dashboardRows: number
   occupiedRects: Rect[]
   nextOrder: number
   automations: Automation[]
@@ -97,8 +97,8 @@ interface AddWidgetModalProps {
 
 export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
   isOpen,
-  overviewCols,
-  overviewRows,
+  dashboardCols,
+  dashboardRows,
   occupiedRects,
   nextOrder,
   automations,
@@ -224,8 +224,8 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
 
   const placement = useMemo(() => {
     if (isEditing) return null
-    return findFreeArea(occupiedRects, { cols: overviewCols, rows: overviewRows }, minSize.cols, minSize.rows)
-  }, [isEditing, occupiedRects, overviewCols, overviewRows, minSize.cols, minSize.rows])
+    return findFreeArea(occupiedRects, { cols: dashboardCols, rows: dashboardRows }, minSize.cols, minSize.rows)
+  }, [isEditing, occupiedRects, dashboardCols, dashboardRows, minSize.cols, minSize.rows])
 
   if (!isOpen) return null
 

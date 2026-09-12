@@ -74,18 +74,18 @@ _Avoid_: Blink, Flash, Glow
 The restricted set of executable operations from the dashboard to Home Assistant (exclusively on/off toggles and automation triggering).
 _Avoid_: Command Pass-through, Generic Service Call
 
-### Dashboards & Overview Views
+### Dashboards & Widgets
 
-**Overview Dashboard**:
+**Dashboard**:
 A customized summary view composed of a grid of configurable widgets (sensor states, device switches, selected automation lists).
-_Avoid_: Dashboard View, Summary Panel
+_Avoid_: Overview, Dashboard View, Summary Panel
 
 **Widget**:
-A single unit block anchored in an Overview Dashboard's Widget Grid, linked to one or more Devices or Automations and rendered according to a Display Mode.
+A single unit block anchored in a Dashboard's Widget Grid, linked to one or more Devices or Automations and rendered according to a Display Mode.
 _Avoid_: Tile, Card, Component
 
 **Widget Grid**:
-The fixed column and row grid belonging to an Overview Dashboard, which occupies exactly the window and in which each Widget is anchored.
+The fixed column and row grid belonging to a Dashboard, which occupies exactly the window and in which each Widget is anchored.
 _Avoid_: Canvas, Layout, Board
 
 **Display Mode**:
@@ -93,7 +93,7 @@ The way a Widget renders the data it is linked to, independent of the nature of 
 _Avoid_: Style, Skin, Renderer, Variant
 
 **Arc**:
-The downward-opening dial Display Mode representing a measurement between two bounds set by the administrator.
+The downward-opening dial Display Mode representing a measurement between two bounds set by the user.
 _Avoid_: Gauge, Jauge, Horseshoe, Dial
 
 **Primary Action**:
@@ -101,7 +101,7 @@ The single operation triggered by a tap on a Widget linked to an Actuator. A Wid
 _Avoid_: Default Action, Main Command, Tap Action
 
 **Edit Mode**:
-The state of an Overview Dashboard in which an administrator composes the layout of its Widgets, as opposed to normal use where a tap only triggers a Primary Action.
+The dashboard editor opened from Setup mode, in which the layout of a Dashboard's Widgets is composed, as opposed to normal use where a tap only triggers a Primary Action.
 _Avoid_: Admin Mode, Design Mode, Layout Mode
 
 **Stale Value**:

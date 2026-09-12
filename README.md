@@ -25,8 +25,8 @@
 ![2D Floor Plan Editor with walls, zones and device placements](docs/user-manual/static/images/plan-editor.png)
 *In-browser 2D editor — trace walls and openings, define zones across levels, and drag devices onto the plan.*
 
-![Overview dashboard with sensor, switch and automation widgets](docs/user-manual/static/images/dashboard.png)
-*Overview dashboards — a touch-friendly grid of gauges, toggles and favorite automations, composed in edit mode.*
+![Dashboard with sensor, switch and automation widgets](docs/user-manual/static/images/dashboard.png)
+*Dashboards — a touch-friendly grid of gauges, toggles and favorite automations, composed in Setup mode.*
 
 *Screenshots captured from the built-in demo devices and a generic example plan — no real installation is shown.*
 
@@ -50,10 +50,10 @@
   - Drag-and-drop device placement with custom names, icons and per-device render domains.
   - Import existing **Sweet Home 3D** (`.sh3d`) plans in a single step.
 
-- **📊 Overview Dashboards & Widgets**:
+- **📊 Dashboards & Widgets**:
   - Touch-friendly widget grid layouts for quick actions and monitoring.
   - Dedicated widgets for favorite automations, dials/gauges, toggle switches, and sensor statistics.
-  - Touch-drag reordering in edit mode.
+  - Compose layouts in Setup mode, with a per-dashboard background picture.
 
 - **⚡ Real-Time WebSocket Synchronization**:
   - Instant bi-directional communication between Home Assistant, backend, and all connected wall panels.

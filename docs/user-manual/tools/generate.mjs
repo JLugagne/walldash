@@ -4,7 +4,7 @@
 // It never talks to a real Home Assistant instance: it starts the Walldash
 // backend with an empty HA_URL / HA_TOKEN, which makes it serve its built-in
 // example devices ("demo mode"), imports a Sweet Home 3D demo plan, seeds a few
-// device placements and an overview dashboard, then drives the UI with
+// device placements and a dashboard, then drives the UI with
 // Playwright and writes the screenshots to ../static/images.
 //
 // Usage:
@@ -281,10 +281,10 @@ async function seed() {
   }
   console.log(`  placed ${placed} devices`)
 
-  // 3. Create the showcase overview dashboards.
+  // 3. Create the showcase dashboards.
   const home = await createOverviewWithWidgets('Home', 0, '/backgrounds/mountains-lake.jpg', HOME_WIDGETS)
   const weather = await createOverviewWithWidgets('Weather', 1, '/backgrounds/desert-night.jpg', WEATHER_WIDGETS)
-  console.log(`  created overviews "${home.name}" and "${weather.name}"`)
+  console.log(`  created dashboards "${home.name}" and "${weather.name}"`)
 
   return { groundId: ground.id, levels, dashboardId: home.id }
 }

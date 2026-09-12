@@ -1,6 +1,6 @@
 # Background image credits
 
-Bundled sample backgrounds for Overview Dashboards. All images are **CC0 1.0
+Bundled sample backgrounds for Dashboards. All images are **CC0 1.0
 Universal (Public Domain Dedication)** — free to use, modify and redistribute
 with **no attribution required**. Credits are listed below as a courtesy.
 

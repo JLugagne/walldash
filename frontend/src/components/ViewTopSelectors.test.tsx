@@ -28,7 +28,7 @@ describe('ViewTopSelectors', () => {
     expect(pressed[0].getAttribute('aria-label')).toBe('Back to floor view')
   })
 
-  it('marks the active level when the overview is not shown', () => {
+  it('marks the active level when the house overview is not shown', () => {
     render(
       <ViewTopSelectors
         levels={levels}

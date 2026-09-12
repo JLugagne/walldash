@@ -31,7 +31,7 @@ The static site is written to `public/` (git-ignored).
 Screenshots are produced by the Playwright harness in `tools/`. It boots the
 Walldash backend in **demo mode** (no `HA_URL` / `HA_TOKEN`, so it uses the
 built-in example devices), imports a Sweet Home 3D plan, seeds a few device
-placements and an overview dashboard, then drives the UI at an iPad-landscape
+placements and a dashboard, then drives the UI at an iPad-landscape
 resolution (1194×834).
 
 ```bash

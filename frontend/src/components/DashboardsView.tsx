@@ -623,8 +623,8 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
       {isEdit && (
         <AddWidgetModal
           isOpen={isAddWidgetOpen || !!editingWidget}
-          overviewCols={activeDashboard?.cols ?? 12}
-          overviewRows={activeDashboard?.rows ?? 8}
+          dashboardCols={activeDashboard?.cols ?? 12}
+          dashboardRows={activeDashboard?.rows ?? 8}
           occupiedRects={activeDashboard ? widgetsToRects(activeDashboard.widgets) : []}
           nextOrder={activeDashboard?.widgets.length ?? 0}
           automations={automations}

@@ -183,7 +183,7 @@ export function EditorHeader({
           type="button"
           onClick={onExport}
           disabled={disabled}
-          title="Download a full backup (levels, plans, placements, overviews)"
+          title="Download a full backup (levels, plans, placements, dashboards)"
           className="h-8 px-2.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition-all cursor-pointer"
         >
           <Download className="w-3.5 h-3.5" />
