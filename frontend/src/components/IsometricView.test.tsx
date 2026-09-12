@@ -155,4 +155,20 @@ describe('IsometricView Layer Selection and Filtering', () => {
       expect(lastSceneProps.activeLayer).toBe('garden_sensors')
     })
   })
+
+  it('tilts the view on a vertical pointer drag, so touch tablets can rotate the scene', async () => {
+    const { container } = renderInRouter(
+      <IsometricView level={level1} levels={[level1]} onSelectLevel={vi.fn()} />
+    )
+    const section = container.firstElementChild as HTMLElement
+
+    fireEvent.pointerDown(section, { pointerId: 7, pointerType: 'touch', clientY: 100, button: 0 })
+    fireEvent.pointerMove(section, { pointerId: 7, pointerType: 'touch', clientY: 200 })
+    fireEvent.pointerUp(section, { pointerId: 7, pointerType: 'touch', clientY: 200 })
+
+    await waitFor(() => {
+      const stored = parseFloat(localStorage.getItem('ha_dash_view_angle') ?? '')
+      expect(stored).toBeGreaterThan(0.6)
+    })
+  })
 })

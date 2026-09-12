@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Canvas } from '@react-three/fiber'
 import { Layers, Edit3, Maximize2, Minimize2 } from 'lucide-react'
@@ -34,15 +34,49 @@ export function IsometricView({
     }
   })
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
+  const handleViewAngleDelta = useCallback((delta: number) => {
     setViewAngle((prev) => {
-      const next = Math.max(0, Math.min(1, prev + e.deltaY * 0.0003))
+      const next = Math.max(0, Math.min(1, prev + delta))
       try {
         localStorage.setItem('ha_dash_view_angle', String(next))
       } catch { /* ignore storage errors */ }
       return next
     })
+  }, [])
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault()
+    handleViewAngleDelta(e.deltaY * 0.0003)
+  }, [handleViewAngleDelta])
+
+  // Pointer drag to tilt the view: a wheel does not exist on a touch tablet, so an iPad user gets
+  // the same control by dragging vertically. `touch-none` on the section keeps the browser from
+  // hijacking the gesture as a scroll/pan and cancelling the pointer stream. Device badges stop
+  // propagation, so a drag starting on one never tilts the scene.
+  const dragRef = useRef<{ pointerId: number; lastY: number } | null>(null)
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    dragRef.current = { pointerId: e.pointerId, lastY: e.clientY }
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }, [])
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== e.pointerId) return
+    const dy = e.clientY - drag.lastY
+    if (dy === 0) return
+    drag.lastY = e.clientY
+    handleViewAngleDelta(dy * 0.0015)
+  }, [handleViewAngleDelta])
+
+  const endPointerDrag = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== e.pointerId) return
+    dragRef.current = null
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    }
   }, [])
 
   const toggleFullscreen = useCallback(() => {
@@ -130,7 +164,14 @@ export function IsometricView({
   const hasWallsOrZones = plan && (plan.walls.length > 0 || plan.zones.length > 0)
 
   return (
-    <section className="relative flex-1 w-full h-full min-h-[420px] min-h-0 bg-[#0b0f19] overflow-hidden select-none" onWheel={handleWheel}>
+    <section
+      className="relative flex-1 w-full h-full min-h-[420px] min-h-0 bg-[#0b0f19] overflow-hidden select-none touch-none"
+      onWheel={handleWheel}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={endPointerDrag}
+      onPointerCancel={endPointerDrag}
+    >
       {/* 3D WebGL Canvas */}
       <div className="absolute inset-0 w-full h-full">
         <Canvas
