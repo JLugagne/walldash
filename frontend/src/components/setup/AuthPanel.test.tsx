@@ -80,6 +80,26 @@ describe('AuthPanel', () => {
     expect(screen.getByText('Kitchen tablet')).toBeDefined()
   })
 
+  it('reloads devices after a silent token refresh on 401', async () => {
+    let deviceLoads = 0
+    mockRoutes({
+      'GET /api/auth/me': meRoute('owner'),
+      'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
+      'GET /api/setup/auth/devices': () => {
+        deviceLoads += 1
+        if (deviceLoads === 1) return jsonResponse(401, { status: 'error' })
+        return jsonResponse(200, { status: 'success', data: DEVICES })
+      },
+      'GET /api/csrf-token': csrfRoute(),
+      'POST /api/auth/refresh': () => jsonResponse(204, {}),
+    })
+
+    render(<AuthPanel />)
+
+    expect(await screen.findByText('Hall panel', {}, { timeout: 5000 })).toBeDefined()
+    expect(deviceLoads).toBe(2)
+  })
+
   it('revokes a device through the setup endpoint', async () => {
     const fetchMock = mockRoutes({
       'GET /api/auth/me': meRoute('owner'),

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Check, KeyRound, Pencil, RefreshCw, ShieldCheck, Trash2, User, X } from 'lucide-react'
-import { apiFetch, readApiError } from '../../api'
-import { useAuth } from '../../useAuth'
+import { readApiError } from '../../api'
+import { authFetch, useAuth } from '../../useAuth'
 
 type AccountRole = 'owner' | 'admin' | 'device'
 
@@ -56,7 +56,7 @@ export function AuthPanel() {
 
   const loadPending = useCallback(async () => {
     try {
-      const res = await fetch('/api/setup/auth/pending')
+      const res = await authFetch('/api/setup/auth/pending')
       const payload = await res.json()
       if (res.ok && payload?.status === 'success' && Array.isArray(payload.data)) {
         setPending(payload.data)
@@ -70,7 +70,7 @@ export function AuthPanel() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/setup/auth/devices')
+      const res = await authFetch('/api/setup/auth/devices')
       const payload = await res.json()
       if (res.ok && payload?.status === 'success' && Array.isArray(payload.data)) {
         setDevices(payload.data)
@@ -103,7 +103,7 @@ export function AuthPanel() {
     setBusyId(device.id)
     setError(null)
     try {
-      const res = await apiFetch(`/api/setup/auth/devices/${device.id}/role`, {
+      const res = await authFetch(`/api/setup/auth/devices/${device.id}/role`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: nextRole }),
@@ -137,7 +137,7 @@ export function AuthPanel() {
     setBusyId(device.id)
     setError(null)
     try {
-      const res = await apiFetch(`/api/setup/auth/devices/${device.id}/label`, {
+      const res = await authFetch(`/api/setup/auth/devices/${device.id}/label`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label }),
@@ -161,7 +161,7 @@ export function AuthPanel() {
     setBusyId(device.id)
     setError(null)
     try {
-      const res = await apiFetch(`/api/setup/auth/devices/${device.id}/revoke`, { method: 'POST' })
+      const res = await authFetch(`/api/setup/auth/devices/${device.id}/revoke`, { method: 'POST' })
       if (res.ok) {
         await loadDevices()
       } else {

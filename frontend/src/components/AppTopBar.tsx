@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Box, LayoutDashboard, Settings, ShieldCheck, type LucideIcon } from 'lucide-react'
 import { useRealtimeDeviceControl } from '../hooks/useRealtimeDevices'
-import { useAuth } from '../useAuth'
+import { authFetch, useAuth } from '../useAuth'
 import { useSetTopBarSlot } from './TopBarSlot'
 
 type ViewMode = '3d' | 'house' | 'dashboards'
@@ -62,7 +62,7 @@ export function AppTopBar({ activeLevelId }: AppTopBarProps) {
     let cancelled = false
     const loadPending = async () => {
       try {
-        const res = await fetch('/api/setup/auth/pending')
+        const res = await authFetch('/api/setup/auth/pending')
         const payload = await res.json()
         if (cancelled) return
         if (res.ok && payload?.status === 'success' && Array.isArray(payload.data)) {
