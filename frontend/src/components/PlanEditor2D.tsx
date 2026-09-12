@@ -101,6 +101,10 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, al
   const [placements, setPlacements] = useState<DevicePlacement[]>([])
   const [loadingDevices, setLoadingDevices] = useState(false)
   const [deviceToPlace, setDeviceToPlace] = useState<Device | null>(null)
+  // Touch drag of a palette device onto the plan: iOS has no HTML5 drag-and-drop, so the editor
+  // tracks the pointer itself and places the device where the finger is released.
+  const [paletteDrag, setPaletteDrag] = useState<{ device: Device; x: number; y: number } | null>(null)
+  const paletteDragRef = useRef<Device | null>(null)
   const [activeLayer, setActiveLayer] = useState<string>('controls')
 
   const [tool, setToolState] = useState<ToolMode>('select')
@@ -1133,6 +1137,51 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, al
     savePlacement({ device_id: dev.id, x: point.x, y: point.y, custom_name: dev.name, icon: dev.domain, layer: activeLayer })
   }
 
+  const handlePaletteDragStart = (device: Device, e: React.PointerEvent) => {
+    if (!level) return
+    e.preventDefault()
+    paletteDragRef.current = device
+    setPaletteDrag({ device, x: e.clientX, y: e.clientY })
+  }
+
+  const paletteDragging = paletteDrag !== null
+
+  // Global pointer tracking for the touch palette drag: the ghost follows the finger and the
+  // device is placed on release, but only when the release lands on the plan (not on the panel).
+  useEffect(() => {
+    if (!paletteDragging) return
+    const move = (ev: PointerEvent) => {
+      setPaletteDrag((current) => (current ? { ...current, x: ev.clientX, y: ev.clientY } : current))
+    }
+    const finish = (ev: PointerEvent) => {
+      const device = paletteDragRef.current
+      paletteDragRef.current = null
+      setPaletteDrag(null)
+      if (!device) return
+      const rect = svgRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const inside =
+        ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom
+      if (!inside) return
+      const raw = toSvgPoint(ev.clientX, ev.clientY)
+      if (!raw) return
+      const { point } = snapPoint(raw, { noVertex: true })
+      savePlacement({ device_id: device.id, x: point.x, y: point.y, custom_name: device.name, icon: device.domain, layer: activeLayer })
+    }
+    const cancel = () => {
+      paletteDragRef.current = null
+      setPaletteDrag(null)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', finish)
+    window.addEventListener('pointercancel', cancel)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', finish)
+      window.removeEventListener('pointercancel', cancel)
+    }
+  }, [paletteDragging, toSvgPoint, snapPoint, savePlacement, activeLayer])
+
   const handleSelectLevel = (id: string) => {
     if (id === level?.id) return
     if (isDirty && !confirm('Unsaved modifications. Switching levels will discard them. Continue?')) return
@@ -1615,6 +1664,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, al
                     if (dev) setSelection(null)
                   }}
                   onRefresh={fetchDevices}
+                  onDragDeviceStart={handlePaletteDragStart}
                 />
               )}
             </div>
@@ -1633,6 +1683,15 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, al
           }}
           onClose={() => setShowWizard(false)}
         />
+      )}
+
+      {paletteDrag && (
+        <div
+          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-[140%] rounded-lg border border-indigo-500/60 bg-slate-900/90 px-2.5 py-1.5 text-xs font-semibold text-white shadow-lg"
+          style={{ left: paletteDrag.x, top: paletteDrag.y }}
+        >
+          {paletteDrag.device.name}
+        </div>
       )}
     </div>
   )

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider, useNavigate } from 'react-router-dom'
 import { PlanEditor2D } from './PlanEditor2D'
-import type { Level, WallSegment } from '../types'
+import type { Device, Level, WallSegment } from '../types'
 
 class ResizeObserverMock {
   observe() {}
@@ -21,6 +21,15 @@ const LEVEL: Level = {
 }
 
 const WALL: WallSegment = { id: 'w1', x1: 0, y1: 0, x2: 100, y2: 0, thickness: 8, openings: [] }
+
+const DEVICE: Device = {
+  id: 'light.1',
+  name: 'Lamp',
+  domain: 'light',
+  state: 'on',
+  attributes: {},
+  last_updated: '',
+}
 
 function jsonResponse(payload: unknown): Promise<Response> {
   return Promise.resolve({ ok: true, json: async () => payload } as Response)
@@ -105,6 +114,65 @@ describe('PlanEditor2D navigation guard', () => {
     expect(await screen.findByText('Dashboards page')).toBeDefined()
     expect(confirmSpy).not.toHaveBeenCalledWith(
       'Unsaved modifications. Leaving the editor will discard them. Continue?',
+    )
+  })
+})
+
+describe('PlanEditor2D touch placement', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', ResizeObserverMock)
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      const method = (init?.method ?? 'GET').toUpperCase()
+      if (url.endsWith('/plan')) return jsonResponse({ status: 'success', data: { walls: [WALL], zones: [] } })
+      if (url.endsWith('/placements') && method === 'POST') {
+        return jsonResponse({
+          status: 'success',
+          data: { id: 'pl-1', level_id: 'lvl-1', device_id: 'light.1', x: 500, y: 500, layer: 'controls' },
+        })
+      }
+      if (url.endsWith('/api/devices')) return jsonResponse({ status: 'success', data: [DEVICE] })
+      return jsonResponse({ status: 'success', data: [] })
+    }) as unknown as typeof fetch
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('places a device dropped from the palette with a touch pointer', async () => {
+    await loadPlanWithWall()
+
+    fireEvent.click(screen.getByRole('button', { name: /devices/i }))
+    const dragIcon = await waitFor(() => {
+      const el = document.querySelector('[data-drag-icon]') as HTMLElement | null
+      if (!el) throw new Error('palette icon not rendered yet')
+      return el
+    })
+
+    // jsdom has no layout and no SVG CTM: give the plan an identity geometry so the drop lands.
+    const svg = document.querySelector('svg.touch-none') as SVGSVGElement
+    svg.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, right: 1000, bottom: 1000, width: 1000, height: 1000, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
+    svg.getScreenCTM = () =>
+      ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0, inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }) }) as unknown as DOMMatrix
+
+    act(() => {
+      const down = new Event('pointerdown', { bubbles: true, cancelable: true })
+      Object.assign(down, { pointerType: 'touch', pointerId: 1, clientX: 10, clientY: 10, button: 0 })
+      dragIcon.dispatchEvent(down)
+    })
+    act(() => {
+      const up = new Event('pointerup', { bubbles: true, cancelable: true })
+      Object.assign(up, { pointerType: 'touch', pointerId: 1, clientX: 500, clientY: 500 })
+      window.dispatchEvent(up)
+    })
+
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        '/api/levels/lvl-1/placements',
+        expect.objectContaining({ method: 'POST' }),
+      ),
     )
   })
 })

@@ -25,7 +25,7 @@ A **zone** is a closed polygon representing a room or a garden sub-area.
 ## Placing devices
 
 1. Open the device palette — it lists every supported device discovered from Home Assistant, filtered and normalized by Walldash.
-2. **Drag a device** onto the plan to anchor it at 2D coordinates.
+2. **Drag a device** onto the plan to anchor it at 2D coordinates. On a touch tablet (iPad), drag the device icon from the palette with your finger; on a computer you can also press the **crosshair** button then tap the desired spot.
 3. Double-click a placement to edit it:
    - a **custom name**,
    - the **icon**,

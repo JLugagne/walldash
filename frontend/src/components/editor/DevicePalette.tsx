@@ -10,9 +10,14 @@ interface DevicePaletteProps {
   deviceToPlace: Device | null
   onPickDevice: (device: Device | null) => void
   onRefresh: () => void
+  /**
+   * Touch drag start. iOS/iPadOS does not fire HTML5 `dragstart`/`drop` for touch, so a finger
+   * drag on the device icon is handed to the editor, which tracks the pointer and drops on release.
+   */
+  onDragDeviceStart?: (device: Device, e: React.PointerEvent) => void
 }
 
-export function DevicePalette({ devices, loading, placedDeviceIds, deviceToPlace, onPickDevice, onRefresh }: DevicePaletteProps) {
+export function DevicePalette({ devices, loading, placedDeviceIds, deviceToPlace, onPickDevice, onRefresh, onDragDeviceStart }: DevicePaletteProps) {
   const [category, setCategory] = useState('all')
   const [search, setSearch] = useState('')
   const [hidePlaced, setHidePlaced] = useState(false)
@@ -119,7 +124,12 @@ export function DevicePalette({ devices, loading, placedDeviceIds, deviceToPlace
               >
                 <div
                   data-drag-icon
-                  className={`relative w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 bg-slate-950 ${style.bg} ${style.border} ${style.text}`}
+                  onPointerDown={(e) => {
+                    // Mouse keeps the native HTML5 drag (setDragImage etc.); touch uses the
+                    // pointer-based fallback that works on iPad.
+                    if (e.pointerType !== 'mouse') onDragDeviceStart?.(dev, e)
+                  }}
+                  className={`relative w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 bg-slate-950 touch-none ${style.bg} ${style.border} ${style.text}`}
                 >
                   <Icon className="w-4 h-4" />
                   <span
@@ -149,7 +159,7 @@ export function DevicePalette({ devices, loading, placedDeviceIds, deviceToPlace
                     className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
                       placing
                         ? 'bg-rose-600 text-white hover:bg-rose-500'
-                        : 'text-slate-400 hover:text-white hover:bg-indigo-600 opacity-0 group-hover:opacity-100'
+                        : 'text-slate-400 hover:text-white hover:bg-indigo-600 opacity-70 group-hover:opacity-100'
                     }`}
                   >
                     {placing ? <X className="w-3.5 h-3.5" /> : <Crosshair className="w-3.5 h-3.5" />}
@@ -162,7 +172,7 @@ export function DevicePalette({ devices, loading, placedDeviceIds, deviceToPlace
       </div>
 
       <div className="px-3 py-2 border-t border-slate-800 text-[11px] text-slate-500 leading-relaxed">
-        Drag a device onto the plan, or click the crosshair then click the desired location.
+        Drag a device onto the plan, or press the crosshair then tap the desired spot.
       </div>
     </div>
   )
