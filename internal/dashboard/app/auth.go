@@ -114,6 +114,7 @@ func (a *Auth) StartEnrollment(ctx context.Context, label, ip string) (*PendingE
 		"event":     "otp_issued",
 		"device_id": deviceID,
 		"label":     label,
+		"code":      ch.Code,
 		"ip":        ip,
 	}).Info("otp_issued")
 

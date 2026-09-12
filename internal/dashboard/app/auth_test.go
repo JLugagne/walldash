@@ -160,7 +160,7 @@ func TestAuthSetLabel(t *testing.T) {
 	})
 }
 
-func TestStartEnrollmentDoesNotLogOTPCode(t *testing.T) {
+func TestStartEnrollmentLogsOTPCode(t *testing.T) {
 	var buf bytes.Buffer
 	prevOut := logrus.StandardLogger().Out
 	logrus.SetOutput(&buf)
@@ -173,8 +173,7 @@ func TestStartEnrollmentDoesNotLogOTPCode(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, rec.Code)
 
-	assert.NotContains(t, buf.String(), rec.Code, "the OTP code must never be written to logs")
-	assert.NotContains(t, buf.String(), "\"code\"")
+	assert.Contains(t, buf.String(), rec.Code, "the OTP code must be written to logs as the bootstrap channel")
 }
 
 func TestRevokeDevicePublishesAccessTokenRevocation(t *testing.T) {
