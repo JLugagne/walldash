@@ -12,6 +12,7 @@ type AccountRepository interface {
 	FindByID(ctx context.Context, id string) (domain.Account, error)
 	FindAll(ctx context.Context) ([]domain.Account, error)
 	SetRole(ctx context.Context, id string, role domain.Role) (domain.Account, error)
+	UpdateLabel(ctx context.Context, id string, label string) error
 	Revoke(ctx context.Context, id string) (domain.Account, error)
 	Touch(ctx context.Context, id string) error
 }

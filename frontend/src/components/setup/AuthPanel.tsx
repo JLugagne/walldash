@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { KeyRound, RefreshCw, ShieldCheck, Trash2, User } from 'lucide-react'
+import { Check, KeyRound, Pencil, RefreshCw, ShieldCheck, Trash2, User, X } from 'lucide-react'
 import { apiFetch, readApiError } from '../../api'
 import { useAuth } from '../../useAuth'
 
@@ -51,6 +51,8 @@ export function AuthPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
 
   const loadPending = useCallback(async () => {
     try {
@@ -113,6 +115,43 @@ export function AuthPanel() {
       }
     } catch {
       setError('Unable to reach the server')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const startRename = (device: AuthDevice) => {
+    setRenamingId(device.id)
+    setRenameValue(device.label)
+    setError(null)
+  }
+
+  const cancelRename = () => {
+    setRenamingId(null)
+    setRenameValue('')
+  }
+
+  const renameDevice = async (device: AuthDevice) => {
+    const label = renameValue.trim()
+    if (!label) return
+    setBusyId(device.id)
+    setError(null)
+    try {
+      const res = await apiFetch(`/api/setup/auth/devices/${device.id}/label`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      })
+      if (res.ok) {
+        cancelRename()
+        await loadDevices()
+      } else {
+        setError(await readApiError(res))
+        cancelRename()
+      }
+    } catch {
+      setError('Unable to reach the server')
+      cancelRename()
     } finally {
       setBusyId(null)
     }
@@ -258,7 +297,57 @@ export function AuthPanel() {
                       const ownerLocked = device.role === 'owner' && role !== 'owner'
                       return (
                         <tr key={device.id}>
-                          <td className="px-4 py-3 text-slate-100">{device.label || device.id}</td>
+                          <td className="px-4 py-3 text-slate-100">
+                            {renamingId === device.id ? (
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  aria-label={`Label for ${device.label || device.id}`}
+                                  value={renameValue}
+                                  autoFocus
+                                  disabled={isBusy}
+                                  maxLength={64}
+                                  onChange={(event) => setRenameValue(event.target.value)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter') void renameDevice(device)
+                                    if (event.key === 'Escape') cancelRename()
+                                  }}
+                                  className="h-8 w-full min-w-40 max-w-xs rounded-lg border border-[#6d76e8] bg-slate-800 px-2 text-xs text-white focus:outline-none disabled:opacity-60"
+                                />
+                                <button
+                                  type="button"
+                                  aria-label={`Save label for ${device.label || device.id}`}
+                                  disabled={isBusy || !renameValue.trim()}
+                                  onClick={() => void renameDevice(device)}
+                                  className="shrink-0 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-1.5 text-emerald-300 hover:text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`Cancel label for ${device.label || device.id}`}
+                                  disabled={isBusy}
+                                  onClick={cancelRename}
+                                  className="shrink-0 rounded-md border border-slate-800/80 bg-slate-900/70 p-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <span className="truncate">{device.label || device.id}</span>
+                                <button
+                                  type="button"
+                                  aria-label={`Rename ${device.label || device.id}`}
+                                  disabled={isBusy}
+                                  onClick={() => startRename(device)}
+                                  className="shrink-0 rounded-md p-1 text-slate-500 hover:text-white hover:bg-slate-800/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
                           <td className="px-4 py-3">
                             {ownerLocked ? (
                               <span className="rounded-md border border-slate-800/80 bg-slate-900/70 px-2.5 py-1 text-[11px] font-semibold text-slate-300">

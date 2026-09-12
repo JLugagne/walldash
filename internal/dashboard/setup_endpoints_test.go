@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -140,4 +141,80 @@ func TestSetupEndpointsRateLimited(t *testing.T) {
 	resp := client.do(http.MethodPost, "/api/auth/connect", nil, nil)
 	require.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
 	requireJSendCode(t, resp, "RATE_LIMITED")
+}
+
+func TestSetupEndpointsRenameDevice(t *testing.T) {
+	ctx, dash, server, owner := setupAuthServer(t)
+	_, ownerRole := enrollClient(t, ctx, dash, owner)
+	require.Equal(t, "owner", ownerRole)
+
+	device := newAuthTestClient(t, server)
+	device.fetchCSRF()
+	deviceID, deviceRole := enrollClient(t, ctx, dash, device)
+	require.Equal(t, "device", deviceRole)
+
+	resp := owner.do(http.MethodPost, "/api/setup/auth/devices/"+deviceID+"/label", map[string]string{"label": "Kitchen tablet"}, nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var renamed struct {
+		Status string `json:"status"`
+		Data   struct {
+			ID    string `json:"id"`
+			Label string `json:"label"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&renamed))
+	resp.Body.Close()
+	require.Equal(t, "success", renamed.Status)
+	require.Equal(t, deviceID, renamed.Data.ID)
+	require.Equal(t, "Kitchen tablet", renamed.Data.Label)
+
+	resp = owner.do(http.MethodGet, "/api/setup/auth/devices", nil, nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var devicesResp struct {
+		Status string `json:"status"`
+		Data   []struct {
+			ID    string `json:"id"`
+			Label string `json:"label"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&devicesResp))
+	resp.Body.Close()
+	labels := map[string]string{}
+	for _, d := range devicesResp.Data {
+		labels[d.ID] = d.Label
+	}
+	require.Equal(t, "Kitchen tablet", labels[deviceID])
+
+	t.Run("empty label is rejected", func(t *testing.T) {
+		resp := owner.do(http.MethodPost, "/api/setup/auth/devices/"+deviceID+"/label", map[string]string{"label": "   "}, nil)
+		require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		requireJSendCode(t, resp, "INVALID_LABEL")
+	})
+
+	t.Run("too long label is rejected", func(t *testing.T) {
+		resp := owner.do(http.MethodPost, "/api/setup/auth/devices/"+deviceID+"/label", map[string]string{"label": strings.Repeat("a", 65)}, nil)
+		require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		requireJSendCode(t, resp, "INVALID_LABEL")
+	})
+
+	t.Run("unknown id is rejected", func(t *testing.T) {
+		resp := owner.do(http.MethodPost, "/api/setup/auth/devices/does-not-exist/label", map[string]string{"label": "ok"}, nil)
+		require.Equal(t, http.StatusNotFound, resp.StatusCode)
+		requireJSendCode(t, resp, "ACCOUNT_NOT_FOUND")
+	})
+}
+
+func TestSetupEndpointsRenameForbidden(t *testing.T) {
+	ctx, dash, server, owner := setupAuthServer(t)
+	_, ownerRole := enrollClient(t, ctx, dash, owner)
+	require.Equal(t, "owner", ownerRole)
+
+	device := newAuthTestClient(t, server)
+	device.fetchCSRF()
+	deviceID, deviceRole := enrollClient(t, ctx, dash, device)
+	require.Equal(t, "device", deviceRole)
+
+	resp := device.do(http.MethodPost, "/api/setup/auth/devices/"+deviceID+"/label", map[string]string{"label": "Nope"}, nil)
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
+	requireJSendCode(t, resp, "FORBIDDEN")
 }

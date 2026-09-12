@@ -166,3 +166,20 @@ func (r *accountRepo) Touch(ctx context.Context, id string) error {
 	}
 	return nil
 }
+
+func (r *accountRepo) UpdateLabel(ctx context.Context, id string, label string) error {
+	log := logger.LoggerFromContext(ctx)
+	res, err := r.db.ExecContext(ctx, `UPDATE auth_accounts SET label = ? WHERE id = ?`, label, id)
+	if err != nil {
+		log.WithError(err).WithField("account_id", id).Error("failed to update account label")
+		return errors.Join(domain.ErrDatabaseUnavailable, err)
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return errors.Join(domain.ErrDatabaseUnavailable, err)
+	}
+	if affected == 0 {
+		return errors.Join(domain.ErrAccountNotFound, errors.New("no account found to update label"))
+	}
+	return nil
+}

@@ -52,9 +52,9 @@ func newAuthTestClient(t *testing.T, server *httptest.Server) *authTestClient {
 	t.Helper()
 	jar, err := cookiejar.New(nil)
 	require.NoError(t, err)
-	client := server.Client()
+	client := *server.Client()
 	client.Jar = jar
-	return &authTestClient{t: t, base: server.URL, client: client}
+	return &authTestClient{t: t, base: server.URL, client: &client}
 }
 
 func (c *authTestClient) do(method, path string, body any, mutate func(*http.Request)) *http.Response {

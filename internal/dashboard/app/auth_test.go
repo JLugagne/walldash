@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
@@ -118,5 +119,36 @@ func TestAuthSetRoleRules(t *testing.T) {
 		auth := NewAuth(nil, newRepo(deviceTarget), nil, &stubRefreshRevoker{})
 		_, err := auth.SetRole(context.Background(), owner, deviceTarget.ID, domain.Role("root"))
 		require.ErrorIs(t, err, domain.ErrInvalidRole)
+	})
+}
+
+func TestAuthSetLabel(t *testing.T) {
+	target := domain.Account{ID: uuid.NewString(), Role: domain.RoleDevice, Status: domain.StatusActive, Label: "old"}
+	repo := &accountstest.MockAccountRepository{
+		UpdateLabelFunc: func(_ context.Context, id string, label string) error {
+			if id != target.ID {
+				return domain.ErrAccountNotFound
+			}
+			target.Label = label
+			return nil
+		},
+	}
+	auth := NewAuth(nil, repo, nil, &stubRefreshRevoker{})
+
+	t.Run("trims and stores a valid label", func(t *testing.T) {
+		require.NoError(t, auth.SetLabel(context.Background(), target.ID, "  Kitchen tablet  "))
+		require.Equal(t, "Kitchen tablet", target.Label)
+	})
+
+	t.Run("rejects an empty label", func(t *testing.T) {
+		require.ErrorIs(t, auth.SetLabel(context.Background(), target.ID, "   "), domain.ErrInvalidLabel)
+	})
+
+	t.Run("rejects a label longer than 64 characters", func(t *testing.T) {
+		require.ErrorIs(t, auth.SetLabel(context.Background(), target.ID, strings.Repeat("a", 65)), domain.ErrInvalidLabel)
+	})
+
+	t.Run("propagates an unknown account", func(t *testing.T) {
+		require.ErrorIs(t, auth.SetLabel(context.Background(), "missing", "ok"), domain.ErrAccountNotFound)
 	})
 }

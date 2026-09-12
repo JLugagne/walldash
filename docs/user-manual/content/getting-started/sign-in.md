@@ -19,7 +19,7 @@ Walldash calls `POST /api/auth/connect` in the background when the screen opens.
 The code is single-use and expires after **15 minutes**. It is delivered through two channels:
 
 - **The server log** — the intended delivery channel. Walldash logs an `otp_issued` line containing the code, the device label and the client IP. In the Home Assistant add-on, open the add-on page and check its log; with Docker, use `docker compose logs`.
-- **Setup → Access** — once an owner or admin device is enrolled, any pending code is listed there with its device label and expiry.
+- **Setup → Access** — once an owner or admin device is enrolled, any pending code is listed there with its device label and expiry. The top-bar **shield button** (owner/admin) opens it directly and shows a badge while a request is pending.
 
 > The **first device** has no authenticated Setup tab yet, so its only channel is the log. Read the first `otp_issued` code from the add-on or container log to bootstrap the installation.
 

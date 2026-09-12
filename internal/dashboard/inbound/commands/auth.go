@@ -229,4 +229,40 @@ func (h *AuthHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 func SetupSetupAuthRoutes(r *mux.Router, h *AuthHandler) {
 	r.HandleFunc("/devices/{id}/revoke", h.RevokeDevice).Methods(http.MethodPost)
 	r.HandleFunc("/devices/{id}/role", h.SetRole).Methods(http.MethodPost)
+	r.HandleFunc("/devices/{id}/label", h.SetLabel).Methods(http.MethodPost)
+}
+
+func (h *AuthHandler) SetLabel(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Label string `json:"label"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		middleware.WriteJSendError(w, http.StatusBadRequest, "INVALID_LABEL", "invalid label")
+		return
+	}
+	id := mux.Vars(r)["id"]
+	if err := h.auth.SetLabel(r.Context(), id, body.Label); err != nil {
+		switch {
+		case errors.Is(err, domain.ErrInvalidLabel):
+			middleware.WriteJSendError(w, http.StatusBadRequest, "INVALID_LABEL", "invalid label")
+		case errors.Is(err, domain.ErrAccountNotFound):
+			middleware.WriteJSendError(w, http.StatusNotFound, "ACCOUNT_NOT_FOUND", "account not found")
+		default:
+			h.controller.SendError(w, r, err)
+		}
+		return
+	}
+	updated, err := h.auth.GetAccount(r.Context(), id)
+	if err != nil {
+		h.controller.SendError(w, r, err)
+		return
+	}
+	h.controller.SendSuccess(w, r, map[string]any{
+		"id":         updated.ID,
+		"label":      updated.Label,
+		"role":       updated.Role,
+		"status":     updated.Status,
+		"created_at": updated.CreatedAt,
+		"last_seen":  updated.LastSeen,
+	})
 }

@@ -103,6 +103,68 @@ describe('AuthPanel', () => {
     })
   })
 
+  it('renames a device and reloads the list', async () => {
+    let deviceLoads = 0
+    const fetchMock = mockRoutes({
+      'GET /api/auth/me': meRoute('owner'),
+      'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
+      'GET /api/setup/auth/devices': () => {
+        deviceLoads += 1
+        return jsonResponse(200, { status: 'success', data: DEVICES })
+      },
+      'GET /api/csrf-token': csrfRoute(),
+      'POST /api/setup/auth/devices/d2/label': () =>
+        jsonResponse(200, { status: 'success', data: { id: 'd2', label: 'Kitchen panel' } }),
+    })
+
+    render(<AuthPanel />)
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /rename garage tablet/i }, { timeout: 5000 }),
+    )
+    const input = screen.getByRole('textbox', { name: /label for garage tablet/i })
+    fireEvent.change(input, { target: { value: 'Kitchen panel' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(deviceLoads).toBe(2)
+    })
+
+    const labelCall = fetchMock.mock.calls.find(
+      ([input, init]) =>
+        String(input) === '/api/setup/auth/devices/d2/label' &&
+        (init as RequestInit | undefined)?.method === 'POST',
+    )
+    expect(labelCall).toBeDefined()
+    const init = (labelCall?.[1] ?? {}) as RequestInit
+    expect(JSON.parse(String(init.body))).toEqual({
+      label: 'Kitchen panel',
+    })
+  })
+
+  it('surfaces the error and keeps the old label when renaming fails', async () => {
+    mockRoutes({
+      'GET /api/auth/me': meRoute('owner'),
+      'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
+      'GET /api/setup/auth/devices': () => jsonResponse(200, { status: 'success', data: DEVICES }),
+      'GET /api/csrf-token': csrfRoute(),
+      'POST /api/setup/auth/devices/d2/label': () =>
+        jsonResponse(400, { status: 'error', message: 'label must be 1..64 characters' }),
+    })
+
+    render(<AuthPanel />)
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /rename garage tablet/i }, { timeout: 5000 }),
+    )
+    const input = screen.getByRole('textbox', { name: /label for garage tablet/i })
+    fireEvent.change(input, { target: { value: 'Bad' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(await screen.findByText('label must be 1..64 characters')).toBeDefined()
+    expect(screen.getByText('Garage tablet')).toBeDefined()
+  })
+
   it('restricts the role selector for non-owner accounts', async () => {
     mockRoutes({
       'GET /api/auth/me': meRoute('admin'),

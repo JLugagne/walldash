@@ -46,10 +46,10 @@ Manage your dashboards: open one to edit it, or create a new one. Rename, delete
 
 {{< figure src="/images/setup-access.png" alt="Setup Access tab listing pending sign-in codes and enrolled devices with roles and a revoke action" caption="**Access** lists pending one-time codes, then every enrolled device with its role and a **revoke** action." >}}
 
-The **Access** area manages device sign-in and is available to **owner** and **admin** devices only:
+The **Access** area manages device sign-in and is available to **owner** and **admin** devices only. It is also reachable directly from the **shield button** in the top bar, which shows a badge while an enrollment is waiting — no need to open Setup first.
 
 - **Pending codes** — devices that have opened the sign-in screen and are waiting for their one-time code. Each entry shows the device label, the code and when it expires, so you can read it out instead of digging through the log.
-- **Devices** — every enrolled device with its label, role, status and last-seen time. Change a device's role (`admin` / `device`; only the **owner** can grant or remove `owner`) or **revoke** it.
+- **Devices** — every enrolled device with its label, role, status and last-seen time. Rename a device with the pencil icon — the default label is its User-Agent, so give it a name that says where it lives. Change a device's role (`admin` / `device`; only the **owner** can grant or remove `owner`) or **revoke** it.
 - **Revoke** deletes the device's refresh tokens immediately, but an access token already issued keeps working for up to 15 minutes. See [Sign in & device access](/getting-started/sign-in/).
 
 ## Settings

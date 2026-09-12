@@ -125,4 +125,8 @@ var (
 		Code:    "INVALID_ROLE",
 		Message: "invalid account role",
 	}
+	ErrInvalidLabel = &Error{
+		Code:    "INVALID_LABEL",
+		Message: "invalid account label",
+	}
 )

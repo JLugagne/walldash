@@ -13,12 +13,13 @@ import (
 
 // MockAccountRepository is a function-based mock implementation of accounts.AccountRepository.
 type MockAccountRepository struct {
-	CreateFunc   func(ctx context.Context, account domain.Account) (domain.Account, error)
-	FindByIDFunc func(ctx context.Context, id string) (domain.Account, error)
-	FindAllFunc  func(ctx context.Context) ([]domain.Account, error)
-	SetRoleFunc  func(ctx context.Context, id string, role domain.Role) (domain.Account, error)
-	RevokeFunc   func(ctx context.Context, id string) (domain.Account, error)
-	TouchFunc    func(ctx context.Context, id string) error
+	CreateFunc      func(ctx context.Context, account domain.Account) (domain.Account, error)
+	FindByIDFunc    func(ctx context.Context, id string) (domain.Account, error)
+	FindAllFunc     func(ctx context.Context) ([]domain.Account, error)
+	SetRoleFunc     func(ctx context.Context, id string, role domain.Role) (domain.Account, error)
+	UpdateLabelFunc func(ctx context.Context, id string, label string) error
+	RevokeFunc      func(ctx context.Context, id string) (domain.Account, error)
+	TouchFunc       func(ctx context.Context, id string) error
 }
 
 func (m *MockAccountRepository) Create(ctx context.Context, account domain.Account) (domain.Account, error) {
@@ -183,8 +184,27 @@ func AccountRepositoryContractTesting(t *testing.T, repo accounts.AccountReposit
 	})
 
 	t.Run("Contract: Touch reports ErrAccountNotFound for a missing account", func(t *testing.T) {
+		t.Run("Contract: UpdateLabel updates the label", func(t *testing.T) {
+			require.NoError(t, repo.UpdateLabel(ctx, "acct-contract-device", "Kitchen tablet"))
+			found, err := repo.FindByID(ctx, "acct-contract-device")
+			require.NoError(t, err)
+			assert.Equal(t, "Kitchen tablet", found.Label)
+		})
+
+		t.Run("Contract: UpdateLabel reports ErrAccountNotFound for a missing account", func(t *testing.T) {
+			err := repo.UpdateLabel(ctx, "acct-missing", "Nope")
+			require.Error(t, err)
+			assert.ErrorIs(t, err, domain.ErrAccountNotFound)
+		})
 		err := repo.Touch(ctx, "acct-missing")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrAccountNotFound)
 	})
+}
+
+func (m *MockAccountRepository) UpdateLabel(ctx context.Context, id string, label string) error {
+	if m.UpdateLabelFunc == nil {
+		panic("called not defined UpdateLabelFunc")
+	}
+	return m.UpdateLabelFunc(ctx, id, label)
 }

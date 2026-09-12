@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Box, LayoutDashboard, Settings, type LucideIcon } from 'lucide-react'
+import { Box, LayoutDashboard, Settings, ShieldCheck, type LucideIcon } from 'lucide-react'
 import { useRealtimeDeviceControl } from '../hooks/useRealtimeDevices'
+import { useAuth } from '../useAuth'
 import { useSetTopBarSlot } from './TopBarSlot'
 
 type ViewMode = '3d' | 'house' | 'dashboards'
@@ -33,6 +34,12 @@ export function AppTopBar({ activeLevelId }: AppTopBarProps) {
   const location = useLocation()
   const { connected } = useRealtimeDeviceControl()
   const setSlot = useSetTopBarSlot()
+  const { account } = useAuth()
+
+  const role = account?.role ?? ''
+  const canManage = role === 'owner' || role === 'admin'
+
+  const [pendingCount, setPendingCount] = useState(0)
 
   const mode = resolveMode(location.pathname)
 
@@ -49,6 +56,31 @@ export function AppTopBar({ activeLevelId }: AppTopBarProps) {
     }
     navigate(mode === '3d' && activeLevelId ? `/setup/plans/${activeLevelId}` : '/setup/plans')
   }
+
+  useEffect(() => {
+    if (!canManage) return
+    let cancelled = false
+    const loadPending = async () => {
+      try {
+        const res = await fetch('/api/setup/auth/pending')
+        const payload = await res.json()
+        if (cancelled) return
+        if (res.ok && payload?.status === 'success' && Array.isArray(payload.data)) {
+          setPendingCount(payload.data.length)
+        }
+      } catch {
+        return
+      }
+    }
+    void loadPending()
+    const timer = window.setInterval(() => {
+      void loadPending()
+    }, 10_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [canManage])
 
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -96,6 +128,27 @@ export function AppTopBar({ activeLevelId }: AppTopBarProps) {
         <span className="text-sm font-semibold leading-none tabular-nums text-white max-sm:text-xs">{time}</span>
         <span className="text-xs leading-none text-slate-400 max-sm:hidden">{date}</span>
       </div>
+
+      {canManage && (
+        <button
+          type="button"
+          onClick={() => navigate('/setup/access')}
+          title={
+            pendingCount > 0
+              ? `${pendingCount} enrollment request${pendingCount === 1 ? '' : 's'} pending`
+              : 'Open access management'
+          }
+          className="relative h-9 shrink-0 rounded-lg border border-slate-800/80 bg-slate-900/70 px-3 max-sm:px-2 flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer"
+        >
+          <ShieldCheck className="w-3.5 h-3.5" />
+          <span className="max-sm:hidden">Access</span>
+          {pendingCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 rounded-full bg-[#6d76e8] px-1 flex items-center justify-center text-[10px] font-semibold leading-none text-white tabular-nums">
+              {pendingCount}
+            </span>
+          )}
+        </button>
+      )}
 
       <button
         type="button"

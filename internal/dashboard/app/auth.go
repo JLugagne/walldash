@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"sort"
+	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/JLugagne/egauth/otp"
 	"github.com/JLugagne/egauth/tokens/basic"
@@ -232,4 +234,12 @@ func (a *Auth) SetRole(ctx context.Context, actor domain.Account, id string, rol
 		return domain.Account{}, domain.ErrForbidden
 	}
 	return a.accounts.SetRole(ctx, id, role)
+}
+
+func (a *Auth) SetLabel(ctx context.Context, id string, label string) error {
+	trimmed := strings.TrimSpace(label)
+	if n := utf8.RuneCountInString(trimmed); n < 1 || n > 64 {
+		return domain.ErrInvalidLabel
+	}
+	return a.accounts.UpdateLabel(ctx, id, trimmed)
 }
