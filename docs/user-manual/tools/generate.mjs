@@ -212,7 +212,7 @@ async function authenticate(label = 'Walldash manual (harness)') {
   const codePromise = nextOtp()
   const connectRes = await fetch(`${BASE}/api/auth/connect`, {
     method: 'POST',
-    headers: { 'X-Requested-With': 'XMLHttpRequest', 'User-Agent': label },
+    headers: { Origin: BASE, 'User-Agent': label },
   })
   storeCookies(connectRes)
   if (!connectRes.ok) {
@@ -223,7 +223,7 @@ async function authenticate(label = 'Walldash manual (harness)') {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
+      Origin: BASE,
       'User-Agent': label,
       Cookie: cookieHeader(),
     },
@@ -273,7 +273,8 @@ function authCookies() {
 }
 
 // ---------------------------------------------------------------------------
-// Backend API helpers (CSRF is bypassed with X-Requested-With, as the SPA does)
+// Backend API helpers (non-GET requests send Origin: BASE so the strict
+// same-origin CSRF check passes, as the SPA does)
 // ---------------------------------------------------------------------------
 
 async function api(pathname, { method = 'GET', body } = {}) {
@@ -281,7 +282,7 @@ async function api(pathname, { method = 'GET', body } = {}) {
   const cookie = cookieHeader()
   if (cookie) headers.Cookie = cookie
   let payload
-  if (method !== 'GET') headers['X-Requested-With'] = 'XMLHttpRequest'
+  if (method !== 'GET') headers.Origin = BASE
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json'
     payload = JSON.stringify(body)
@@ -306,7 +307,7 @@ async function importSh3d() {
   form.append('file', new Blob([buf]), path.basename(SH3D_FILE))
   const res = await fetch(`${BASE}/api/levels/import/sh3d`, {
     method: 'POST',
-    headers: { 'X-Requested-With': 'XMLHttpRequest', Cookie: cookieHeader() },
+    headers: { Origin: BASE, Cookie: cookieHeader() },
     body: form,
   })
   const text = await res.text()
