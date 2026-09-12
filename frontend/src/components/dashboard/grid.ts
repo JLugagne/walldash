@@ -44,6 +44,29 @@ export function clampToMinSize(
   return { colSpan: Math.max(colSpan, min.cols), rowSpan: Math.max(rowSpan, min.rows) }
 }
 
+/** Number of columns the phone flow uses. Phones never show more than two. */
+export const MOBILE_COLUMNS = 2
+
+/** One Widget placed in the phone flow: its derived column span plus the untouched row span. */
+export interface MobileFlowItem {
+  rect: Rect
+  /** 1 for a single-cell Widget (half width), MOBILE_COLUMNS for anything wider (full width). */
+  mobileCols: number
+}
+
+/**
+ * mobileFlowItems turns a desktop layout into the phone flow. Widgets keep their reading order
+ * (row-major, then column), their row span drives the height, and their column span collapses to
+ * one or two flow columns: a single-cell Widget takes half the width, anything wider takes the full
+ * width. Returns new rects; the input is never mutated.
+ */
+export function mobileFlowItems(rects: Rect[]): MobileFlowItem[] {
+  return rects
+    .map((rect) => ({ ...rect, rowSpan: Math.max(rect.rowSpan, 1) }))
+    .sort((a, b) => a.row - b.row || a.col - b.col)
+    .map((rect) => ({ rect, mobileCols: rect.colSpan >= MOBILE_COLUMNS ? MOBILE_COLUMNS : 1 }))
+}
+
 /** rectsOverlap reports whether two areas share at least one cell. Touching edges do not overlap. */
 export function rectsOverlap(a: Rect, b: Rect): boolean {
   return (

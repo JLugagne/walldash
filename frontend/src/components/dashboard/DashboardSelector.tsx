@@ -38,7 +38,7 @@ export function DashboardSelector({
               onClick={() => onSelectDashboard(dashboard.id)}
               aria-pressed={isActive}
               aria-label={`Dashboard ${dashboard.name}`}
-              className={`px-3.5 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap select-none ${
+              className={`px-3.5 py-1.5 max-sm:px-2.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap select-none ${
                 isActive
                   ? 'bg-[#6d76e8] text-white font-semibold'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'

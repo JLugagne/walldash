@@ -13,6 +13,7 @@ import { NumberWidget } from './dashboard/widgets/NumberWidget'
 import { BarWidget } from './dashboard/widgets/BarWidget'
 import { ArcWidget } from './dashboard/widgets/ArcWidget'
 import { ToggleWidget } from './dashboard/widgets/ToggleWidget'
+import { MobileWidgetFlow } from './dashboard/MobileWidgetFlow'
 import { DashboardHeader } from './dashboard/DashboardHeader'
 import { DashboardSelector } from './dashboard/DashboardSelector'
 import { useTopBarSlot } from './TopBarSlot'
@@ -20,6 +21,7 @@ import { useSetupBannerSlot } from './setup/SetupBannerSlot'
 import { WidgetGrid } from './dashboard/WidgetGrid'
 import { Toast } from './dashboard/Toast'
 import { useDashboardData } from './dashboard/useDashboardData'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { DashboardBackgroundPanel, type BackgroundConfig } from './dashboard/DashboardBackgroundPanel'
 import {
   DEFAULT_BACKGROUND_BLUR,
@@ -68,6 +70,7 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
 }) => {
   const navigate = useNavigate()
   const isEdit = mode === 'edit'
+  const isMobile = useIsMobile()
   const [activeDashboardId, setActiveDashboardId] = useState<string | null>(
     () => dashboardId ?? readStoredActiveDashboardId(),
   )
@@ -223,28 +226,38 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
     [activeDashboardId, fetchDashboards]
   )
 
-  const handleRenameDashboard = async (name: string): Promise<boolean> => {
-    if (!activeDashboardId) return false
-    const res = await apiFetch(`/api/dashboards/${activeDashboardId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name,
-        order: activeDashboard?.order || 0,
-        cols: activeDashboard?.cols || 0,
-        rows: activeDashboard?.rows || 0,
-        background_image: activeDashboard?.background_image ?? '',
-        background_opacity: activeDashboard?.background_opacity ?? DEFAULT_BACKGROUND_OPACITY,
-        background_blur: activeDashboard?.background_blur ?? DEFAULT_BACKGROUND_BLUR,
-        background_dim: activeDashboard?.background_dim ?? DEFAULT_BACKGROUND_DIM,
-      }),
-    })
-    if (!res.ok) {
-      throw new Error(await readApiError(res))
-    }
-    await fetchDashboards()
-    return true
-  }
+  // Single writer for the dashboard's own configuration (name, grid size, background). Cols and
+  // rows are persisted per dashboard, so resizing one never touches another; a shrink the server
+  // refuses because a widget would overflow comes back as the thrown message.
+  const updateDashboard = useCallback(
+    async (patch: { name?: string; cols?: number; rows?: number }): Promise<boolean> => {
+      if (!activeDashboardId || !activeDashboard) return false
+      const res = await apiFetch(`/api/dashboards/${activeDashboardId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: patch.name ?? activeDashboard.name,
+          order: activeDashboard.order,
+          cols: patch.cols ?? activeDashboard.cols,
+          rows: patch.rows ?? activeDashboard.rows,
+          background_image: activeDashboard.background_image ?? '',
+          background_opacity: activeDashboard.background_opacity ?? DEFAULT_BACKGROUND_OPACITY,
+          background_blur: activeDashboard.background_blur ?? DEFAULT_BACKGROUND_BLUR,
+          background_dim: activeDashboard.background_dim ?? DEFAULT_BACKGROUND_DIM,
+        }),
+      })
+      if (!res.ok) {
+        throw new Error(await readApiError(res))
+      }
+      await fetchDashboards()
+      return true
+    },
+    [activeDashboard, activeDashboardId, fetchDashboards],
+  )
+
+  const handleRenameDashboard = (name: string) => updateDashboard({ name })
+
+  const handleResizeDashboard = (cols: number, rows: number) => updateDashboard({ cols, rows })
 
   const handleDeleteDashboard = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this dashboard?')) return
@@ -435,6 +448,9 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
 
   const renderGrid = () => {
     if (!activeDashboard) return null
+    if (isMobile) {
+      return <MobileWidgetFlow dashboard={activeDashboard} renderWidgetBody={renderWidgetBody} />
+    }
     if (isEdit) {
       return (
         <WidgetGrid
@@ -523,6 +539,7 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
                 dashboard={activeDashboard}
                 isEditMode={isEditMode}
                 onRename={handleRenameDashboard}
+                onResize={handleResizeDashboard}
                 onDelete={() => {
                   if (activeDashboardId) void handleDeleteDashboard(activeDashboardId)
                 }}
@@ -530,6 +547,13 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
                 onToggleEditMode={() => setIsEditMode((v) => !v)}
                 onToggleBackground={() => setIsBackgroundOpen((v) => !v)}
               />
+            </div>
+          )}
+
+          {isEdit && isMobile && (
+            <div className="shrink-0 rounded-lg border border-[#6d76e8]/30 bg-[#6d76e8]/10 px-3 py-2 text-[11px] leading-snug text-slate-300">
+              On a phone the dashboard flows in two columns and stays read-only. Open Setup on a tablet
+              or desktop to edit the layout.
             </div>
           )}
 
