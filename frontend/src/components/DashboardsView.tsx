@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { LayoutDashboard, Plus, RefreshCw, Settings } from 'lucide-react'
 import type { Device, Widget } from '../types'
 import { AutomationListWidget } from './dashboard/widgets/AutomationListWidget'
+import { AutomationSwitchWidget } from './dashboard/widgets/AutomationSwitchWidget'
 import { WeatherWidget } from './dashboard/widgets/WeatherWidget'
 import { AddWidgetModal, type NewWidgetInput, type WidgetContentInput } from './AddWidgetModal'
 import { apiFetch, readApiError } from '../api'
@@ -372,6 +373,16 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
     if (widget.type === 'automation_list') {
       return (
         <AutomationListWidget widget={widget} automations={automations} onTriggerSuccess={() => fetchAutomations()} />
+      )
+    }
+
+    if (widget.type === 'automation_switch') {
+      return (
+        <AutomationSwitchWidget
+          widget={widget}
+          automations={automations}
+          onTriggerSuccess={() => fetchAutomations()}
+        />
       )
     }
 

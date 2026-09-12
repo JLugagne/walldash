@@ -105,10 +105,10 @@ export interface SavePlacementRequest {
 }
 
 /** What a Widget is bound to, and therefore what a tap on it does. */
-export type WidgetType = 'sensor' | 'actuator' | 'automation_list' | 'weather'
+export type WidgetType = 'sensor' | 'actuator' | 'automation_list' | 'automation_switch' | 'weather'
 
 /** How a Widget draws its data, independent of what that data is. */
-export type DisplayMode = 'number' | 'arc' | 'bar' | 'toggle' | 'list' | 'weather'
+export type DisplayMode = 'number' | 'arc' | 'bar' | 'toggle' | 'list' | 'switch' | 'weather'
 
 /** Which slice of an Open-Meteo forecast a Weather Widget renders. */
 export type WeatherMode = 'current' | 'today' | 'tomorrow' | 'ndays'
@@ -129,6 +129,8 @@ export interface WidgetConfig {
   longitude?: number
   location_name?: string
   units?: WeatherUnits
+  on_automation?: string
+  off_automation?: string
 }
 
 export interface Widget {

@@ -51,7 +51,7 @@ export const BarWidget: React.FC<BarWidgetProps> = ({
     >
       <div
         className="flex items-baseline gap-1 min-w-0 whitespace-nowrap font-semibold tracking-tight text-white tabular-nums"
-        style={{ fontSize: 'clamp(1rem, min(38cqh, 24cqw), 2.25rem)' }}
+        style={{ fontSize: 'max(1rem, min(38cqh, 24cqw))' }}
       >
         <span className="truncate">{formatted.text}</span>
         {formatted.unit && <span className="shrink-0 font-medium text-slate-400 text-[0.55em]">{formatted.unit}</span>}

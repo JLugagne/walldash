@@ -10,6 +10,7 @@
 // Usage:
 //   SH3D_FILE=/path/to/plan.sh3d node generate.mjs
 //   node generate.mjs --skip-build        # reuse an existing frontend/dist and backend binary
+//   node generate.mjs --reuse-db          # reuse .work/manual.db (no .sh3d import) and re-seed dashboards
 //
 // Environment:
 //   SH3D_FILE    Path to a .sh3d plan (default: ./demo/alps-hotel.sh3d)
@@ -34,6 +35,7 @@ const DEMO_DIR = path.join(__dirname, 'demo')
 const PORT = Number(process.env.MANUAL_PORT || '18080')
 const BASE = `http://127.0.0.1:${PORT}`
 const SKIP_BUILD = process.argv.includes('--skip-build')
+const REUSE_DB = process.argv.includes('--reuse-db')
 
 const SH3D_FILE =
   process.env.SH3D_FILE || path.join(DEMO_DIR, 'alps-hotel.sh3d')
@@ -190,10 +192,18 @@ const AUTOMATIONS = [
 // The demo plan is an Alpine hotel, so the showcase dashboards use Chamonix weather.
 const WEATHER_LOCATION = { latitude: 45.9237, longitude: 6.8694, location_name: 'Chamonix' }
 
+const AUTOMATION_SWITCH = {
+  display: 'switch',
+  entity_ids: [],
+  on_automation: 'automation.simulation_presence',
+  off_automation: 'automation.eteindre_toutes_les_lumieres',
+}
+
 const HOME_WIDGETS = [
   { type: 'sensor', title: 'Hall temperature', config: { entity_ids: ['sensor.temperature_salon'], display: 'arc', min: 10, max: 30, unit: '°C' }, col: 0, row: 0, col_span: 3, row_span: 3 },
   { type: 'weather', title: 'Chamonix', config: { display: 'weather', weather_mode: 'current', units: 'metric', ...WEATHER_LOCATION }, col: 3, row: 0, col_span: 3, row_span: 3 },
-  { type: 'automation_list', title: 'Scenes', config: { entity_ids: AUTOMATIONS, display: 'list' }, col: 6, row: 0, col_span: 3, row_span: 3 },
+  { type: 'automation_list', title: 'Scenes', config: { entity_ids: AUTOMATIONS, display: 'list' }, col: 6, row: 0, col_span: 3, row_span: 2 },
+  { type: 'automation_switch', title: 'Evening', config: AUTOMATION_SWITCH, col: 6, row: 2, col_span: 3, row_span: 1 },
   { type: 'actuator', title: 'Hall lights', config: { entity_ids: ['light.salon_plafond'], display: 'toggle' }, col: 9, row: 0, col_span: 3, row_span: 1 },
   { type: 'actuator', title: 'Coffee machine', config: { entity_ids: ['switch.machine_a_cafe'], display: 'toggle' }, col: 9, row: 1, col_span: 3, row_span: 1 },
   { type: 'actuator', title: 'Kitchen lights', config: { entity_ids: ['light.cuisine_spot'], display: 'toggle' }, col: 9, row: 2, col_span: 3, row_span: 1 },
@@ -289,6 +299,37 @@ async function seed() {
   return { groundId: ground.id, levels, dashboardId: home.id }
 }
 
+async function reseedDashboards() {
+  const dashboards = (await api('/api/dashboards')).data
+  const byName = new Map(dashboards.map((d) => [d.name, d]))
+  const levels = (await api('/api/levels')).data
+  const ground = levels.find((l) => /ground/i.test(l.name)) || levels[0]
+
+  const sets = [
+    ['Home', HOME_WIDGETS],
+    ['Weather', WEATHER_WIDGETS],
+  ]
+  for (const [name, widgets] of sets) {
+    const dash = byName.get(name)
+    if (!dash) {
+      console.warn(`  ! dashboard "${name}" not found, skipping`)
+      continue
+    }
+    for (const w of dash.widgets) {
+      await api(`/api/dashboards/${dash.id}/widgets/${w.id}`, { method: 'DELETE' })
+    }
+    for (const w of widgets) {
+      await api(`/api/dashboards/${dash.id}/widgets`, {
+        method: 'POST',
+        body: { type: w.type, title: w.title, config: w.config, col: w.col, row: w.row, col_span: w.col_span, row_span: w.row_span },
+      })
+    }
+    console.log(`  reseeded dashboard "${name}" with ${widgets.length} widgets`)
+  }
+
+  return { groundId: ground.id, levels, dashboardId: byName.get('Home')?.id }
+}
+
 // ---------------------------------------------------------------------------
 // Playwright capture
 // ---------------------------------------------------------------------------
@@ -376,7 +417,7 @@ function stopBackend() {
 }
 
 async function main() {
-  if (!existsSync(SH3D_FILE)) {
+  if (!REUSE_DB && !existsSync(SH3D_FILE)) {
     throw new Error(
       `Sweet Home 3D file not found: ${SH3D_FILE}\n` +
         `Set SH3D_FILE=/path/to/plan.sh3d or drop a plan at tools/demo/alps-hotel.sh3d.`
@@ -396,7 +437,11 @@ async function main() {
   }
 
   console.log('→ starting demo backend (no Home Assistant configured)…')
-  await rm(dbPath, { force: true })
+  if (REUSE_DB) {
+    if (!existsSync(dbPath)) throw new Error(`--reuse-db: ${dbPath} not found`)
+  } else {
+    await rm(dbPath, { force: true })
+  }
 
   backend = spawn(binPath, [], {
     cwd: WORK_DIR, // deliberately isolated so no repository .env is loaded
@@ -424,10 +469,14 @@ async function main() {
   await waitForHealth()
   console.log('  backend is up')
 
-  // Screenshot the onboarding wizard before any data exists.
-  await captureEmptyOnboarding()
-
-  const ctx = await seed()
+  let ctx
+  if (REUSE_DB) {
+    ctx = await reseedDashboards()
+  } else {
+    // Screenshot the onboarding wizard before any data exists.
+    await captureEmptyOnboarding()
+    ctx = await seed()
+  }
   await capture(ctx)
 
   stopBackend()

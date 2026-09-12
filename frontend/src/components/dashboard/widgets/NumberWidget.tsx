@@ -21,13 +21,12 @@ const CHAR_WIDTH_EM = 0.62
 const UNIT_SCALE = 0.55
 const UNIT_GAP_EM = 0.25
 const MIN_FONT = '0.625rem'
-const MAX_FONT = '2.25rem'
 
 function valueFontSize(text: string, unit: string, heightCap: number): string {
   const unitWidthEm = unit ? UNIT_GAP_EM + unit.length * CHAR_WIDTH_EM * UNIT_SCALE : 0
   const lineWidthEm = Math.max(text.length * CHAR_WIDTH_EM + unitWidthEm, CHAR_WIDTH_EM)
   const widthFit = (100 / lineWidthEm).toFixed(1)
-  return `clamp(${MIN_FONT}, min(${heightCap}cqh, ${widthFit}cqw), ${MAX_FONT})`
+  return `max(${MIN_FONT}, min(${heightCap}cqh, ${widthFit}cqw))`
 }
 
 // Sensor widget, Display "number": a single centred value line whose font follows the body size

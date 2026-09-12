@@ -47,6 +47,10 @@ SH3D_FILE=/path/to/plan.sh3d npm run generate
 - `MANUAL_PORT` — backend port for the demo server (default `18080`).
 - Pass `--skip-build` to reuse the existing backend binary and
   `frontend/dist` build.
+- Pass `--reuse-db` to reuse the already-seeded `.work/manual.db` instead of
+  importing a `.sh3d` plan: it rebuilds the showcase dashboards and re-captures
+  every screenshot except the onboarding wizard. Useful when the demo plan is
+  not at hand.
 
 The generated PNGs are written to `../static/images/`. **No real Home Assistant
 installation is ever contacted** — the backend runs from an isolated working

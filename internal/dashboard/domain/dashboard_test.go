@@ -583,3 +583,49 @@ func TestDashboardValidateBackground(t *testing.T) {
 		})
 	}
 }
+
+func automationSwitchWidget() domain.Widget {
+	w := sensorNumberWidget()
+	w.ID = "widget-automation-switch"
+	w.Type = domain.WidgetTypeAutomationSwitch
+	w.Title = "Evening"
+	w.Config.Display = domain.DisplaySwitch
+	w.Config.EntityIDs = []string{}
+	w.Config.Unit = ""
+	w.Config.OnAutomation = "automation.evening_on"
+	w.Config.OffAutomation = "automation.evening_off"
+	return w
+}
+
+func TestAutomationSwitchWidget(t *testing.T) {
+	t.Run("matrix exposes a 1x1 switch", func(t *testing.T) {
+		size, ok := domain.MinimumWidgetSize(domain.WidgetTypeAutomationSwitch, domain.DisplaySwitch)
+		require.True(t, ok)
+		assert.Equal(t, domain.WidgetSize{Cols: 1, Rows: 1}, size)
+		assert.True(t, domain.IsSupportedWidgetType(domain.WidgetTypeAutomationSwitch))
+	})
+
+	t.Run("accepts two automation entities", func(t *testing.T) {
+		require.NoError(t, automationSwitchWidget().Validate())
+	})
+
+	t.Run("requires both automations", func(t *testing.T) {
+		missingOn := automationSwitchWidget()
+		missingOn.Config.OnAutomation = ""
+		require.ErrorIs(t, missingOn.Validate(), domain.ErrInvalidWidget)
+
+		missingOff := automationSwitchWidget()
+		missingOff.Config.OffAutomation = "  "
+		require.ErrorIs(t, missingOff.Validate(), domain.ErrInvalidWidget)
+	})
+
+	t.Run("rejects non-automation entities", func(t *testing.T) {
+		wrongDomain := automationSwitchWidget()
+		wrongDomain.Config.OnAutomation = "switch.evening_on"
+		require.ErrorIs(t, wrongDomain.Validate(), domain.ErrInvalidWidget)
+
+		malformed := automationSwitchWidget()
+		malformed.Config.OffAutomation = "evening_off"
+		require.ErrorIs(t, malformed.Validate(), domain.ErrInvalidWidget)
+	})
+}

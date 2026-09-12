@@ -10,10 +10,11 @@ import (
 // Widget types name what a widget is bound to and what a tap on it does.
 // They never encode how the widget is drawn: that is the Display Mode axis.
 const (
-	WidgetTypeSensor         = "sensor"
-	WidgetTypeActuator       = "actuator"
-	WidgetTypeAutomationList = "automation_list"
-	WidgetTypeWeather        = "weather"
+	WidgetTypeSensor           = "sensor"
+	WidgetTypeActuator         = "actuator"
+	WidgetTypeAutomationList   = "automation_list"
+	WidgetTypeAutomationSwitch = "automation_switch"
+	WidgetTypeWeather          = "weather"
 )
 
 // Display modes name how a widget draws the data it is bound to.
@@ -24,6 +25,7 @@ const (
 	DisplayBar     = "bar"
 	DisplayToggle  = "toggle"
 	DisplayList    = "list"
+	DisplaySwitch  = "switch"
 	DisplayWeather = "weather"
 )
 
@@ -49,9 +51,8 @@ var widgetDisplayMatrix = map[string]map[string]WidgetSize{
 		DisplayBar:    {Cols: 2, Rows: 1},
 		DisplayArc:    {Cols: 2, Rows: 2},
 	},
-	WidgetTypeActuator: {
-		DisplayToggle: {Cols: 1, Rows: 1},
-	},
+	WidgetTypeActuator:         {DisplayToggle: {Cols: 1, Rows: 1}},
+	WidgetTypeAutomationSwitch: {DisplaySwitch: {Cols: 1, Rows: 1}},
 	WidgetTypeAutomationList: {
 		DisplayList: {Cols: 2, Rows: 2},
 	},
@@ -81,18 +82,20 @@ func IsSupportedWidgetType(widgetType string) bool {
 // zero, which a temperature arc needs. Labels renames the bound devices for this widget
 // only; it never touches DevicePlacement.CustomName.
 type WidgetConfig struct {
-	EntityIDs    []string          `json:"entity_ids,omitempty"`
-	Display      string            `json:"display"`
-	Labels       map[string]string `json:"labels,omitempty"`
-	Min          *float64          `json:"min,omitempty"`
-	Max          *float64          `json:"max,omitempty"`
-	Unit         string            `json:"unit,omitempty"`
-	WeatherMode  string            `json:"weather_mode,omitempty"`
-	WeatherDays  int               `json:"weather_days,omitempty"`
-	Latitude     *float64          `json:"latitude,omitempty"`
-	Longitude    *float64          `json:"longitude,omitempty"`
-	LocationName string            `json:"location_name,omitempty"`
-	Units        string            `json:"units,omitempty"`
+	EntityIDs     []string          `json:"entity_ids,omitempty"`
+	Display       string            `json:"display"`
+	Labels        map[string]string `json:"labels,omitempty"`
+	Min           *float64          `json:"min,omitempty"`
+	Max           *float64          `json:"max,omitempty"`
+	Unit          string            `json:"unit,omitempty"`
+	WeatherMode   string            `json:"weather_mode,omitempty"`
+	WeatherDays   int               `json:"weather_days,omitempty"`
+	Latitude      *float64          `json:"latitude,omitempty"`
+	Longitude     *float64          `json:"longitude,omitempty"`
+	LocationName  string            `json:"location_name,omitempty"`
+	Units         string            `json:"units,omitempty"`
+	OnAutomation  string            `json:"on_automation,omitempty"`
+	OffAutomation string            `json:"off_automation,omitempty"`
 }
 
 // Widget represents an interactive visual component anchored in the Widget Grid of an
@@ -150,6 +153,9 @@ func (w Widget) Validate() error {
 		return err
 	}
 	if err := w.validateWeatherConfig(); err != nil {
+		return err
+	}
+	if err := w.validateAutomationSwitch(); err != nil {
 		return err
 	}
 	return w.validateBounds()
@@ -345,5 +351,22 @@ func (w Widget) validateWeatherConfig() error {
 		return errors.Join(ErrInvalidWidget, errors.New("unsupported weather units: "+w.Config.Units))
 	}
 
+	return nil
+}
+
+func (w Widget) validateAutomationSwitch() error {
+	if w.Type != WidgetTypeAutomationSwitch {
+		return nil
+	}
+	for _, entityID := range []string{w.Config.OnAutomation, w.Config.OffAutomation} {
+		trimmed := strings.TrimSpace(entityID)
+		if trimmed == "" {
+			return errors.Join(ErrInvalidWidget, errors.New("widget type "+WidgetTypeAutomationSwitch+" requires both on and off automations"))
+		}
+		entityDomain, _, found := strings.Cut(trimmed, ".")
+		if !found || entityDomain != DomainAutomation {
+			return errors.Join(ErrInvalidWidget, errors.New("automation switch entities must be automation.* entities"))
+		}
+	}
 	return nil
 }

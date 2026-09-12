@@ -63,18 +63,20 @@ func toPublicWidgetConfig(c domain.WidgetConfig) pkgdashboard.WidgetConfigDTO {
 		entityIDs = []string{}
 	}
 	return pkgdashboard.WidgetConfigDTO{
-		EntityIDs:    entityIDs,
-		Display:      c.Display,
-		Labels:       c.Labels,
-		Min:          c.Min,
-		Max:          c.Max,
-		Unit:         c.Unit,
-		WeatherMode:  c.WeatherMode,
-		WeatherDays:  c.WeatherDays,
-		Latitude:     c.Latitude,
-		Longitude:    c.Longitude,
-		LocationName: c.LocationName,
-		Units:        c.Units,
+		EntityIDs:     entityIDs,
+		Display:       c.Display,
+		Labels:        c.Labels,
+		Min:           c.Min,
+		Max:           c.Max,
+		Unit:          c.Unit,
+		WeatherMode:   c.WeatherMode,
+		WeatherDays:   c.WeatherDays,
+		Latitude:      c.Latitude,
+		Longitude:     c.Longitude,
+		LocationName:  c.LocationName,
+		Units:         c.Units,
+		OnAutomation:  c.OnAutomation,
+		OffAutomation: c.OffAutomation,
 	}
 }
 
@@ -88,18 +90,20 @@ func toDomainWidgetConfig(dto pkgdashboard.WidgetConfigDTO) domain.WidgetConfig 
 		weatherMode = domain.WeatherModeCurrent
 	}
 	return domain.WidgetConfig{
-		EntityIDs:    entityIDs,
-		Display:      dto.Display,
-		Labels:       dto.Labels,
-		Min:          dto.Min,
-		Max:          dto.Max,
-		Unit:         dto.Unit,
-		WeatherMode:  weatherMode,
-		WeatherDays:  dto.WeatherDays,
-		Latitude:     dto.Latitude,
-		Longitude:    dto.Longitude,
-		LocationName: dto.LocationName,
-		Units:        dto.Units,
+		EntityIDs:     entityIDs,
+		Display:       dto.Display,
+		Labels:        dto.Labels,
+		Min:           dto.Min,
+		Max:           dto.Max,
+		Unit:          dto.Unit,
+		WeatherMode:   weatherMode,
+		WeatherDays:   dto.WeatherDays,
+		Latitude:      dto.Latitude,
+		Longitude:     dto.Longitude,
+		LocationName:  dto.LocationName,
+		Units:         dto.Units,
+		OnAutomation:  dto.OnAutomation,
+		OffAutomation: dto.OffAutomation,
 	}
 }
 

@@ -11,7 +11,22 @@ body {
   background-color: #0f172a;
   color: #f8fafc;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
+}
+
+/* Full-bleed app shell. `dvh` tracks the iPad/iPhone dynamic browser chrome instead of the
+   larger `100vh`, which Safari reports even when its toolbars reduce the visible area and so
+   crops the bottom of the dashboard. The `@supports` guard keeps the plain `vh` for older
+   browsers that do not understand `dvh`. */
+.app-viewport {
+  height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  .app-viewport {
+    height: 100dvh;
+  }
 }
 
 /* Subtle modern scrollbar */

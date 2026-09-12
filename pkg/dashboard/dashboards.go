@@ -35,18 +35,20 @@ type UpdateDashboardRequest struct {
 // WidgetConfigDTO contains configuration data for a widget in API payloads.
 // Min and Max are pointers so an absent bound stays distinguishable from a bound of zero.
 type WidgetConfigDTO struct {
-	EntityIDs    []string          `json:"entity_ids"`
-	Display      string            `json:"display" validate:"required"`
-	Labels       map[string]string `json:"labels,omitempty"`
-	Min          *float64          `json:"min,omitempty"`
-	Max          *float64          `json:"max,omitempty"`
-	Unit         string            `json:"unit,omitempty"`
-	WeatherMode  string            `json:"weather_mode,omitempty" validate:"omitempty,oneof=current today tomorrow ndays"`
-	WeatherDays  int               `json:"weather_days,omitempty" validate:"omitempty,gte=1,lte=14"`
-	Latitude     *float64          `json:"latitude,omitempty" validate:"omitempty,gte=-90,lte=90"`
-	Longitude    *float64          `json:"longitude,omitempty" validate:"omitempty,gte=-180,lte=180"`
-	LocationName string            `json:"location_name,omitempty" validate:"max=100"`
-	Units        string            `json:"units,omitempty" validate:"omitempty,oneof=metric imperial"`
+	EntityIDs     []string          `json:"entity_ids"`
+	Display       string            `json:"display" validate:"required"`
+	Labels        map[string]string `json:"labels,omitempty"`
+	Min           *float64          `json:"min,omitempty"`
+	Max           *float64          `json:"max,omitempty"`
+	Unit          string            `json:"unit,omitempty"`
+	WeatherMode   string            `json:"weather_mode,omitempty" validate:"omitempty,oneof=current today tomorrow ndays"`
+	WeatherDays   int               `json:"weather_days,omitempty" validate:"omitempty,gte=1,lte=14"`
+	Latitude      *float64          `json:"latitude,omitempty" validate:"omitempty,gte=-90,lte=90"`
+	Longitude     *float64          `json:"longitude,omitempty" validate:"omitempty,gte=-180,lte=180"`
+	LocationName  string            `json:"location_name,omitempty" validate:"max=100"`
+	Units         string            `json:"units,omitempty" validate:"omitempty,oneof=metric imperial"`
+	OnAutomation  string            `json:"on_automation,omitempty" validate:"omitempty,max=200"`
+	OffAutomation string            `json:"off_automation,omitempty" validate:"omitempty,max=200"`
 }
 
 // CreateWidgetRequest contains payload for adding a new widget to a dashboard.

@@ -68,7 +68,7 @@ function App() {
   const isSetup = location.pathname.startsWith('/setup')
 
   return (
-    <div className="h-screen w-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden">
+    <div className="app-viewport w-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden">
       {showWizard && (
         <OnboardingWizard
           onDone={() => {

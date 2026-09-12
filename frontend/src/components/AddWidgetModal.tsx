@@ -20,6 +20,7 @@ const DISPLAY_OPTIONS_BY_TYPE: Record<WidgetType, DisplayMode[]> = {
   sensor: ['number', 'arc', 'bar'],
   actuator: ['toggle'],
   automation_list: ['list'],
+  automation_switch: ['switch'],
   weather: ['weather'],
 }
 
@@ -31,6 +32,7 @@ const TYPE_LABELS: Record<WidgetType, string> = {
   sensor: 'Sensor',
   actuator: 'Actuator',
   automation_list: 'Automation list',
+  automation_switch: 'Automation switch',
   weather: 'Weather',
 }
 
@@ -62,6 +64,7 @@ const DISPLAY_LABELS: Record<DisplayMode, string> = {
   bar: 'Bar',
   toggle: 'Toggle',
   list: 'List',
+  switch: 'Switch',
   weather: 'Weather',
 }
 
@@ -118,6 +121,8 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
   const [minValue, setMinValue] = useState('')
   const [maxValue, setMaxValue] = useState('')
   const [unit, setUnit] = useState('')
+  const [onAutomation, setOnAutomation] = useState('')
+  const [offAutomation, setOffAutomation] = useState('')
   const [weatherMode, setWeatherMode] = useState<WeatherMode>('current')
   const [weatherDays, setWeatherDays] = useState(String(DEFAULT_WEATHER_DAYS))
   const [weatherUnits, setWeatherUnits] = useState<WeatherUnits>('')
@@ -140,6 +145,8 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
       setMinValue(editingWidget.config.min !== undefined ? String(editingWidget.config.min) : '')
       setMaxValue(editingWidget.config.max !== undefined ? String(editingWidget.config.max) : '')
       setUnit(editingWidget.config.unit || '')
+      setOnAutomation(editingWidget.config.on_automation || '')
+      setOffAutomation(editingWidget.config.off_automation || '')
       setWeatherMode(editingWidget.config.weather_mode || 'current')
       setWeatherDays(
         editingWidget.config.weather_days !== undefined
@@ -159,6 +166,8 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
       setMinValue('')
       setMaxValue('')
       setUnit('')
+      setOnAutomation('')
+      setOffAutomation('')
       setWeatherMode('current')
       setWeatherDays(String(DEFAULT_WEATHER_DAYS))
       setWeatherUnits('')
@@ -185,6 +194,8 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
     minValue,
     maxValue,
     unit,
+    onAutomation,
+    offAutomation,
     weatherMode,
     weatherDays,
     weatherUnits,
@@ -236,6 +247,8 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
     setDisplay(DISPLAY_OPTIONS_BY_TYPE[nextType][0])
     setSelectedEntityIds([])
     setUnit('')
+    setOnAutomation('')
+    setOffAutomation('')
   }
 
   const handleDisplayChange = (nextDisplay: DisplayMode) => {
@@ -256,12 +269,17 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
   }
 
   const isWeather = type === 'weather'
+  const isAutomationSwitch = type === 'automation_switch'
 
-  const cardinalityOk = isWeather
-    ? true
-    : type === 'automation_list'
-      ? selectedEntityIds.length >= 1
-      : selectedEntityIds.length === 1
+  const cardinalityOk =
+    isWeather || isAutomationSwitch
+      ? true
+      : type === 'automation_list'
+        ? selectedEntityIds.length >= 1
+        : selectedEntityIds.length === 1
+
+  const automationSwitchOk =
+    !isAutomationSwitch || (onAutomation.trim() !== '' && offAutomation.trim() !== '')
 
   const boundsRequired = display === 'arc' || display === 'bar'
   const parsedMin = minValue.trim() === '' ? undefined : Number(minValue)
@@ -316,6 +334,10 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
       : 'Select exactly one entity for this widget.'
     : null
 
+  const automationSwitchReason = !automationSwitchOk
+    ? 'Select one automation for On and one for Off.'
+    : null
+
   const boundsReason = !boundsOk ? 'Enter a minimum strictly lower than the maximum.' : null
 
   const weatherDaysReason = !weatherDaysOk
@@ -329,7 +351,13 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
     : null
 
   const blockingReason =
-    noRoomReason || tooSmallForEditReason || cardinalityReason || boundsReason || weatherDaysReason || locationReason
+    noRoomReason ||
+    tooSmallForEditReason ||
+    cardinalityReason ||
+    automationSwitchReason ||
+    boundsReason ||
+    weatherDaysReason ||
+    locationReason
 
   const canSubmit = !saving && !blockingReason
 
@@ -354,14 +382,21 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
               ? { latitude: parsedLatitude, longitude: parsedLongitude }
               : {}),
           }
-        : {
-            entity_ids: selectedEntityIds,
-            display,
-            ...(Object.keys(labels).length > 0 ? { labels } : {}),
-            ...(parsedMin !== undefined ? { min: parsedMin } : {}),
-            ...(parsedMax !== undefined ? { max: parsedMax } : {}),
-            ...(unit.trim() ? { unit: unit.trim() } : {}),
-          }
+        : isAutomationSwitch
+          ? {
+              entity_ids: [],
+              display,
+              on_automation: onAutomation,
+              off_automation: offAutomation,
+            }
+          : {
+              entity_ids: selectedEntityIds,
+              display,
+              ...(Object.keys(labels).length > 0 ? { labels } : {}),
+              ...(parsedMin !== undefined ? { min: parsedMin } : {}),
+              ...(parsedMax !== undefined ? { max: parsedMax } : {}),
+              ...(unit.trim() ? { unit: unit.trim() } : {}),
+            }
 
       if (isEditing && editingWidget) {
         await onUpdate(editingWidget.id, { title: title.trim(), config })
@@ -565,6 +600,41 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
               </div>
             )}
 
+            {isAutomationSwitch && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Automation when On</label>
+                  <select
+                    value={onAutomation}
+                    onChange={(e) => setOnAutomation(e.target.value)}
+                    className="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#6d76e8]"
+                  >
+                    <option value="">Select an automation…</option>
+                    {automations.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Automation when Off</label>
+                  <select
+                    value={offAutomation}
+                    onChange={(e) => setOffAutomation(e.target.value)}
+                    className="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#6d76e8]"
+                  >
+                    <option value="">Select an automation…</option>
+                    {automations.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
             {boundsRequired && (
               <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -613,7 +683,7 @@ export const AddWidgetModal: React.FC<AddWidgetModalProps> = ({
               </div>
             )}
 
-            {!isWeather && (
+            {!isWeather && !isAutomationSwitch && (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-semibold text-slate-300">

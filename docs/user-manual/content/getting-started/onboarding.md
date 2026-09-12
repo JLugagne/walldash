@@ -37,4 +37,4 @@ You can switch between them from the floor view, and add your own layers from th
 
 ## Next steps
 
-Once your home is created, the dashboard opens on the [house overview](/using/house-overview/).
+Once your home is created, the dashboard opens on the [house overview](/using/house-overview/). A default **Home** dashboard with a 5-day weather forecast already exists, ready to extend in [Dashboards](/using/dashboards/).
