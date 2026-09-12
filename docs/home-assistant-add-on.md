@@ -40,7 +40,7 @@ When the binary detects it runs inside an add-on container, it adapts without an
 - **Persistent storage**: when the `/data` volume exists, the database defaults to `/data/walldash.db`, surviving updates and reboots.
 - **Version**: the binary version is injected at build time (`BUILD_VERSION` build arg → `main.Version`), keeping the `/api/health` version and the add-on `version:` in sync.
 - **Health check**: `GET /api/health` serves as the add-on `watchdog` URL.
-- **Authentication**: devices enroll with a per-device one-time code (`otp_issued` in the add-on log, and **Setup → Access** once an owner exists). The first verified device becomes `owner`. `TOKEN_SECRET` is auto-generated and persisted in `/data` when unset; keep it stable across restarts. Revocation kills refresh tokens immediately but access tokens remain valid until their 15-minute TTL expires. Reaching the add-on over HTTPS is required for the `__Host-`/`Secure` cookies; if the reverse proxy rewrites `Host`, set the `domain` option to the browser-facing hostname (or list extra origins in `allowed_origins`/`ALLOWED_ORIGINS`).
+- **Authentication**: devices enroll with a per-device one-time code (`otp_issued` in the add-on log, and **Setup → Access** once an owner exists). The first verified device becomes `owner`. `TOKEN_SECRET` is auto-generated and persisted in `/data` when unset; keep it stable across restarts. Set `SECRET_KEY` (the `secret_key` option) to encrypt that stored signing key so `/data` snapshots do not expose it; removing `SECRET_KEY` after it has been used fails closed. Revocation kills refresh tokens immediately but access tokens remain valid until their 15-minute TTL expires. Reaching the add-on over HTTPS is required for the `__Host-`/`Secure` cookies; if the reverse proxy rewrites `Host`, set the `domain` option to the browser-facing hostname (or list extra origins in `allowed_origins`/`ALLOWED_ORIGINS`).
 - **Init system**: s6-overlay is PID 1, so the add-on `config.yaml` must set `init: false` (required since S6 V3, otherwise the add-on will not start).
 
 Full precedence per setting: environment variable → `/data/options.json` → default (see `README.md`).
@@ -53,12 +53,13 @@ Each one has the same environment-variable equivalent, which always wins when se
 | Option | Env var | Default | Description |
 | --- | --- | --- | --- |
 | `log_level` | `LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warn`, `error`. |
-| `token_secret` | `TOKEN_SECRET` | _(empty → auto-generated)_ | HS256 key used to sign access/refresh tokens, at least 32 bytes. Leave empty to generate one on first boot and persist it in `/data`; changing it invalidates all sessions. |
+| `token_secret` | `TOKEN_SECRET` | _(empty → auto-generated)_ | HS256 key used to sign access/refresh tokens, at least 32 bytes. Leave empty to generate one on first boot and persist it in `/data`; changing it signs out every device. |
+| `secret_key` | `SECRET_KEY` | _(empty)_ | Optional key-encryption key (exactly 32 characters) that encrypts the stored `TOKEN_SECRET` with AES-256-GCM, so a `/data` copy or snapshot does not expose the signing key. Keep it stable and backed up; removing it after use fails closed. |
 | `allowed_origins` | `ALLOWED_ORIGINS` | _(empty)_ | Comma-separated browser-facing origins trusted for CORS, CSRF and the refresh/logout same-origin check. Accepts `https://host` or a bare `host`. Only needed when the reverse proxy rewrites `Host`. |
 | `domain` | `DOMAIN` | _(empty)_ | Public hostname of this instance (bare host, `http://host` or `https://host`; optional port kept, path/query ignored). Merged with `allowed_origins`. Only needed when the reverse proxy rewrites `Host`. |
 
-The `token_secret`, `allowed_origins` and `domain` options are declared in the companion
-`config.yaml` as `password?` / `str?` and are all optional.
+The `token_secret`, `secret_key`, `allowed_origins` and `domain` options are declared in the
+companion `config.yaml` as `password?` / `str?` and are all optional.
 
 ### Runtime notes
 
@@ -122,11 +123,13 @@ map:
 options:
   log_level: info
   token_secret: ""
+  secret_key: ""
   allowed_origins: ""
   domain: ""
 schema:
   log_level: list(debug|info|warn|error)
   token_secret: password?
+  secret_key: password?
   allowed_origins: str?
   domain: str?
 watchdog: http://[HOST]:8080/api/health
@@ -212,6 +215,12 @@ configuration:
     description: >-
       Optional HS256 signing key for access/refresh tokens (at least 32 bytes).
       Leave empty to auto-generate and persist one in /data. Keep it stable.
+  secret_key:
+    name: Secret key
+    description: >-
+      Optional key-encryption key (exactly 32 characters) that encrypts the stored
+      signing secret with AES-256-GCM, so a /data copy does not expose it. Keep it
+      stable and backed up; removing it after use fails closed.
   allowed_origins:
     name: Allowed origins
     description: >-
