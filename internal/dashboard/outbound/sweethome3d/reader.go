@@ -233,9 +233,16 @@ type ImportedLevel struct {
 
 // readHomeXML extracts and returns the Home.xml document from a .sh3d archive.
 func readHomeXML(r io.Reader) ([]byte, error) {
-	data, err := io.ReadAll(r)
+	const (
+		maxArchiveBytes = 64 << 20
+		maxHomeXMLBytes = 32 << 20
+	)
+	data, err := io.ReadAll(io.LimitReader(r, maxArchiveBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("reading sh3d file: %w", err)
+	}
+	if int64(len(data)) > maxArchiveBytes {
+		return nil, fmt.Errorf("sh3d archive exceeds %d bytes", maxArchiveBytes)
 	}
 	zipReader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
@@ -243,14 +250,20 @@ func readHomeXML(r io.Reader) ([]byte, error) {
 	}
 	for _, f := range zipReader.File {
 		if f.Name == "Home.xml" {
+			if f.UncompressedSize64 > maxHomeXMLBytes {
+				return nil, fmt.Errorf("Home.xml exceeds %d bytes", maxHomeXMLBytes)
+			}
 			rc, err := f.Open()
 			if err != nil {
 				return nil, fmt.Errorf("opening Home.xml: %w", err)
 			}
-			homeXML, err := io.ReadAll(rc)
+			homeXML, err := io.ReadAll(io.LimitReader(rc, maxHomeXMLBytes+1))
 			rc.Close()
 			if err != nil {
 				return nil, fmt.Errorf("reading Home.xml: %w", err)
+			}
+			if int64(len(homeXML)) > maxHomeXMLBytes {
+				return nil, fmt.Errorf("Home.xml exceeds %d bytes", maxHomeXMLBytes)
 			}
 			return homeXML, nil
 		}

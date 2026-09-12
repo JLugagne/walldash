@@ -13,8 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JLugagne/egauth/origin"
 	"github.com/JLugagne/egauth/otp"
 	otpmemory "github.com/JLugagne/egauth/otp/memory"
+	"github.com/JLugagne/egauth/revocation"
 	"github.com/JLugagne/egauth/tokens"
 	"github.com/JLugagne/egauth/tokens/basic"
 	"github.com/JLugagne/walldash/frontend"
@@ -30,6 +32,7 @@ import (
 	"github.com/JLugagne/walldash/internal/dashboard/outbound/sqlite"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 )
 
 // Config contains runtime configuration for the dashboard application.
@@ -121,7 +124,11 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		return nil, err
 	}
 	issuer := basic.NewIssuer(issuerCfg)
-	authApp := app.NewAuth(otpSvc, accountRepo, issuer, tokenStore)
+
+	revocationBus := revocation.NewMemBus()
+	revocationTracker := tokens.NewRevocationTracker(revocationBus)
+
+	authApp := app.NewAuth(otpSvc, accountRepo, issuer, tokenStore, revocationBus)
 
 	haClient := homeassistant.NewClient(conf.HAUrl, conf.HAToken, nil)
 	application := app.New(adapter, adapter, adapter, adapter, haClient, adapter, adapter, adapter, conf.Version)
@@ -136,6 +143,7 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	if len(conf.AllowedOrigins) > 0 {
 		corsConfig.AllowedOrigins = conf.AllowedOrigins
 	}
+	router.Use(middleware.SecurityHeaders)
 	router.Use(middleware.CORS(corsConfig))
 
 	// Preflight handler so Gorilla Mux matches OPTIONS for all routes
@@ -145,27 +153,44 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 
 	tokenManager := middleware.NewCSRFTokenManager()
 	if !conf.DisableCSRF {
-		csrfConfig := middleware.CSRFConfig{
-			AllowedOrigins: conf.AllowedOrigins,
-		}
-		router.Use(middleware.CSRF(tokenManager, csrfConfig))
+		trustedOrigins := conf.AllowedOrigins
+		router.Use(func(next http.Handler) http.Handler {
+			return origin.Middleware(next, origin.WithTrustedOrigins(trustedOrigins...))
+		})
 	}
 
 	// Register WebSocket endpoint
-	router.Handle("/api/ws", basic.ContextMiddleware(issuer, http.HandlerFunc(wsHub.ServeWS), tokens.WithCookieAuth[struct{}](cookies))).Methods(http.MethodGet)
+	router.Handle("/api/ws", basic.ContextMiddleware(
+		issuer,
+		http.HandlerFunc(wsHub.ServeWS),
+		tokens.WithCookieAuth[struct{}](cookies),
+		tokens.WithAccessTokenRevocation[struct{}](revocationTracker),
+	)).Methods(http.MethodGet)
 
 	// Register inbound routes
 	queries.SetupRoutes(router, controller, application, tokenManager)
 	commands.SetupRoutes(router, controller, application)
-	authCommands := commands.NewAuthHandler(controller, authApp, cookies, issuer, tokenStore, trustedOriginHosts(conf.AllowedOrigins))
+	authCommands := commands.NewAuthHandler(controller, authApp, cookies, issuer, tokenStore, revocationBus, trustedOriginHosts(conf.AllowedOrigins))
 	commands.SetupAuthRoutes(router, authCommands)
 	authQueries := queries.NewAuthHandler(controller, authApp, cookies, issuer)
 	queries.SetupAuthRoutes(router, authQueries)
 
 	setupRouter := router.PathPrefix("/api/setup/auth").Subrouter()
-	setupRouter.Use(middleware.RequireSetupScope(issuer, cookies))
+	setupRouter.Use(middleware.RequireSetupScope(issuer, cookies, revocationTracker))
 	commands.SetupSetupAuthRoutes(setupRouter, authCommands)
 	queries.SetupSetupAuthRoutes(setupRouter, authQueries)
+
+	// Owner-only management operations: every state-changing request requires the
+	// setup:manage scope, except the public auth endpoints and the device-safe action route.
+	adminWriteExempt := []string{
+		"/api/actions",
+		"/api/auth/connect",
+		"/api/auth/verify",
+		"/api/auth/refresh",
+		"/api/auth/logout",
+	}
+	router.Use(middleware.RequireSetupScopeOnWrites(issuer, cookies, revocationTracker, adminWriteExempt))
+	queries.SetupExportRoute(router, controller, application, middleware.RequireSetupScope(issuer, cookies, revocationTracker))
 
 	publicAPIPaths := []string{
 		"/api/auth/connect",
@@ -176,7 +201,7 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		"/api/csrf-token",
 		"/api/ws",
 	}
-	router.Use(middleware.Conditional(middleware.RequireAuth(issuer, cookies), middleware.ExemptAuth(publicAPIPaths...)))
+	router.Use(middleware.Conditional(middleware.RequireAuth(issuer, cookies, revocationTracker), middleware.ExemptAuth(publicAPIPaths...)))
 
 	// Setup static files / SPA fallback
 	setupFrontendServing(router, conf.FrontendDir, conf.AssetsFS)
@@ -287,6 +312,7 @@ func resolveTokenSecret(ctx context.Context, store *sqlite.SecretsStore, configu
 	if err := store.SetIfAbsent(ctx, sqlite.TokenSecretName, raw); err != nil {
 		return "", err
 	}
+	logrus.Warn("TOKEN_SECRET is not set: generated a JWT signing key and stored it in the database; set TOKEN_SECRET from a secret store so snapshots of the database do not contain it")
 	stored, err := store.Get(ctx, sqlite.TokenSecretName)
 	if err != nil {
 		return "", err

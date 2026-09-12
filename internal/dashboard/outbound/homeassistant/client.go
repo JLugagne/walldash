@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -269,7 +270,7 @@ func (c *Client) GetState(ctx context.Context, entityID string) (domain.Device, 
 		return domain.Device{}, errors.Join(domain.ErrDeviceNotFound, fmt.Errorf("entity %s not found in fallback devices", entityID))
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/states/"+entityID, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/states/"+url.PathEscape(entityID), nil)
 	if err != nil {
 		return domain.Device{}, errors.Join(domain.ErrDeviceNotFound, err)
 	}
@@ -433,7 +434,7 @@ func (c *Client) GetAutomation(ctx context.Context, entityID string) (domain.Aut
 		return domain.Automation{}, errors.Join(domain.ErrAutomationNotFound, fmt.Errorf("automation %s not found in fallback automations", entityID))
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/states/"+entityID, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/states/"+url.PathEscape(entityID), nil)
 	if err != nil {
 		return domain.Automation{}, errors.Join(domain.ErrAutomationNotFound, err)
 	}

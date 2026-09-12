@@ -31,6 +31,9 @@ func main() {
 	if haURL == "" {
 		haURL = "http://homeassistant.local:8123"
 	}
+	if haToken != "" && strings.HasPrefix(strings.ToLower(haURL), "http://") {
+		logrus.WithField("ha_host", haHost(haURL)).Warn("HA_URL uses plain HTTP: the Home Assistant access token will be sent in cleartext; use https:// or a trusted management network")
+	}
 	logrus.WithFields(logrus.Fields{"ha_source": haSourceLabel(haURL), "ha_host": haHost(haURL), "ha_token_set": haToken != ""}).Info("home assistant configuration resolved")
 	frontendDir := os.Getenv("FRONTEND_DIR")
 	allowedOrigins := resolveAllowedOrigins(options)

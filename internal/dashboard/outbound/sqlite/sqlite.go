@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"sort"
+	"strings"
 
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/dashboards"
@@ -66,6 +68,11 @@ func New(ctx context.Context, dbPath string) (*Adapter, error) {
 		return nil, err
 	}
 
+	if dbPath != "" && dbPath != ":memory:" && !strings.Contains(dbPath, "mode=memory") {
+		if err := os.Chmod(dbPath, 0o600); err != nil {
+			logger.LoggerFromContext(ctx).WithError(err).Warn("could not restrict database file permissions")
+		}
+	}
 	return adapter, nil
 }
 

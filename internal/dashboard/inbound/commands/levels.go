@@ -188,6 +188,7 @@ func SetupLevelRoutes(r *mux.Router, controller *inbound.Controller, commands sv
 }
 
 func (h *LevelsHandler) ImportPlan(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
 	vars := mux.Vars(r)
 	id := vars["id"]
 
@@ -241,6 +242,7 @@ func (h *LevelsHandler) ImportPlan(w http.ResponseWriter, r *http.Request) {
 // ImportSh3dLevels imports a Sweet Home 3D archive, creating one Level per
 // declared level (ordered by elevation), each with its imported plan.
 func (h *LevelsHandler) ImportSh3dLevels(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<20)
 	reader, parseErr := r.MultipartReader()
 	if parseErr != nil {
 		h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidSavePlanRequest, parseErr))

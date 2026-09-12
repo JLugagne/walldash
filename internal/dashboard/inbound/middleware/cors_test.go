@@ -16,7 +16,9 @@ func TestCORS_PreflightOptions(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	corsMiddleware := middleware.CORS()
+	cfg := middleware.DefaultCORSConfig()
+	cfg.AllowedOrigins = []string{"http://localhost:5173"}
+	corsMiddleware := middleware.CORS(cfg)
 	handler := corsMiddleware(nextHandler)
 
 	req := httptest.NewRequest(http.MethodOptions, "/api/levels", nil)
@@ -49,7 +51,9 @@ func TestCORS_StandardRequest(t *testing.T) {
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	corsMiddleware := middleware.CORS()
+	cfg := middleware.DefaultCORSConfig()
+	cfg.AllowedOrigins = []string{"http://localhost:8080"}
+	corsMiddleware := middleware.CORS(cfg)
 	handler := corsMiddleware(nextHandler)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)

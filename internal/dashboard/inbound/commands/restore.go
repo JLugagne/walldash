@@ -40,6 +40,7 @@ func SetupRestoreRoutes(r *mux.Router, controller *inbound.Controller, commands 
 // RestoreBackup replaces current data with the snapshot in the request body.
 // Device placements are only replayed when include_devices is set.
 func (h *RestoreHandler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
 	var req pkgdashboard.RestoreRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.controller.SendFail(w, r, nil, errors.Join(pkgdashboard.ErrInvalidRestoreRequest, err))

@@ -131,4 +131,19 @@ func TestActionCommandValidation(t *testing.T) {
 			assert.ErrorIs(t, err, domain.ErrActionNotAllowed)
 		}
 	})
+	t.Run("path metacharacters in entity ID are rejected", func(t *testing.T) {
+		badIDs := []string{
+			"light.a/../../../api/config",
+			"light.foo/bar",
+			"light.foo?x=1",
+			"light.foo#frag",
+			"light.Foo",
+		}
+		for _, id := range badIDs {
+			cmd := domain.ActionCommand{EntityID: id, Action: "toggle"}
+			err := cmd.Validate()
+			require.Error(t, err, "entity ID %q must be rejected", id)
+			assert.ErrorIs(t, err, domain.ErrActionNotAllowed)
+		}
+	})
 }

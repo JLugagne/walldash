@@ -12,20 +12,29 @@ import (
 
 // RequireAuth returns middleware that verifies the access token from the cookie (or
 // Authorization header) and transparently refreshes it when a valid refresh cookie is present.
-func RequireAuth(issuer *basic.Issuer, cookies tokens.Cookies) func(http.Handler) http.Handler {
-	return authMiddleware(issuer, []tokens.AuthOption[struct{}]{
-		tokens.WithCookieAuth[struct{}](cookies),
-		tokens.WithAutoRefresh[struct{}](issuer, cookies),
-	})
+func RequireAuth(issuer *basic.Issuer, cookies tokens.Cookies, revocation tokens.AccessTokenRevocationChecker) func(http.Handler) http.Handler {
+	return authMiddleware(issuer, authOptions(cookies, issuer, revocation, nil))
 }
 
 // RequireSetupScope returns middleware that also requires the setup:manage scope.
-func RequireSetupScope(issuer *basic.Issuer, cookies tokens.Cookies) func(http.Handler) http.Handler {
-	return authMiddleware(issuer, []tokens.AuthOption[struct{}]{
+func RequireSetupScope(issuer *basic.Issuer, cookies tokens.Cookies, revocation tokens.AccessTokenRevocationChecker) func(http.Handler) http.Handler {
+	return authMiddleware(issuer, authOptions(cookies, issuer, revocation, []string{"setup:manage"}))
+}
+
+// authOptions assembles the shared cookie/auto-refresh options, an optional access-token
+// revocation checker, and an optional required-scope list.
+func authOptions(cookies tokens.Cookies, issuer *basic.Issuer, revocation tokens.AccessTokenRevocationChecker, scopes []string) []tokens.AuthOption[struct{}] {
+	opts := []tokens.AuthOption[struct{}]{
 		tokens.WithCookieAuth[struct{}](cookies),
 		tokens.WithAutoRefresh[struct{}](issuer, cookies),
-		tokens.WithRequiredScopes[struct{}]("setup:manage"),
-	})
+	}
+	if revocation != nil {
+		opts = append(opts, tokens.WithAccessTokenRevocation[struct{}](revocation))
+	}
+	if len(scopes) > 0 {
+		opts = append(opts, tokens.WithRequiredScopes[struct{}](scopes...))
+	}
+	return opts
 }
 
 func authMiddleware(issuer *basic.Issuer, opts []tokens.AuthOption[struct{}]) func(http.Handler) http.Handler {

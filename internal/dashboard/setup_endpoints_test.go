@@ -218,3 +218,60 @@ func TestSetupEndpointsRenameForbidden(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	requireJSendCode(t, resp, "FORBIDDEN")
 }
+
+func TestSetupEndpointsDeviceCannotWriteConfiguration(t *testing.T) {
+	ctx, dash, server, owner := setupAuthServer(t)
+	_, ownerRole := enrollClient(t, ctx, dash, owner)
+	require.Equal(t, "owner", ownerRole)
+
+	device := newAuthTestClient(t, server)
+	device.fetchCSRF()
+	_, deviceRole := enrollClient(t, ctx, dash, device)
+	require.Equal(t, "device", deviceRole)
+
+	resp := device.do(http.MethodPost, "/api/levels", map[string]any{"name": "Hacked", "is_outdoor": false}, nil)
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
+	requireJSendCode(t, resp, "FORBIDDEN")
+
+	resp = device.do(http.MethodPost, "/api/restore", map[string]any{"version": "1", "levels": []any{}, "dashboards": []any{}}, nil)
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
+	requireJSendCode(t, resp, "FORBIDDEN")
+
+	resp = device.do(http.MethodGet, "/api/export", nil, nil)
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
+	requireJSendCode(t, resp, "FORBIDDEN")
+
+	resp = device.do(http.MethodPost, "/api/actions", map[string]any{"entity_id": "light.salon", "action": "toggle"}, nil)
+	require.NotEqual(t, http.StatusForbidden, resp.StatusCode, "devices may still trigger whitelisted actions")
+	resp.Body.Close()
+
+	resp = owner.do(http.MethodPost, "/api/levels", map[string]any{"name": "Garage", "is_outdoor": false}, nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+}
+
+func TestSetupEndpointsRevokeInvalidatesAccessToken(t *testing.T) {
+	ctx, dash, server, owner := setupAuthServer(t)
+	_, ownerRole := enrollClient(t, ctx, dash, owner)
+	require.Equal(t, "owner", ownerRole)
+
+	device := newAuthTestClient(t, server)
+	device.fetchCSRF()
+	deviceID, deviceRole := enrollClient(t, ctx, dash, device)
+	require.Equal(t, "device", deviceRole)
+
+	// The device can read while its access token is valid.
+	resp := device.do(http.MethodGet, "/api/levels", nil, nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
+	// The owner revokes the device.
+	resp = owner.do(http.MethodPost, "/api/setup/auth/devices/"+deviceID+"/revoke", nil, nil)
+	require.Equal(t, http.StatusNoContent, resp.StatusCode)
+	resp.Body.Close()
+
+	// The device's still-unexpired access token must be rejected immediately, not after the TTL.
+	resp = device.do(http.MethodGet, "/api/levels", nil, nil)
+	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	resp.Body.Close()
+}

@@ -16,7 +16,7 @@ type CORSConfig struct {
 // DefaultCORSConfig returns a default CORS configuration.
 func DefaultCORSConfig() CORSConfig {
 	return CORSConfig{
-		AllowedOrigins: []string{"*"},
+		AllowedOrigins: nil,
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Content-Type", "Authorization", "X-Requested-With", "X-CSRF-Token"},
 	}
@@ -35,20 +35,20 @@ func CORS(cfg ...CORSConfig) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			if origin != "" {
-				allowed := false
+			wildcard := len(config.AllowedOrigins) == 1 && config.AllowedOrigins[0] == "*"
+			switch {
+			case wildcard:
+				// A wildcard allow-list never reflects the caller origin and never grants credentials.
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+			case origin != "":
 				originKey := normalizeOrigin(origin)
 				for _, o := range config.AllowedOrigins {
-					if o == "*" || strings.EqualFold(normalizeOrigin(o), originKey) {
-						allowed = true
+					if strings.EqualFold(normalizeOrigin(o), originKey) {
+						w.Header().Set("Access-Control-Allow-Origin", origin)
+						w.Header().Add("Vary", "Origin")
 						break
 					}
 				}
-				if allowed {
-					w.Header().Set("Access-Control-Allow-Origin", origin)
-				}
-			} else if len(config.AllowedOrigins) == 1 && config.AllowedOrigins[0] == "*" {
-				w.Header().Set("Access-Control-Allow-Origin", "*")
 			}
 
 			w.Header().Set("Access-Control-Allow-Methods", methodsStr)

@@ -61,6 +61,7 @@ func TestController(t *testing.T) {
 		err := json.Unmarshal(rec.Body.Bytes(), &body)
 		require.NoError(t, err)
 		assert.Equal(t, "error", body["status"])
-		assert.Equal(t, "unexpected crash", body["message"])
+		assert.Equal(t, "internal error", body["message"])
+		assert.NotContains(t, body["message"], "unexpected crash")
 	})
 }

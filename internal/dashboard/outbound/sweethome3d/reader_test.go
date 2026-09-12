@@ -3,6 +3,7 @@ package sweethome3d_test
 import (
 	"archive/zip"
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/JLugagne/walldash/internal/dashboard/outbound/sweethome3d"
@@ -235,4 +236,13 @@ func TestFromReaderLevels(t *testing.T) {
 	for _, lvl := range imported {
 		require.NoError(t, lvl.Plan.Validate())
 	}
+}
+
+func TestFromReaderRejectsOversizedHomeXML(t *testing.T) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?>
+<home version="5300">` + strings.Repeat(" ", 40<<20) + `<wall id="w1" xStart="0.0" yStart="0.0" xEnd="100.0" yEnd="0.0" thickness="10.0"/></home>`
+	zipData := buildSh3dZip(xml)
+	_, err := sweethome3d.FromReader(bytes.NewReader(zipData), "test-level")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds")
 }

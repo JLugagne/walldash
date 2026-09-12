@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/JLugagne/egauth/otp"
+	"github.com/JLugagne/egauth/revocation"
 	"github.com/JLugagne/egauth/tokens/basic"
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/accounts"
@@ -39,26 +40,28 @@ type PendingEnrollment struct {
 // account lookup. Pending enrollment state is kept in memory and is intentionally lost on
 // restart so a fresh code is required.
 type Auth struct {
-	otp      otp.Service
-	accounts accounts.AccountRepository
-	issuer   *basic.Issuer
-	now      func() time.Time
-	ttl      time.Duration
-	mu       sync.Mutex
-	pending  map[string]*PendingEnrollment
-	revoker  RefreshRevoker
+	otp         otp.Service
+	accounts    accounts.AccountRepository
+	issuer      *basic.Issuer
+	now         func() time.Time
+	ttl         time.Duration
+	mu          sync.Mutex
+	pending     map[string]*PendingEnrollment
+	revoker     RefreshRevoker
+	revocations revocation.Bus
 }
 
 // NewAuth builds the authentication use-cases over its outbound dependencies.
-func NewAuth(otpSvc otp.Service, accountRepo accounts.AccountRepository, issuer *basic.Issuer, revoker RefreshRevoker) *Auth {
+func NewAuth(otpSvc otp.Service, accountRepo accounts.AccountRepository, issuer *basic.Issuer, revoker RefreshRevoker, revocations revocation.Bus) *Auth {
 	return &Auth{
-		otp:      otpSvc,
-		accounts: accountRepo,
-		issuer:   issuer,
-		revoker:  revoker,
-		now:      time.Now,
-		ttl:      15 * time.Minute,
-		pending:  make(map[string]*PendingEnrollment),
+		otp:         otpSvc,
+		accounts:    accountRepo,
+		issuer:      issuer,
+		revoker:     revoker,
+		revocations: revocations,
+		now:         time.Now,
+		ttl:         15 * time.Minute,
+		pending:     make(map[string]*PendingEnrollment),
 	}
 }
 
@@ -112,7 +115,6 @@ func (a *Auth) StartEnrollment(ctx context.Context, label, ip string) (*PendingE
 		"device_id": deviceID,
 		"label":     label,
 		"ip":        ip,
-		"code":      ch.Code,
 	}).Info("otp_issued")
 
 	return rec, nil
@@ -219,7 +221,23 @@ func (a *Auth) RevokeDevice(ctx context.Context, id string) (domain.Account, err
 	if err := a.revoker.RevokeAllRefreshTokensForUser(ctx, "", subject); err != nil {
 		return domain.Account{}, err
 	}
+	a.publishRevocation(ctx, subject, revocation.ReasonAccountDisabled)
 	return acct, nil
+}
+
+// publishRevocation publishes an account-scoped revocation so already-issued access tokens
+// are rejected before their TTL expires, not just the refresh family.
+func (a *Auth) publishRevocation(ctx context.Context, subject uuid.UUID, reason revocation.Reason) {
+	if a.revocations == nil {
+		return
+	}
+	_ = a.revocations.Publish(ctx, revocation.Revocation{
+		TargetType: revocation.TargetUser,
+		TargetID:   subject.String(),
+		Scope:      revocation.ScopeAll,
+		Reason:     reason,
+		CutoffTime: a.now().UTC(),
+	})
 }
 
 func (a *Auth) SetRole(ctx context.Context, actor domain.Account, id string, role domain.Role) (domain.Account, error) {

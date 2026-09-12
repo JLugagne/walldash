@@ -103,7 +103,6 @@ func (c *Controller) SendError(w http.ResponseWriter, r *http.Request, err error
 	msg := "internal error"
 	code := "INTERNAL_ERROR"
 	if err != nil {
-		msg = err.Error()
 		if domainErr, ok := domain.AsDomainError(err); ok {
 			code = domainErr.Code
 		} else if rootErr, ok := rootDomain.AsDomainError(err); ok {

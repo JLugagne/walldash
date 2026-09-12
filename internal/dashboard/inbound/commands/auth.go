@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/JLugagne/egauth/ratelimit"
+	"github.com/JLugagne/egauth/revocation"
 	"github.com/JLugagne/egauth/tokens"
 	"github.com/JLugagne/egauth/tokens/basic"
 	"github.com/JLugagne/walldash/internal/dashboard/app"
@@ -27,17 +28,19 @@ type AuthHandler struct {
 	cookies        tokens.Cookies
 	issuer         *basic.Issuer
 	revoker        tokens.FamilyRevoker
+	revocations    revocation.Bus
 	allowedOrigins []string
 }
 
 // NewAuthHandler builds the authentication command handler.
-func NewAuthHandler(controller *inbound.Controller, auth *app.Auth, cookies tokens.Cookies, issuer *basic.Issuer, revoker tokens.FamilyRevoker, allowedOrigins []string) *AuthHandler {
+func NewAuthHandler(controller *inbound.Controller, auth *app.Auth, cookies tokens.Cookies, issuer *basic.Issuer, revoker tokens.FamilyRevoker, revocations revocation.Bus, allowedOrigins []string) *AuthHandler {
 	return &AuthHandler{
 		controller:     controller,
 		auth:           auth,
 		cookies:        cookies,
 		issuer:         issuer,
 		revoker:        revoker,
+		revocations:    revocations,
 		allowedOrigins: allowedOrigins,
 	}
 }
@@ -124,11 +127,36 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 // Logout revokes the caller's refresh family and clears the auth cookies.
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	h.publishRevocation(r)
 	basic.LogoutHandler(
 		h.revoker,
 		tokens.WithCookies(h.cookies),
 		tokens.WithTrustedOrigins(h.allowedOrigins...),
 	)(w, r)
+}
+
+// publishRevocation invalidates already-issued access tokens for the logging-out device so
+// they cannot be replayed after logout, before the access TTL elapses.
+func (h *AuthHandler) publishRevocation(r *http.Request) {
+	if h.revocations == nil {
+		return
+	}
+	raw, ok := h.cookies.Refresh(r)
+	if !ok || raw == "" {
+		return
+	}
+	rt, err := h.revoker.FindRefreshToken(r.Context(), "", tokens.HashToken(raw))
+	if err != nil || rt == nil {
+		return
+	}
+	_ = h.revocations.Publish(r.Context(), revocation.Revocation{
+		TenantID:   rt.TenantID,
+		TargetType: revocation.TargetUser,
+		TargetID:   rt.UserID.String(),
+		Scope:      revocation.ScopeAll,
+		Reason:     revocation.ReasonLogoutEverywhere,
+		CutoffTime: time.Now().UTC(),
+	})
 }
 
 func pendingCookie(r *http.Request) (string, bool) {

@@ -36,11 +36,19 @@ func SetupRoutes(r *mux.Router, controller *inbound.Controller, queries svchealt
 	if weatherQueries, ok := queries.(svcweather.WeatherQueries); ok {
 		SetupWeatherRoutes(r, controller, weatherQueries)
 	}
+}
+
+// SetupExportRoute registers the owner-only full-configuration export endpoint.
+func SetupExportRoute(r *mux.Router, controller *inbound.Controller, queries svchealth.HealthQueries, guard func(http.Handler) http.Handler) {
 	levelQueries, lOk := queries.(svclevels.LevelQueries)
 	deviceQueries, dOk := queries.(svcdevices.DeviceQueries)
 	dashboardQueries, oOk := queries.(svcdashboards.DashboardQueries)
 	if lOk && dOk && oOk {
 		exportHandler := NewExportHandler(controller, levelQueries, deviceQueries, dashboardQueries)
+		if guard != nil {
+			r.Handle("/api/export", guard(http.HandlerFunc(exportHandler.Export))).Methods(http.MethodGet)
+			return
+		}
 		r.HandleFunc("/api/export", exportHandler.Export).Methods(http.MethodGet)
 	}
 }

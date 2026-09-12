@@ -65,6 +65,9 @@ func (c ActionCommand) Validate() error {
 		return errors.Join(ErrActionNotAllowed, errors.New("entity_id cannot be empty"))
 	}
 
+	if !isSafeEntityID(entityID) {
+		return errors.Join(ErrActionNotAllowed, errors.New("malformed entity_id: "+entityID))
+	}
 	parts := strings.Split(entityID, ".")
 	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
 		return errors.Join(ErrActionNotAllowed, errors.New("malformed entity_id: "+entityID))
@@ -96,4 +99,21 @@ func (c ActionCommand) Validate() error {
 // DeviceBroadcaster represents an outbound broadcaster capable of publishing device updates.
 type DeviceBroadcaster interface {
 	BroadcastDevice(device Device)
+}
+
+func isSafeEntityID(s string) bool {
+	if strings.Count(s, ".") != 1 {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= '0' && r <= '9':
+		case r == '_':
+		case r == '.':
+		default:
+			return false
+		}
+	}
+	return true
 }

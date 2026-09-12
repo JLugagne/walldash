@@ -28,15 +28,16 @@ func TestDashboardNew(t *testing.T) {
 
 	router := mux.NewRouter()
 	conf := dashboard.Config{
-		DBPath:  dbPath,
-		Version: "0.1.0-test",
+		DBPath:         dbPath,
+		Version:        "0.1.0-test",
+		AllowedOrigins: []string{"http://localhost:8080"},
 	}
 
 	dash, err := dashboard.New(ctx, conf, router)
 	require.NoError(t, err)
 	require.NotNil(t, dash)
 
-	pair, err := dash.Issuer.IssueTokenPair(ctx, basic.Claims{Subject: uuid.New()})
+	pair, err := dash.Issuer.IssueTokenPair(ctx, basic.Claims{Subject: uuid.New(), Scopes: []string{"setup:manage"}})
 	require.NoError(t, err)
 	authCookie := &http.Cookie{Name: dash.Cookies.AccessName, Value: pair.AccessToken, Path: "/"}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -86,13 +87,15 @@ func TestDashboardNew(t *testing.T) {
 	}
 	body, _ := json.Marshal(createPayload)
 	unauthReq := httptest.NewRequest(http.MethodPost, "/api/levels", bytes.NewReader(body))
+	unauthReq.Header.Set("Origin", "http://evil.example")
 	unauthRec := httptest.NewRecorder()
 	handler.ServeHTTP(unauthRec, unauthReq)
-	assert.Equal(t, http.StatusForbidden, unauthRec.Code, "mutation without CSRF token/header must be rejected")
+	assert.Equal(t, http.StatusForbidden, unauthRec.Code, "cross-origin mutation must be rejected")
 
 	// 5. Create a Level via POST /api/levels with valid X-CSRF-Token
 	req = httptest.NewRequest(http.MethodPost, "/api/levels", bytes.NewReader(body))
 	req.Header.Set("X-CSRF-Token", csrfToken)
+	req.Header.Set("Origin", "http://localhost:8080")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -142,6 +145,7 @@ func TestDashboardNew(t *testing.T) {
 	planBody, _ := json.Marshal(savePlanPayload)
 	req = httptest.NewRequest(http.MethodPut, "/api/levels/"+levelID+"/plan", bytes.NewReader(planBody))
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("Origin", "http://localhost:8080")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)

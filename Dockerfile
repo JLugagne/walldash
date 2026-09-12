@@ -9,7 +9,8 @@ FROM node:26-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
-RUN npm ci || npm install
+# Fail closed on a stale lockfile rather than silently resolving newer ranges.
+RUN npm ci
 
 COPY frontend/ ./
 RUN npm run build
