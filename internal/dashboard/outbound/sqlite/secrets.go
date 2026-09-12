@@ -32,3 +32,8 @@ func (s *SecretsStore) SetIfAbsent(ctx context.Context, name string, value []byt
 	_, err := s.db.ExecContext(ctx, "INSERT INTO app_secrets (name, value) VALUES (?, ?) ON CONFLICT(name) DO NOTHING", name, value)
 	return err
 }
+
+func (s *SecretsStore) Set(ctx context.Context, name string, value []byte) error {
+	_, err := s.db.ExecContext(ctx, "INSERT INTO app_secrets (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value", name, value)
+	return err
+}

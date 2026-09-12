@@ -11,3 +11,9 @@ tmp
 .env
 .env.*
 !.env.example
+.security-audit
+.artefacts
+.scaffor
+.tickets
+.questions
+skills-lock.json

@@ -27,6 +27,7 @@ func main() {
 	haURL := configValue("HA_URL", "ha_url", "", options)
 	haToken := configValue("HA_TOKEN", "ha_token", "", options)
 	tokenSecret := configValue("TOKEN_SECRET", "token_secret", "", options)
+	secretKey := configValue("SECRET_KEY", "secret_key", "", options)
 	haURL, haToken = resolveHAConfig(haURL, haToken, os.Getenv(supervisorTokenEnv))
 	if haURL == "" {
 		haURL = "http://homeassistant.local:8123"
@@ -47,6 +48,7 @@ func main() {
 		AssetsFS:       frontend.FS(),
 		AllowedOrigins: allowedOrigins,
 		TokenSecret:    tokenSecret,
+		SecretKey:      secretKey,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

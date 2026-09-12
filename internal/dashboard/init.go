@@ -1,8 +1,10 @@
 package dashboard
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -13,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JLugagne/egauth/keystore"
 	"github.com/JLugagne/egauth/origin"
 	"github.com/JLugagne/egauth/otp"
 	otpmemory "github.com/JLugagne/egauth/otp/memory"
@@ -46,6 +49,10 @@ type Config struct {
 	AllowedOrigins []string
 	DisableCSRF    bool
 	TokenSecret    string
+	// SecretKey is an optional 32-byte key-encryption key (KEK). When set, the
+	// auto-generated JWT signing secret is envelope-encrypted (AES-256-GCM) before it is
+	// persisted, so a database copy or snapshot alone never yields the signing key.
+	SecretKey string
 }
 
 // Dashboard represents the initialized composition root for the dashboard service.
@@ -88,7 +95,17 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	}
 
 	secretStore := sqlite.NewSecretsStore(adapter.DB())
-	tokenSecret, err := resolveTokenSecret(ctx, secretStore, conf.TokenSecret)
+
+	var kek *keystore.KEK
+	if conf.SecretKey != "" {
+		k, err := keystore.NewKEK([]byte(conf.SecretKey))
+		if err != nil {
+			_ = adapter.Close()
+			return nil, fmt.Errorf("SECRET_KEY must be exactly 32 bytes: %w", err)
+		}
+		kek = k
+	}
+	tokenSecret, err := resolveTokenSecret(ctx, secretStore, conf.TokenSecret, kek)
 	if err != nil {
 		_ = adapter.Close()
 		return nil, err
@@ -290,7 +307,7 @@ func serveFromDir(router *mux.Router, frontendDir string) {
 	}))
 }
 
-func resolveTokenSecret(ctx context.Context, store *sqlite.SecretsStore, configured string) (string, error) {
+func resolveTokenSecret(ctx context.Context, store *sqlite.SecretsStore, configured string, kek *keystore.KEK) (string, error) {
 	const minBytes = 32
 	if configured != "" {
 		if len(configured) < minBytes {
@@ -303,24 +320,45 @@ func resolveTokenSecret(ctx context.Context, store *sqlite.SecretsStore, configu
 		return "", err
 	}
 	if len(existing) > 0 {
-		return string(existing), nil
+		plain, sealed, err := unwrapSecret(existing, kek)
+		if err != nil {
+			return "", err
+		}
+		if len(plain) > 0 {
+			if kek != nil && !sealed {
+				if wrapped, wrapErr := wrapSecret(plain, kek); wrapErr == nil {
+					_ = store.Set(ctx, sqlite.TokenSecretName, wrapped)
+				}
+			}
+			return string(plain), nil
+		}
 	}
 	raw := make([]byte, minBytes)
 	if _, err := rand.Read(raw); err != nil {
 		return "", fmt.Errorf("generate token secret: %w", err)
 	}
-	if err := store.SetIfAbsent(ctx, sqlite.TokenSecretName, raw); err != nil {
-		return "", err
-	}
-	logrus.Warn("TOKEN_SECRET is not set: generated a JWT signing key and stored it in the database; set TOKEN_SECRET from a secret store so snapshots of the database do not contain it")
-	stored, err := store.Get(ctx, sqlite.TokenSecretName)
+	stored, err := wrapSecret(raw, kek)
 	if err != nil {
 		return "", err
 	}
-	if len(stored) == 0 {
+	if err := store.SetIfAbsent(ctx, sqlite.TokenSecretName, stored); err != nil {
+		return "", err
+	}
+	current, err := store.Get(ctx, sqlite.TokenSecretName)
+	if err != nil {
+		return "", err
+	}
+	plain, _, err := unwrapSecret(current, kek)
+	if err != nil {
+		return "", err
+	}
+	if len(plain) == 0 {
 		return "", errors.New("failed to persist generated token secret")
 	}
-	return string(stored), nil
+	if kek == nil {
+		logrus.Warn("TOKEN_SECRET is not set: generated a JWT signing key and stored it in the database; set TOKEN_SECRET or SECRET_KEY so database snapshots do not expose it")
+	}
+	return string(plain), nil
 }
 
 func trustedOriginHosts(origins []string) []string {
@@ -337,4 +375,42 @@ func trustedOriginHosts(origins []string) []string {
 		hosts = append(hosts, origin)
 	}
 	return hosts
+}
+
+// secretEnvelopePrefix marks values in app_secrets that were envelope-encrypted with a KEK.
+const secretEnvelopePrefix = "enc:v1:"
+
+func secretEnvelopeAAD() []byte { return []byte("walldash.app_secrets") }
+
+// wrapSecret seals plaintext with the KEK when one is configured, otherwise it returns the
+// plaintext unchanged (legacy zero-config behaviour).
+func wrapSecret(plain []byte, kek *keystore.KEK) ([]byte, error) {
+	if kek == nil {
+		return plain, nil
+	}
+	sealed, err := kek.Seal(plain, secretEnvelopeAAD())
+	if err != nil {
+		return nil, fmt.Errorf("sealing token secret: %w", err)
+	}
+	return []byte(secretEnvelopePrefix + base64.StdEncoding.EncodeToString(sealed)), nil
+}
+
+// unwrapSecret returns the plaintext behind a stored secret and whether it was sealed. A
+// value without the envelope prefix is treated as legacy plaintext and returned as-is.
+func unwrapSecret(stored []byte, kek *keystore.KEK) ([]byte, bool, error) {
+	if !bytes.HasPrefix(stored, []byte(secretEnvelopePrefix)) {
+		return stored, false, nil
+	}
+	if kek == nil {
+		return nil, true, errors.New("stored token secret is encrypted but SECRET_KEY is not set")
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(string(stored), secretEnvelopePrefix))
+	if err != nil {
+		return nil, true, fmt.Errorf("decoding token secret: %w", err)
+	}
+	plain, err := kek.Open(raw, secretEnvelopeAAD())
+	if err != nil {
+		return nil, true, fmt.Errorf("opening token secret (wrong SECRET_KEY?): %w", err)
+	}
+	return plain, true, nil
 }

@@ -2,10 +2,10 @@
 # Pinned for build stability; the official builder overrides BUILD_FROM per
 # architecture, the default below keeps local `docker build` working.
 # https://developers.home-assistant.io/docs/apps/configuration#app-dockerfile
-ARG BUILD_FROM=ghcr.io/home-assistant/base:3.23
+ARG BUILD_FROM=ghcr.io/home-assistant/base:3.23@sha256:1c7a8c7321c15cdc327c264232a76e6fbfdaf7f2b1734a8d8da6fcc994f66015
 
 # Stage 1: Build the frontend assets
-FROM node:26-alpine AS frontend-builder
+FROM node:26-alpine@sha256:ef24c5053d50fdc3e4e56eb4e7ddb7861874ab0fdc797046ba897581deb8e868 AS frontend-builder
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
@@ -16,7 +16,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build the Go backend binary with embedded frontend assets
-FROM golang:1.27-alpine AS backend-builder
+FROM golang:1.27-alpine@sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125 AS backend-builder
 WORKDIR /app
 
 # BUILD_VERSION and BUILD_ARCH are provided automatically by the official
@@ -48,6 +48,9 @@ COPY --from=backend-builder /app/walldash /usr/bin/walldash
 # s6-overlay service definitions
 COPY rootfs /
 RUN chmod a+x /etc/services.d/walldash/run
+
+# Unprivileged runtime user; the s6 service drops root to it (see the run script).
+RUN addgroup -g 1000 -S walldash && adduser -u 1000 -S -G walldash -H -h /data walldash
 
 LABEL \
     org.opencontainers.image.title="Walldash" \

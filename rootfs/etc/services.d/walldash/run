@@ -16,5 +16,12 @@ fi
 
 export LOG_LEVEL="${log_level}"
 
+# Ensure the data directory is writable by the unprivileged service user, then drop root.
+for data_dir in /data /app/data; do
+    if [[ -d "${data_dir}" ]]; then
+        chown -R walldash:walldash "${data_dir}" 2>/dev/null || true
+    fi
+done
+
 bashio::log.info "Starting Walldash..."
-exec /usr/bin/walldash
+exec s6-setuidgid walldash /usr/bin/walldash
