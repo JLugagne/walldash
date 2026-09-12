@@ -1,7 +1,10 @@
 # Home Assistant Add-on Packaging
 
 Walldash is distributed as a Home Assistant add-on with **direct port access** (no Ingress),
-so wall-mounted tablets can open the dashboard without a Home Assistant login.
+so wall-mounted tablets open the dashboard without a Home Assistant login. Each tablet signs
+in with Walldash's own per-device OTP flow (see the main `README.md`), not with a Home
+Assistant account. The add-on must be reached over **HTTPS**: the authentication cookies use
+`__Host-` + `Secure`, which browsers drop over plain HTTP.
 The runtime image follows the official recommendations: Home Assistant base image
 (`ghcr.io/home-assistant/base`, pinned) with s6-overlay as PID 1, bashio for option
 mapping, and the official builder actions for multi-arch publishing.
@@ -37,9 +40,38 @@ When the binary detects it runs inside an add-on container, it adapts without an
 - **Persistent storage**: when the `/data` volume exists, the database defaults to `/data/walldash.db`, surviving updates and reboots.
 - **Version**: the binary version is injected at build time (`BUILD_VERSION` build arg → `main.Version`), keeping the `/api/health` version and the add-on `version:` in sync.
 - **Health check**: `GET /api/health` serves as the add-on `watchdog` URL.
+- **Authentication**: devices enroll with a per-device one-time code (`otp_issued` in the add-on log, and **Setup → Access** once an owner exists). The first verified device becomes `owner`. `TOKEN_SECRET` is auto-generated and persisted in `/data` when unset; keep it stable across restarts. Revocation kills refresh tokens immediately but access tokens remain valid until their 15-minute TTL expires. Reaching the add-on over HTTPS is required for the `__Host-`/`Secure` cookies; if the reverse proxy rewrites `Host`, set the `domain` option to the browser-facing hostname (or list extra origins in `allowed_origins`/`ALLOWED_ORIGINS`).
 - **Init system**: s6-overlay is PID 1, so the add-on `config.yaml` must set `init: false` (required since S6 V3, otherwise the add-on will not start).
 
 Full precedence per setting: environment variable → `/data/options.json` → default (see `README.md`).
+
+## Add-on Options
+
+These are the options exposed in the add-on configuration UI and stored in `/data/options.json`.
+Each one has the same environment-variable equivalent, which always wins when set.
+
+| Option | Env var | Default | Description |
+| --- | --- | --- | --- |
+| `log_level` | `LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warn`, `error`. |
+| `token_secret` | `TOKEN_SECRET` | _(empty → auto-generated)_ | HS256 key used to sign access/refresh tokens, at least 32 bytes. Leave empty to generate one on first boot and persist it in `/data`; changing it invalidates all sessions. |
+| `allowed_origins` | `ALLOWED_ORIGINS` | _(empty)_ | Comma-separated browser-facing origins trusted for CORS, CSRF and the refresh/logout same-origin check. Accepts `https://host` or a bare `host`. Only needed when the reverse proxy rewrites `Host`. |
+| `domain` | `DOMAIN` | _(empty)_ | Public hostname of this instance (bare host, `http://host` or `https://host`; optional port kept, path/query ignored). Merged with `allowed_origins`. Only needed when the reverse proxy rewrites `Host`. |
+
+The `token_secret`, `allowed_origins` and `domain` options are declared in the companion
+`config.yaml` as `password?` / `str?` and are all optional.
+
+### Runtime notes
+
+- **HTTPS**: the add-on's `webui:` link and `ports:` entry expose plain HTTP on `8080`. Because
+  the authentication cookies are `__Host-` + `Secure`, opening that URL directly produces a login
+  loop. Put a TLS reverse proxy in front and reach the UI over HTTPS; the proxy must forward
+  `X-Forwarded-Proto: https`.
+- **First device**: bootstrap by reading the first `otp_issued` code from the add-on log; there is
+  no authenticated **Setup → Access** screen yet.
+- **Revocation latency**: revoking a device kills its refresh tokens immediately, but an access
+  token already issued remains valid until its 15-minute TTL expires.
+- **Single replica only**: pending enrollments and OTPs are held in memory, so run exactly one
+  container per database.
 
 ## Release Process
 
@@ -89,8 +121,14 @@ map:
     read_only: false
 options:
   log_level: info
+  token_secret: ""
+  allowed_origins: ""
+  domain: ""
 schema:
   log_level: list(debug|info|warn|error)
+  token_secret: password?
+  allowed_origins: str?
+  domain: str?
 watchdog: http://[HOST]:8080/api/health
 panel_icon: mdi:tablet-dashboard
 stage: experimental
@@ -169,8 +207,26 @@ configuration:
   log_level:
     name: Log level
     description: Verbosity of the add-on logs.
+  token_secret:
+    name: Token secret
+    description: >-
+      Optional HS256 signing key for access/refresh tokens (at least 32 bytes).
+      Leave empty to auto-generate and persist one in /data. Keep it stable.
+  allowed_origins:
+    name: Allowed origins
+    description: >-
+      Comma-separated browser-facing origins trusted for CSRF and same-origin
+      checks. Only needed when a reverse proxy rewrites the Host header.
+      Requires HTTPS (see the add-on documentation).
+  domain:
+    name: Domain
+    description: >-
+      Public hostname of this Walldash instance (bare host, http://host or
+      https://host; optional port kept). Used for the CORS header and the
+      CSRF/same-origin checks. Only needed when a reverse proxy rewrites the
+      Host header. Requires HTTPS (see the add-on documentation).
 network:
-  8080/tcp: Walldash web interface (direct access, no Home Assistant login required).
+  8080/tcp: Walldash web interface (direct access, HTTPS recommended).
 ```
 
 > Note: additional translation files (e.g. `fr.yaml`) can be added next to `en.yaml`
@@ -179,9 +235,11 @@ network:
 ### `walldash/DOCS.md` (outline)
 
 Cover: prerequisites (HA OS/Supervised with add-on store), adding the repository,
-installing and starting Walldash, opening `http://<home-assistant-ip>:8080` on tablets
-(kiosk mode tip), configuration options table, data persistence (`/data`), updating,
-uninstallation, troubleshooting (port conflict, Supervisor API unreachable, logs).
+installing and starting Walldash, reaching the UI **over HTTPS** (terminate TLS in a
+reverse proxy; plain HTTP breaks the authentication cookies), enrolling the first device
+with the `otp_issued` code from the log, configuration options table, data persistence
+(`/data`), updating, uninstallation, troubleshooting (port conflict, Supervisor API
+unreachable, login loop over HTTP, proxy Host rewriting and `allowed_origins`, logs).
 
 ### `walldash/README.md`, `walldash/CHANGELOG.md`, icons
 
@@ -193,7 +251,11 @@ uninstallation, troubleshooting (port conflict, Supervisor API unreachable, logs
 
 - [ ] Add-on installs from the custom repository on a test instance.
 - [ ] Starts with default options; logs show Supervisor API in use, no token configured manually.
-- [ ] Dashboard reachable at `http://<ha-ip>:8080` from a device without a Home Assistant session.
+- [ ] Dashboard reachable over **HTTPS** from a device without a Home Assistant session.
+- [ ] First device enrolls with the `otp_issued` code from the add-on log and becomes `owner`.
+- [ ] A second device enrolls and stays `device`; the owner can promote it to `admin` and revoke it.
+- [ ] A revoked device cannot refresh; its current access token stops working within the 15 min TTL.
+- [ ] `TOKEN_SECRET` is auto-generated on first boot and reused across an add-on restart (sessions survive).
 - [ ] Device toggle from the dashboard reflects in Home Assistant.
 - [ ] Database persists across add-on restart and update.
 - [ ] Version reported by `/api/health` matches the `config.yaml` version.

@@ -113,4 +113,16 @@ var (
 		Code:    "AUTOMATION_NOT_FOUND",
 		Message: "automation not found",
 	}
+	ErrAccountNotFound = &Error{
+		Code:    "ACCOUNT_NOT_FOUND",
+		Message: "account not found",
+	}
+	ErrForbidden = &Error{
+		Code:    "FORBIDDEN",
+		Message: "operation not permitted",
+	}
+	ErrInvalidRole = &Error{
+		Code:    "INVALID_ROLE",
+		Message: "invalid account role",
+	}
 )

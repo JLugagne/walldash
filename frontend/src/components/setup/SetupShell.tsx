@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronRight, Cpu, LayoutDashboard, Layers, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { ChevronRight, Cpu, LayoutDashboard, Layers, ShieldCheck, SlidersHorizontal, type LucideIcon } from 'lucide-react'
 import { useApp } from '../../useApp'
 import { SetupBannerSlotProvider, useSetSetupBannerSlot } from './SetupBannerSlot'
 
@@ -14,6 +14,7 @@ const TASKS: SetupTask[] = [
   { to: '/setup/plans', label: 'Floors & Plans', icon: Layers },
   { to: '/setup/devices', label: 'Devices', icon: Cpu },
   { to: '/setup/dashboards', label: 'Dashboards', icon: LayoutDashboard },
+  { to: '/setup/access', label: 'Access', icon: ShieldCheck },
   { to: '/setup/settings', label: 'Settings', icon: SlidersHorizontal },
 ]
 

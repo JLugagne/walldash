@@ -2,12 +2,15 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import type { Level } from './types'
 import type { AppContext } from './useApp'
+import { authFetch, useAuth } from './useAuth'
 import { OnboardingWizard } from './components/OnboardingWizard'
 import { AppTopBar } from './components/AppTopBar'
 import { TopBarSlotProvider } from './components/TopBarSlot'
+import { LoginScreen } from './components/auth/LoginScreen'
 
 function App() {
   const location = useLocation()
+  const auth = useAuth()
   const [levels, setLevels] = useState<Level[]>([])
   const [activeLevelId, setActiveLevelId] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -15,7 +18,7 @@ function App() {
 
   const fetchLevels = useCallback(async () => {
     try {
-      const res = await fetch('/api/levels')
+      const res = await authFetch('/api/levels')
       if (res.ok) {
         const payload = await res.json()
         if (payload?.status === 'success' && Array.isArray(payload.data)) {
@@ -44,8 +47,8 @@ function App() {
   }, [])
 
   useEffect(() => {
-    fetchLevels()
-  }, [fetchLevels])
+    if (auth.authenticated) void fetchLevels()
+  }, [fetchLevels, auth.authenticated])
 
   useEffect(() => {
     if (levels.length > 0) setWizardDismissed(false)
@@ -69,19 +72,25 @@ function App() {
 
   return (
     <div className="app-viewport w-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-hidden">
-      {showWizard && (
-        <OnboardingWizard
-          onDone={() => {
-            setWizardDismissed(true)
-            void fetchLevels()
-          }}
-          onClose={() => setWizardDismissed(true)}
-        />
+      {auth.checking ? null : !auth.authenticated ? (
+        <LoginScreen onAuthenticated={auth.refresh} />
+      ) : (
+        <>
+          {showWizard && (
+            <OnboardingWizard
+              onDone={() => {
+                setWizardDismissed(true)
+                void fetchLevels()
+              }}
+              onClose={() => setWizardDismissed(true)}
+            />
+          )}
+          <TopBarSlotProvider>
+            {!isSetup && <AppTopBar activeLevelId={activeLevelId} />}
+            <Outlet context={context} />
+          </TopBarSlotProvider>
+        </>
       )}
-      <TopBarSlotProvider>
-        {!isSetup && <AppTopBar activeLevelId={activeLevelId} />}
-        <Outlet context={context} />
-      </TopBarSlotProvider>
     </div>
   )
 }

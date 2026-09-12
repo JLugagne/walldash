@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -36,8 +37,9 @@ func CORS(cfg ...CORSConfig) func(http.Handler) http.Handler {
 			origin := r.Header.Get("Origin")
 			if origin != "" {
 				allowed := false
+				originKey := normalizeOrigin(origin)
 				for _, o := range config.AllowedOrigins {
-					if o == "*" || strings.EqualFold(o, origin) {
+					if o == "*" || strings.EqualFold(normalizeOrigin(o), originKey) {
 						allowed = true
 						break
 					}
@@ -61,4 +63,14 @@ func CORS(cfg ...CORSConfig) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// normalizeOrigin reduces an origin or allowed entry to a comparable host: the host
+// of a URL, or the raw value when no host can be parsed (bare host, "*").
+func normalizeOrigin(origin string) string {
+	origin = strings.TrimSpace(origin)
+	if u, err := url.Parse(origin); err == nil && u.Host != "" {
+		return u.Host
+	}
+	return origin
 }

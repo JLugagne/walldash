@@ -11,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/JLugagne/egauth/tokens/basic"
 	dashboard "github.com/JLugagne/walldash/internal/dashboard"
 	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
@@ -33,6 +35,14 @@ func TestDashboardNew(t *testing.T) {
 	dash, err := dashboard.New(ctx, conf, router)
 	require.NoError(t, err)
 	require.NotNil(t, dash)
+
+	pair, err := dash.Issuer.IssueTokenPair(ctx, basic.Claims{Subject: uuid.New()})
+	require.NoError(t, err)
+	authCookie := &http.Cookie{Name: dash.Cookies.AccessName, Value: pair.AccessToken, Path: "/"}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.AddCookie(authCookie)
+		router.ServeHTTP(w, r)
+	})
 	defer func() {
 		_ = dash.Close()
 	}()
@@ -40,13 +50,13 @@ func TestDashboardNew(t *testing.T) {
 	// 1. Verify health endpoint
 	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
+	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
 	// 2. Obtain CSRF token via GET /api/csrf-token
 	req = httptest.NewRequest(http.MethodGet, "/api/csrf-token", nil)
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
+	handler.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var csrfResp struct {
@@ -63,7 +73,7 @@ func TestDashboardNew(t *testing.T) {
 	preflightReq.Header.Set("Origin", "http://localhost:8080")
 	preflightReq.Header.Set("Access-Control-Request-Method", "POST")
 	preflightRec := httptest.NewRecorder()
-	router.ServeHTTP(preflightRec, preflightReq)
+	handler.ServeHTTP(preflightRec, preflightReq)
 	assert.Equal(t, http.StatusNoContent, preflightRec.Code)
 	assert.NotEmpty(t, preflightRec.Header().Get("Access-Control-Allow-Origin"))
 	assert.Contains(t, preflightRec.Header().Get("Access-Control-Allow-Methods"), "POST")
@@ -77,14 +87,14 @@ func TestDashboardNew(t *testing.T) {
 	body, _ := json.Marshal(createPayload)
 	unauthReq := httptest.NewRequest(http.MethodPost, "/api/levels", bytes.NewReader(body))
 	unauthRec := httptest.NewRecorder()
-	router.ServeHTTP(unauthRec, unauthReq)
+	handler.ServeHTTP(unauthRec, unauthReq)
 	assert.Equal(t, http.StatusForbidden, unauthRec.Code, "mutation without CSRF token/header must be rejected")
 
 	// 5. Create a Level via POST /api/levels with valid X-CSRF-Token
 	req = httptest.NewRequest(http.MethodPost, "/api/levels", bytes.NewReader(body))
 	req.Header.Set("X-CSRF-Token", csrfToken)
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
+	handler.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var createResp struct {
@@ -100,7 +110,7 @@ func TestDashboardNew(t *testing.T) {
 	// 6. List levels via GET /api/levels
 	req = httptest.NewRequest(http.MethodGet, "/api/levels", nil)
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
+	handler.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var listResp struct {
@@ -133,13 +143,13 @@ func TestDashboardNew(t *testing.T) {
 	req = httptest.NewRequest(http.MethodPut, "/api/levels/"+levelID+"/plan", bytes.NewReader(planBody))
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
+	handler.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	// 8. Get Plan via GET /api/levels/{id}/plan
 	req = httptest.NewRequest(http.MethodGet, "/api/levels/"+levelID+"/plan", nil)
 	rec = httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
+	handler.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var planResp struct {
@@ -156,7 +166,7 @@ func TestDashboardNew(t *testing.T) {
 	t.Run("embedded frontend serves index.html at root", func(t *testing.T) {
 		req = httptest.NewRequest(http.MethodGet, "/", nil)
 		rec = httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
+		handler.ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Contains(t, rec.Body.String(), "<div id=\"root\"></div>")
 	})
@@ -164,7 +174,7 @@ func TestDashboardNew(t *testing.T) {
 	t.Run("embedded frontend falls back to index.html for client route", func(t *testing.T) {
 		req = httptest.NewRequest(http.MethodGet, "/levels/view/123", nil)
 		rec = httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
+		handler.ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Contains(t, rec.Body.String(), "<div id=\"root\"></div>")
 	})
@@ -172,12 +182,12 @@ func TestDashboardNew(t *testing.T) {
 	t.Run("unknown api route returns 404 not SPA index.html", func(t *testing.T) {
 		req = httptest.NewRequest(http.MethodGet, "/api/nonexistent", nil)
 		rec = httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
+		handler.ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 	})
 
 	// 10. Test WebSocket /api/ws integration
-	server := httptest.NewServer(router)
+	server := httptest.NewServer(handler)
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/api/ws"

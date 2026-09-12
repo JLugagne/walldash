@@ -4,7 +4,7 @@ description: "See every floor of your home stacked into a single 3D model and ju
 weight: 10
 ---
 
-The **house overview** is the landing screen. It stacks all your levels on top of each other as one isometric model, so you can understand the whole house at a glance.
+The **house overview** is the landing screen once a device is signed in. It stacks all your levels on top of each other as one isometric model, so you can understand the whole house at a glance.
 
 {{< figure src="/images/house-overview.png" alt="Stacked floors in the Walldash house overview" caption="Each level is rendered as a slab; rooms, walls and outdoor areas are visible at a glance." >}}
 

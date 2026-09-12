@@ -19,7 +19,7 @@ The everyday bar has two view segments (**3D View** / **Dashboards**), the live 
 Tap **Setup** to switch the whole app into Setup mode. The button is context-aware: on a floor it opens that floor's 2D editor, and on the Dashboards view it opens the editor for the dashboard you are viewing. The shell changes unmistakably:
 
 - a **SETUP MODE** banner reminds you that you are configuring, not viewing;
-- the four configuration areas are listed below the banner;
+- the five configuration areas are listed below the banner;
 - **Exit setup** returns to the everyday shell — for dashboards it reopens the one you were editing. You can also press `Esc`.
 
 Focused editors (**Floors & Plans** and a specific **Dashboard**) hide the cross-section nav so they fill the height and preview the final result. Use **Exit setup** to reach the other areas.
@@ -41,6 +41,16 @@ A read-only inventory of the devices Walldash exposes, useful to confirm that an
 {{< figure src="/images/setup-dashboards.png" alt="Setup mode listing the dashboards with widget counts" caption="**Dashboards** lists your dashboards and how many widgets each holds." >}}
 
 Manage your dashboards: open one to edit it, or create a new one. Rename, delete, layout, widgets and the per-dashboard background are all handled in the dashboard editor (see [Dashboards](/using/dashboards/)).
+
+## Access
+
+{{< figure src="/images/setup-access.png" alt="Setup Access tab listing pending sign-in codes and enrolled devices with roles and a revoke action" caption="**Access** lists pending one-time codes, then every enrolled device with its role and a **revoke** action." >}}
+
+The **Access** area manages device sign-in and is available to **owner** and **admin** devices only:
+
+- **Pending codes** — devices that have opened the sign-in screen and are waiting for their one-time code. Each entry shows the device label, the code and when it expires, so you can read it out instead of digging through the log.
+- **Devices** — every enrolled device with its label, role, status and last-seen time. Change a device's role (`admin` / `device`; only the **owner** can grant or remove `owner`) or **revoke** it.
+- **Revoke** deletes the device's refresh tokens immediately, but an access token already issued keeps working for up to 15 minutes. See [Sign in & device access](/getting-started/sign-in/).
 
 ## Settings
 

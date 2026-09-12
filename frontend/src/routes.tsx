@@ -9,6 +9,7 @@ import { SetupShell } from './components/setup/SetupShell'
 import { DevicesList } from './components/setup/DevicesList'
 import { DashboardsManager } from './components/setup/DashboardsManager'
 import { SettingsPanel } from './components/setup/SettingsPanel'
+import { AuthPanel } from './components/setup/AuthPanel'
 
 export const router = createHashRouter([
   {
@@ -28,6 +29,7 @@ export const router = createHashRouter([
           { path: 'devices', element: <DevicesList /> },
           { path: 'dashboards', element: <DashboardsManager /> },
           { path: 'dashboards/:dashboardId', element: <DashboardEditorRoute /> },
+          { path: 'access', element: <AuthPanel /> },
           { path: 'settings', element: <SettingsPanel /> },
         ],
       },

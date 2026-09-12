@@ -4,7 +4,17 @@ description: "Set up your first floor plan by importing a Sweet Home 3D file, re
 weight: 20
 ---
 
-The first time Walldash starts with no data, it shows the onboarding wizard. It offers three ways to create your home.
+## Sign in first
+
+The very first time a device opens Walldash, it shows the **sign-in screen** instead of the app. The device requests a one-time code, which is written to the server log as an `otp_issued` line. Read that code and enter it to enroll the device.
+
+The **first device** to enroll becomes **owner**; later tablets become **device** and can be promoted in **Setup → Access**. See [Sign in & device access](/getting-started/sign-in/) for the full flow, the code channels and the roles.
+
+Once a device is signed in, Walldash shows the onboarding wizard.
+
+## The onboarding wizard
+
+When Walldash starts with no data, it shows the onboarding wizard. It offers three ways to create your home.
 
 {{< figure src="/images/onboarding.png" alt="Walldash onboarding wizard offering import, restore and blank options" caption="The onboarding wizard appears automatically when no level exists yet." >}}
 

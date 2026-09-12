@@ -41,6 +41,23 @@ add-on — only the forward host/port differ.
      challenge needs port 80 reachable from the internet.
 4. Open `https://walldash.domain.tld` — Walldash loads with a valid certificate.
 
+After the proxy is in place, set the public hostname so the CORS header and the
+CSRF/same-origin checks trust it:
+
+- Docker Compose / `.env`: `DOMAIN=walldash.domain.tld`
+- Home Assistant add-on: the `domain` option in the add-on configuration.
+
+Both `https://walldash.domain.tld` and the bare host `walldash.domain.tld` are
+accepted; an optional port is kept. This matters when the proxy rewrites the
+`Host` header (the default in NPM is to forward the original `Host`, so no extra
+configuration is usually needed). `ALLOWED_ORIGINS` remains available for
+additional origins and is merged with `DOMAIN`.
+
+The proxy must also forward `X-Forwarded-Proto: https` (NPM does this by default)
+so Walldash recognizes the client connection as secure. Without it, the
+`__Host-`/`Secure` authentication cookies are dropped and the UI loops on the
+login screen even though the browser URL is HTTPS.
+
 ## Optional hardening
 
 - **Access List** (NPM → **Access Lists**): restrict by IP/CIDR (e.g. your LAN only),
@@ -56,6 +73,7 @@ add-on — only the forward host/port differ.
 | `502 Bad Gateway` | NPM cannot reach Walldash: check forward host/port, and that the container/add-on is running. From the NPM host, `curl http://<host>:<port>/api/health` must return `ok`. |
 | Toggles work but states never update live | **Websockets Support** is off on the Proxy Host — enable it. |
 | Browser mixed-content warnings / redirect loop | **Force SSL** on, and open only the `https://` URL. |
+| Login screen loops after entering the OTP | The auth cookies were dropped: make sure the proxy forwards `X-Forwarded-Proto: https`, and set `DOMAIN` (or `allowed_origins`) if it rewrites `Host`. |
 | Certificate fails (HTTP challenge) | Port 80 must reach NPM from the internet — check the router forward, or switch to DNS challenge. |
 | Works on LAN but not remotely | Router port-forward `80`/`443` → NPM host missing, or DNS record pointing at the wrong (e.g. CGNAT) IP. |
 

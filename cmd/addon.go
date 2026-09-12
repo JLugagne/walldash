@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var Version = "1.1.1"
+var Version = "1.2.0"
 
 const (
 	// defaultSupervisorURL is the Home Assistant Supervisor API proxy base URL.
@@ -129,4 +129,76 @@ func haHost(haURL string) string {
 		return "unknown"
 	}
 	return parsed.Hostname()
+}
+
+// resolveAllowedOrigins merges the comma-separated ALLOWED_ORIGINS setting with the
+// normalized DOMAIN host, deduplicating case-insensitively while preserving order.
+func resolveAllowedOrigins(options map[string]string) []string {
+	origins := splitOrigins(configValue("ALLOWED_ORIGINS", "allowed_origins", "", options))
+	domain := normalizeDomain(configValue("DOMAIN", "domain", "", options))
+	return mergeOrigins(origins, domain)
+}
+
+// splitOrigins splits a comma-separated origin list, dropping blank entries.
+func splitOrigins(value string) []string {
+	var origins []string
+	for _, part := range strings.Split(value, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			origins = append(origins, trimmed)
+		}
+	}
+	return origins
+}
+
+// normalizeDomain reduces a domain setting to a bare host, accepting an optional
+// scheme and dropping any path or query while keeping an optional port.
+func normalizeDomain(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if !strings.Contains(value, "://") {
+		value = "https://" + value
+	}
+	u, err := url.Parse(value)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	return u.Host
+}
+
+// mergeOrigins appends domain to origins, deduplicating by host case-insensitively.
+func mergeOrigins(origins []string, domain string) []string {
+	merged := make([]string, 0, len(origins)+1)
+	seen := make(map[string]struct{}, len(origins)+1)
+	add := func(origin string) {
+		key := originHostKey(origin)
+		if key == "" {
+			return
+		}
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		merged = append(merged, origin)
+	}
+	for _, origin := range origins {
+		add(origin)
+	}
+	if domain != "" {
+		add(domain)
+	}
+	return merged
+}
+
+// originHostKey returns a case-insensitive dedup key: the host of a URL, or the raw value.
+func originHostKey(origin string) string {
+	origin = strings.TrimSpace(origin)
+	if origin == "" || origin == "*" {
+		return origin
+	}
+	if host := normalizeDomain(origin); host != "" {
+		return strings.ToLower(host)
+	}
+	return strings.ToLower(origin)
 }

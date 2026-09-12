@@ -71,11 +71,11 @@
 ### As a Home Assistant Add-on (Recommended)
 
 1. Add the add-on repository to Home Assistant: **Settings** → **Add-ons** → **Add-on Store** → menu (⋮) → **Repositories**, then add `https://github.com/JLugagne/ha-addons`.
-2. Install **Walldash** from the store and start it. No token setup is required: the add-on connects to Home Assistant through the Supervisor API automatically.
-3. Open the Walldash web UI at `http://<home-assistant-ip>:8080` on your wall tablets. No Home Assistant login is needed on the tablets (direct port access, no Ingress).
-4. Data is stored in the add-on `/data` volume and survives updates and reboots.
+2. Install **Walldash** from the store and start it. No Home Assistant API token setup is required: the add-on connects through the Supervisor API automatically.
+3. Reach the Walldash web UI on your wall tablets **over HTTPS** (terminate TLS in a reverse proxy in front of the add-on, see [`docs/reverse-proxy.md`](docs/reverse-proxy.md)). Plain HTTP cannot hold the authentication cookies.
+4. Enroll the first device with the one-time code from the add-on log (see [Device authentication](#-device-authentication-otp)). Data is stored in the add-on `/data` volume and survives updates and reboots.
 
-See [`docs/home-assistant-add-on.md`](docs/home-assistant-add-on.md) for packaging details, the release process, and the manual token fallback.
+See [`docs/home-assistant-add-on.md`](docs/home-assistant-add-on.md) for packaging details, add-on options, and the release process.
 
 ### Using Docker Compose (Alternative)
 
@@ -103,7 +103,7 @@ See [`docs/home-assistant-add-on.md`](docs/home-assistant-add-on.md) for packagi
    docker compose up -d
    ```
 
-5. Open your browser or tablet display at `http://<server-ip>:9090` (the Compose file maps host port `9090` to the container's `8080`).
+5. Open your browser or tablet display at `http://<server-ip>:9090` (the Compose file maps host port `9090` to the container's `8080`). For sign-in to work, serve it over HTTPS (put a TLS reverse proxy in front); plain HTTP cannot hold the authentication cookies.
 
 > No Home Assistant configured yet? Walldash starts in **demo mode** with built-in example devices, so you can explore the interface before connecting a real instance.
 
@@ -121,6 +121,93 @@ To generate a Long-Lived Access Token:
 
 ---
 
+## 🔐 Device Authentication (OTP)
+
+Walldash authenticates each screen itself — tablets never log in with a Home Assistant account.
+Every device is its own anonymous Walldash account with its own subject UUID, which keeps wall
+panels usable in kiosk mode (no Home Assistant session, no long-lived HA token on the device)
+while still letting you decide which screens may change the dashboard.
+
+### Why a one-time code
+
+There is no password to share and nothing to provision in Home Assistant. Instead a device
+proves it belongs to this Walldash instance by entering a short-lived, single-use one-time code
+(OTP) that an operator reads from the server side. The API never returns the code, so a device
+cannot simply enroll itself.
+
+### Enrollment flow
+
+1. A device with no auth cookie calls `POST /api/auth/connect`. Walldash creates a **pending**
+   device account bound to that device and issues an OTP valid for **15 minutes**.
+2. The code is delivered where an operator can read it — never in the HTTP response:
+   - written to the container/add-on log as `otp_issued` (the JSON field is `code`); this is the
+     intended channel and the only one available for the very first device;
+   - listed in **Setup → Access** once an `owner` or `admin` device exists.
+3. The user types the code into the app, which calls `POST /api/auth/verify`. On success
+   Walldash promotes the pending device to a real account and sets two cookies:
+   - an **access token** — 15 minutes;
+   - a **refresh token** — 60 days, rotated on every refresh.
+4. The first device ever to verify becomes **owner**; every later device becomes **device**.
+
+### Roles
+
+| Role | Can do |
+| --- | --- |
+| `owner` | The first enrolled device. Everything an `admin` can do, plus grant/remove the `owner` role, promote/demote `admin`, and revoke any device. |
+| `admin` | Manage devices (promote to `admin`, demote to `device`), revoke devices, and read pending enrollment codes. |
+| `device` | Use the dashboard only; no Setup access. |
+
+Only an `owner` may grant or remove the `owner` role, so an `admin` cannot escalate itself.
+
+### Sessions and revocation
+
+Tokens are cookies, so nothing has to be stored on the device. The access cookie lasts 15
+minutes and the refresh cookie lasts 60 days and rotates on every `POST /api/auth/refresh`;
+the account's existence and status are re-checked on each rotation.
+
+**Revocation is bounded, not instant.** Revoking a device deletes its refresh tokens
+immediately, so it can never refresh again, but an access token already issued stays valid until
+it expires — up to 15 minutes (there is no deny-list, by design).
+`POST /api/auth/logout` revokes only the current device's refresh family and clears its cookies;
+the account itself stays active.
+
+### HTTPS is mandatory
+
+Authentication cookies are named with the `__Host-` prefix and always set `Secure`. Browsers
+silently drop such cookies over plain HTTP, which surfaces as a login loop with no visible error.
+Always serve Walldash over HTTPS — terminate TLS in a reverse proxy in front of the
+container/add-on (see [`docs/reverse-proxy.md`](docs/reverse-proxy.md)). The proxy must forward
+`X-Forwarded-Proto: https` so Walldash knows the client connection is secure.
+
+### Custom domain and origins
+
+If the reverse proxy rewrites the `Host` header (the forward host differs from the name in the
+browser), tell Walldash the public hostname:
+
+- `DOMAIN=walldash.domain.tld` (or the add-on `domain` option) — accepts a bare host,
+  `http://host` or `https://host`; an optional port is kept and any path/query is ignored.
+- `ALLOWED_ORIGINS` (or the add-on `allowed_origins` option) — extra comma-separated origins;
+  accepts a full URL or a bare host. Merged with `DOMAIN`.
+
+These feed the CORS `Access-Control-Allow-Origin` header, the CSRF/same-origin checks and the
+refresh/logout origin check. If the proxy preserves `Host` (the common case, for example NPM's
+default), no extra configuration is needed.
+
+### WebSocket
+
+`/api/ws` (live device state) also requires a valid **access** cookie. When it expires the client
+refreshes over HTTP and reconnects; the socket handshake cannot refresh on its own. A revoked
+device therefore stops receiving live updates within at most 15 minutes, like any other
+protected call.
+
+### First-device bootstrap
+
+Before any authenticated device exists there is no **Setup → Access** yet, so read the very first
+`otp_issued` code from the container/add-on log and enter it on the first tablet. That device
+becomes `owner`.
+
+---
+
 ## ⚙️ Configuration Reference
 
 Settings resolve with the following precedence: **environment variable** → **add-on options file** (`/data/options.json`) → **default**.
@@ -131,8 +218,10 @@ Settings resolve with the following precedence: **environment variable** → **a
 | `DB_PATH` | `walldash.db` (or `/data/walldash.db` when the `/data` volume exists) | SQLite database path. |
 | `HA_URL` | `http://homeassistant.local:8123` | Home Assistant base URL. |
 | `HA_TOKEN` | _(empty)_ | Long-lived access token. Not needed when running as an add-on: `SUPERVISOR_TOKEN` is used automatically via the Supervisor API proxy. The Supervisor token is never attached to a custom `HA_URL`. |
+| `TOKEN_SECRET` | _(auto-generated + persisted)_ | HS256 key used to sign access/refresh tokens, at least 32 bytes. Leave empty to generate one on first boot and persist it in the database; keep it stable, changing it invalidates all sessions. |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error`. |
-| `ALLOWED_ORIGINS` | _(empty)_ | Comma-separated CORS origins. |
+| `ALLOWED_ORIGINS` | _(empty)_ | Comma-separated trusted origins for CORS, CSRF and the same-origin check, needed when a reverse proxy rewrites the `Host` header. Accepts `https://host` or a bare `host`. Also settable as the add-on option `allowed_origins`. |
+| `DOMAIN` | _(empty)_ | Public hostname of this Walldash instance, used for the CORS `Access-Control-Allow-Origin` header and the CSRF/same-origin checks. Accepts a bare host, `http://host` or `https://host`; an optional port is kept and any path/query is ignored. Merged with `ALLOWED_ORIGINS`. Also settable as the add-on option `domain`. |
 | `FRONTEND_DIR` | _(embedded assets)_ | Serve the frontend from a directory instead of the embedded build. |
 
 ---
@@ -142,6 +231,10 @@ Settings resolve with the following precedence: **environment variable** → **a
 To reach Walldash at `https://walldash.domain.tld` with automatic HTTPS, see
 [`docs/reverse-proxy.md`](docs/reverse-proxy.md) (Nginx Proxy Manager setup,
 works for both Docker Compose and the add-on — WebSocket support required).
+
+Set `DOMAIN=walldash.domain.tld` (or the add-on `domain` option) so the CORS header and the
+CSRF/same-origin checks trust the public hostname. This is needed when the reverse proxy rewrites
+the `Host` header; extra origins can still be listed in `ALLOWED_ORIGINS`.
 
 ---
 

@@ -26,21 +26,14 @@ func main() {
 	dbPath := resolveDBPath(configValue("DB_PATH", "db_path", "", options))
 	haURL := configValue("HA_URL", "ha_url", "", options)
 	haToken := configValue("HA_TOKEN", "ha_token", "", options)
+	tokenSecret := configValue("TOKEN_SECRET", "token_secret", "", options)
 	haURL, haToken = resolveHAConfig(haURL, haToken, os.Getenv(supervisorTokenEnv))
 	if haURL == "" {
 		haURL = "http://homeassistant.local:8123"
 	}
 	logrus.WithFields(logrus.Fields{"ha_source": haSourceLabel(haURL), "ha_host": haHost(haURL), "ha_token_set": haToken != ""}).Info("home assistant configuration resolved")
 	frontendDir := os.Getenv("FRONTEND_DIR")
-	allowedOriginsStr := os.Getenv("ALLOWED_ORIGINS")
-	var allowedOrigins []string
-	if allowedOriginsStr != "" {
-		for _, o := range strings.Split(allowedOriginsStr, ",") {
-			if trimmed := strings.TrimSpace(o); trimmed != "" {
-				allowedOrigins = append(allowedOrigins, trimmed)
-			}
-		}
-	}
+	allowedOrigins := resolveAllowedOrigins(options)
 
 	conf := dashboard.Config{
 		DBPath:         dbPath,
@@ -50,6 +43,7 @@ func main() {
 		FrontendDir:    frontendDir,
 		AssetsFS:       frontend.FS(),
 		AllowedOrigins: allowedOrigins,
+		TokenSecret:    tokenSecret,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

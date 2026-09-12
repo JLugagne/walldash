@@ -14,9 +14,10 @@ The add-on is the simplest option: it connects to Home Assistant through the Sup
    https://github.com/JLugagne/ha-addons
    ```
 3. Find **Walldash** in the store, install it, then start it.
-4. Open the web UI at `http://<home-assistant-ip>:8080` on your tablets.
+4. Serve Walldash over **HTTPS** (put a TLS reverse proxy in front of it) and open the web UI on your tablets. Plain HTTP cannot hold the authentication cookies.
+5. Enroll the first device with the one-time code from the add-on log — see [Sign in & device access](/getting-started/sign-in/).
 
-Data is stored in the add-on `/data` volume and survives updates and reboots. The wall tablets connect directly to port `8080`, so **no Home Assistant login is needed** on them.
+Data is stored in the add-on `/data` volume and survives updates and reboots. The wall tablets connect directly to Walldash, so **no Home Assistant login is needed** on them — each device signs in once with its own one-time code, and the first device becomes the owner.
 
 ## With Docker Compose
 
@@ -42,7 +43,8 @@ Use this option if you run Home Assistant Core in Docker or want Walldash on a s
    ```bash
    docker compose up -d
    ```
-5. Open `http://<server-ip>:8080`.
+5. Put a TLS reverse proxy in front of it and open `https://<your-domain>` on your tablets. Plain HTTP cannot hold the authentication cookies.
+6. Read the first `otp_issued` code from `docker compose logs` and enter it on the sign-in screen — see [Sign in & device access](/getting-started/sign-in/).
 
 ## Generating an access token
 

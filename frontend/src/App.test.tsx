@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 
 vi.mock('./hooks/useRealtimeDevices', () => ({
@@ -14,6 +14,15 @@ function emptyLevelsResponse() {
     ok: true,
     json: async () => ({ status: 'success', data: [] }),
   } as Response)
+}
+
+function jsonResponse(status: number, body: unknown): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: '',
+    json: async () => body,
+  } as Response
 }
 
 function renderApp() {
@@ -34,5 +43,26 @@ describe('App shell', () => {
     const shell = container.firstElementChild as HTMLElement
     expect(shell.className).toContain('app-viewport')
     expect(shell.className).not.toContain('h-screen')
+  })
+
+  it('returns to the login screen when the silent refresh fails', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const raw =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+      const pathname = new URL(raw, 'http://localhost').pathname
+      const method = (init?.method ?? 'GET').toUpperCase()
+      if (method === 'GET' && pathname === '/api/auth/me') return jsonResponse(401, { status: 'error' })
+      if (method === 'GET' && pathname === '/api/csrf-token')
+        return jsonResponse(200, { status: 'success', data: { csrf_token: 'csrf' } })
+      if (method === 'POST' && pathname === '/api/auth/refresh')
+        return jsonResponse(401, { status: 'error' })
+      if (method === 'POST' && pathname === '/api/auth/connect')
+        return jsonResponse(200, { status: 'success', data: { status: 'pending' } })
+      throw new Error(`Unmocked ${method} ${pathname}`)
+    }) as unknown as typeof fetch
+
+    renderApp()
+
+    expect(await screen.findByText('Waiting for approval')).toBeDefined()
   })
 })

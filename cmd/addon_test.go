@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -145,5 +146,27 @@ func TestHaHost(t *testing.T) {
 		if got := haHost(input); got != expected {
 			t.Fatalf("haHost(%q) = %q, expected %q", input, got, expected)
 		}
+	}
+}
+
+func TestResolveAllowedOriginsMergesDomain(t *testing.T) {
+	t.Setenv("DOMAIN", "https://walldash.domain.tld/path?x=1")
+	t.Setenv("ALLOWED_ORIGINS", "https://other.example.com, walldash.domain.tld")
+
+	got := resolveAllowedOrigins(map[string]string{})
+	want := []string{"https://other.example.com", "walldash.domain.tld"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestResolveAllowedOriginsReadsAddonOption(t *testing.T) {
+	t.Setenv("DOMAIN", "")
+	t.Setenv("ALLOWED_ORIGINS", "")
+
+	got := resolveAllowedOrigins(map[string]string{"domain": "walldash.domain.tld:8443"})
+	want := []string{"walldash.domain.tld:8443"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
 	}
 }

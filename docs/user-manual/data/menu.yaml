@@ -4,6 +4,8 @@
       url: /
     - name: Installation
       url: /getting-started/installation/
+    - name: Sign in & device access
+      url: /getting-started/sign-in/
     - name: First run & onboarding
       url: /getting-started/onboarding/
 

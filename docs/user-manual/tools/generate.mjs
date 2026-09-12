@@ -56,6 +56,77 @@ function run(cmd, args, opts = {}) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+// ---------------------------------------------------------------------------
+// Backend log tailing — the device OTP is only exposed in the logs (and the
+// authenticated setup tab) on first enrollment, so the harness reads it there.
+// ---------------------------------------------------------------------------
+
+const otpBacklog = []
+const otpWaiters = []
+
+function publishOtp(code) {
+  const waiter = otpWaiters.shift()
+  if (waiter) waiter(code)
+  else otpBacklog.push(code)
+}
+
+// nextOtp resolves with the next `otp_issued` code, or rejects after a timeout.
+function nextOtp(timeoutMs = 15000) {
+  if (otpBacklog.length) return Promise.resolve(otpBacklog.shift())
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const index = otpWaiters.indexOf(waiter)
+      if (index !== -1) otpWaiters.splice(index, 1)
+      reject(new Error('timed out waiting for an otp_issued log line'))
+    }, timeoutMs)
+    const waiter = (code) => {
+      clearTimeout(timer)
+      resolve(code)
+    }
+    otpWaiters.push(waiter)
+  })
+}
+
+function handleBackendLine(line, out) {
+  out.write(`${line}\n`)
+  if (!line.includes('otp_issued')) return
+  let code = null
+  try {
+    const parsed = JSON.parse(line)
+    if (parsed && typeof parsed.code === 'string') code = parsed.code
+  } catch {
+    /* not JSON */
+  }
+  if (!code) {
+    const match = line.match(/\bcode["']?\s*[:=]\s*["']?(\d{4,8})/)
+    if (match) code = match[1]
+  }
+  if (code) publishOtp(code)
+}
+
+// wireBackendLogs forwards the child's output and scans it for OTP codes.
+function wireBackendLogs(child) {
+  for (const [stream, out] of [
+    [child.stdout, process.stdout],
+    [child.stderr, process.stderr],
+  ]) {
+    let buffer = ''
+    stream.setEncoding('utf8')
+    stream.on('data', (chunk) => {
+      buffer += chunk
+      let index
+      while ((index = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, index).replace(/\r$/, '')
+        buffer = buffer.slice(index + 1)
+        handleBackendLine(line, out)
+      }
+    })
+    stream.on('end', () => {
+      if (buffer) handleBackendLine(buffer, out)
+    })
+  }
+}
+
 // Playwright pins one Chromium build per release. On machines where that exact
 // build is not downloaded but another revision is cached (common in CI and in
 // Playwright dev environments), fall back to the newest cached full Chromium.
@@ -94,11 +165,13 @@ async function launchBrowser() {
   }
 }
 
+// /api/health is behind RequireAuth; /api/auth/status is one of the public
+// bootstrap probes, so it doubles as an unauthenticated liveness check.
 async function waitForHealth(timeoutMs = 20000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`${BASE}/api/health`)
+      const res = await fetch(`${BASE}/api/auth/status`)
       if (res.ok) return
     } catch {
       /* not up yet */
@@ -109,11 +182,104 @@ async function waitForHealth(timeoutMs = 20000) {
 }
 
 // ---------------------------------------------------------------------------
+// Cookie jar — Node's fetch does not persist cookies, so the harness tracks
+// Set-Cookie itself and replays them as a Cookie header on later requests.
+// ---------------------------------------------------------------------------
+
+const session = { cookies: new Map() }
+
+function storeCookies(res, jar = session.cookies) {
+  const list = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : []
+  for (const raw of list) {
+    const pair = raw.split(';', 1)[0]
+    const eq = pair.indexOf('=')
+    if (eq === -1) continue
+    const name = pair.slice(0, eq).trim()
+    const value = pair.slice(eq + 1).trim()
+    if (!name) continue
+    if (value === '') jar.delete(name)
+    else jar.set(name, value)
+  }
+}
+
+function cookieHeader(jar = session.cookies) {
+  return [...jar.entries()].map(([name, value]) => `${name}=${value}`).join('; ')
+}
+
+// authenticate signs the harness in as the first device (`owner`): POST
+// connect, read the one-time code from the backend logs, then POST verify.
+async function authenticate(label = 'Walldash manual (harness)') {
+  const codePromise = nextOtp()
+  const connectRes = await fetch(`${BASE}/api/auth/connect`, {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'User-Agent': label },
+  })
+  storeCookies(connectRes)
+  if (!connectRes.ok) {
+    throw new Error(`auth connect → HTTP ${connectRes.status}: ${(await connectRes.text()).slice(0, 200)}`)
+  }
+  const code = await codePromise
+  const verifyRes = await fetch(`${BASE}/api/auth/verify`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'User-Agent': label,
+      Cookie: cookieHeader(),
+    },
+    body: JSON.stringify({ code }),
+  })
+  storeCookies(verifyRes)
+  if (!verifyRes.ok) {
+    throw new Error(`auth verify → HTTP ${verifyRes.status}: ${(await verifyRes.text()).slice(0, 200)}`)
+  }
+  const payload = await verifyRes.json()
+  return payload?.data?.device
+}
+
+// clearAuthState empties the demo database's auth tables so this run's first
+// enrollment becomes `owner`. It only ever touches the demo `.work/manual.db`.
+async function clearAuthState(dbPath) {
+  const { DatabaseSync } = await import('node:sqlite')
+  const db = new DatabaseSync(dbPath)
+  try {
+    for (const table of ['auth_refresh_tokens', 'auth_accounts']) {
+      try {
+        db.exec(`DELETE FROM ${table};`)
+      } catch {
+        /* table not created yet on a pristine database */
+      }
+    }
+  } finally {
+    db.close()
+  }
+}
+
+// authCookies maps the harness session onto Playwright's cookie format. On
+// http://127.0.0.1 Chromium treats the origin as trustworthy, so Secure and
+// `__Host-` cookies are stored and sent despite the plain-HTTP scheme.
+function authCookies() {
+  return ['__Host-access_token', '__Host-refresh_token']
+    .filter((name) => session.cookies.has(name))
+    .map((name) => ({
+      name,
+      value: session.cookies.get(name),
+      domain: '127.0.0.1',
+      path: '/',
+      secure: true,
+      httpOnly: true,
+      sameSite: 'Lax',
+    }))
+}
+
+// ---------------------------------------------------------------------------
 // Backend API helpers (CSRF is bypassed with X-Requested-With, as the SPA does)
 // ---------------------------------------------------------------------------
 
 async function api(pathname, { method = 'GET', body } = {}) {
   const headers = {}
+  const cookie = cookieHeader()
+  if (cookie) headers.Cookie = cookie
   let payload
   if (method !== 'GET') headers['X-Requested-With'] = 'XMLHttpRequest'
   if (body !== undefined) {
@@ -140,7 +306,7 @@ async function importSh3d() {
   form.append('file', new Blob([buf]), path.basename(SH3D_FILE))
   const res = await fetch(`${BASE}/api/levels/import/sh3d`, {
     method: 'POST',
-    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    headers: { 'X-Requested-With': 'XMLHttpRequest', Cookie: cookieHeader() },
     body: form,
   })
   const text = await res.text()
@@ -360,17 +526,20 @@ async function capture({ groundId, dashboardId }) {
     colorScheme: 'dark',
     locale: 'en-US',
   })
+  await context.addCookies(authCookies())
 
   const results = []
 
-  async function shot(name, hash, prepare, ctx = context) {
+  async function shot(name, hash, prepare, ctx = context, opts = {}) {
     const file = path.join(IMAGES_DIR, `${name}.png`)
     let lastError = null
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       const page = await ctx.newPage()
       try {
         await page.goto(`${BASE}/#${hash}`, { waitUntil: 'load' })
-        await page.waitForSelector('canvas', { timeout: 15000 }).catch(() => {})
+        if (opts.canvas !== false) {
+          await page.waitForSelector('canvas', { timeout: 15000 }).catch(() => {})
+        }
         if (prepare) await prepare(page)
         await page.waitForTimeout(2800)
         await page.screenshot({ path: file, timeout: 60000, animations: 'disabled' })
@@ -387,6 +556,23 @@ async function capture({ groundId, dashboardId }) {
     console.warn(`  ✗ ${name}.png — ${lastError.message}`)
     results.push({ name, ok: false, error: lastError.message })
   }
+
+  // Sign-in screen: a fresh, cookie-less context lands on LoginScreen, which
+  // requests an enrollment on mount ("Waiting for approval" + 6-digit code
+  // field). This also leaves a pending code for setup-access.png.
+  const loginContext = await browser.newContext({
+    viewport: IPAD_LANDSCAPE,
+    deviceScaleFactor: DEVICE_SCALE_FACTOR,
+    isMobile: false,
+    hasTouch: true,
+    colorScheme: 'dark',
+    locale: 'en-US',
+  })
+  await shot('login', '/', async (page) => {
+    await page.getByText('Waiting for approval').waitFor({ timeout: 10000 })
+    await page.locator('#otp-code').waitFor({ timeout: 10000 })
+  }, loginContext, { canvas: false })
+  await loginContext.close()
 
   await shot('house-overview', '/')
   await shot('floor-controls', `/floor/${groundId}`)
@@ -405,6 +591,10 @@ async function capture({ groundId, dashboardId }) {
   await shot('setup-devices', '/setup/devices')
   await shot('setup-dashboards', '/setup/dashboards')
   await shot('setup-settings', '/setup/settings')
+  await shot('setup-access', '/setup/access', async (page) => {
+    await page.getByRole('heading', { name: 'Access' }).waitFor({ timeout: 10000 })
+    await page.getByText('Pending enrollments').waitFor({ timeout: 8000 })
+  }, context, { canvas: false })
 
   // Phone flow: same dashboard, viewport below the 640 px breakpoint. deviceScaleFactor 2 keeps
   // the narrow image crisp in the manual.
@@ -416,6 +606,7 @@ async function capture({ groundId, dashboardId }) {
     colorScheme: 'dark',
     locale: 'en-US',
   })
+  await mobileContext.addCookies(authCookies())
   await shot('dashboard-mobile', '/dashboards', undefined, mobileContext)
   await mobileContext.close()
 
@@ -475,11 +666,14 @@ async function main() {
       HA_TOKEN: '',
       PORT: String(PORT),
       DB_PATH: dbPath,
-      LOG_LEVEL: 'warn',
+      // info (not warn) so the `otp_issued` code is logged for the harness.
+      LOG_LEVEL: 'info',
       FRONTEND_DIR: path.join(FRONTEND_DIR, 'dist'),
     },
-    stdio: ['ignore', 'inherit', 'inherit'],
+    // Piped (not inherited) so the harness can parse the `otp_issued` code.
+    stdio: ['ignore', 'pipe', 'pipe'],
   })
+  wireBackendLogs(backend)
 
   process.on('SIGINT', () => {
     stopBackend()
@@ -492,6 +686,12 @@ async function main() {
 
   await waitForHealth()
   console.log('  backend is up')
+
+  // Authentication is always on. Reset the demo DB's accounts so this run's
+  // first enrollment is `owner`, then sign the harness in.
+  await clearAuthState(dbPath)
+  const device = await authenticate()
+  console.log(`  authenticated harness as ${device?.role ?? 'owner'}`)
 
   let ctx
   if (REUSE_DB) {
@@ -518,6 +718,7 @@ async function captureEmptyOnboarding() {
     colorScheme: 'dark',
     locale: 'en-US',
   })
+  await context.addCookies(authCookies())
   const page = await context.newPage()
   await page.goto(`${BASE}/`, { waitUntil: 'load' })
   await page.getByText('Welcome to Walldash').waitFor({ timeout: 10000 })
