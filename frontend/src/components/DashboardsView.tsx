@@ -37,9 +37,6 @@ interface DashboardsViewProps {
 const STALE_MS = 30 * 60 * 1000
 const TOAST_MS = 3000
 const NETWORK_ERROR_MESSAGE = 'Unable to reach the server, change not saved.'
-/** Rolling sample window per numeric entity, fed to the sensor sparklines. */
-const HISTORY_LENGTH = 24
-const HISTORY_SAMPLE_MS = 5000
 
 function parseNumericState(state: string | undefined): number | null {
   if (state === undefined) return null
@@ -85,7 +82,6 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
   const backgroundTimerRef = useRef<number | null>(null)
 
   const [lastKnownValues, setLastKnownValues] = useState<Record<string, number>>({})
-  const [histories, setHistories] = useState<Record<string, number[]>>({})
 
   const { deviceMap, devices, pendingDevices, toggleDevice } = useRealtimeDevices(null)
 
@@ -125,31 +121,6 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
       }
       return changed ? next : prev
     })
-  }, [deviceMap])
-
-  // Roll a bounded per-entity sample window: on every device stream tick, plus a slow heartbeat so
-  // a steady reading still yields a (flat) sparkline instead of a single point. Never fabricates a
-  // value — it only records what the stream reports — and the caller renders nothing below two.
-  useEffect(() => {
-    const sample = () => {
-      setHistories((prev) => {
-        let changed = false
-        const next: Record<string, number[]> = { ...prev }
-        for (const device of Object.values(deviceMap)) {
-          if (device.state === 'unavailable' || device.state === 'unknown') continue
-          const num = parseNumericState(device.state)
-          if (num === null) continue
-          const existing = next[device.id] ?? []
-          next[device.id] = [...existing, num].slice(-HISTORY_LENGTH)
-          changed = true
-        }
-        return changed ? next : prev
-      })
-    }
-
-    sample()
-    const timer = window.setInterval(sample, HISTORY_SAMPLE_MS)
-    return () => window.clearInterval(timer)
   }, [deviceMap])
 
   const activeDashboard = dashboards.find((d) => d.id === activeDashboardId) || null
@@ -396,7 +367,6 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
       widget.title || (entityId ? widget.config.labels?.[entityId] : undefined) || device?.name || entityId || 'Widget'
     const unit = widget.config.unit || (device?.attributes?.unit_of_measurement as string | undefined) || ''
     const stale = isStaleDevice(device)
-    const history = entityId ? histories[entityId] : undefined
 
     if (widget.type === 'sensor') {
       const live = parseNumericState(device?.state)
@@ -410,7 +380,6 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
               unit={unit}
               min={widget.config.min}
               max={widget.config.max}
-              history={history}
               stale={stale}
               dense={widget.row_span === 1}
             />
@@ -423,7 +392,6 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
               min={widget.config.min ?? 0}
               max={widget.config.max ?? 100}
               unit={unit}
-              history={history}
               stale={stale}
               dense={widget.row_span === 1}
             />
@@ -436,7 +404,6 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
               min={widget.config.min ?? 0}
               max={widget.config.max ?? 100}
               unit={unit}
-              history={history}
               stale={stale}
             />
           )
@@ -455,6 +422,7 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
           pending={isPending}
           stale={stale}
           dense={widget.row_span === 1}
+          fullTile={widget.col_span === 1 && widget.row_span === 1}
           onToggle={() => {
             if (entityId) toggleDevice(entityId)
           }}

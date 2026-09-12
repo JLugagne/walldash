@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { AutomationSwitchWidget } from './AutomationSwitchWidget'
 import type { Automation, Widget } from '../../../types'
 
-function makeWidget(): Widget {
+function makeWidget(colSpan = 1, rowSpan = 1): Widget {
   return {
     id: 'w1',
     dashboard_id: 'd1',
@@ -12,8 +12,8 @@ function makeWidget(): Widget {
     order: 0,
     col: 0,
     row: 0,
-    col_span: 1,
-    row_span: 1,
+    col_span: colSpan,
+    row_span: rowSpan,
     config: {
       entity_ids: [],
       display: 'switch',
@@ -119,5 +119,37 @@ describe('AutomationSwitchWidget', () => {
         expect.objectContaining({ method: 'POST' }),
       ),
     )
+  })
+
+  it('fills a 1x1 tile with a single exclusive OFF button', () => {
+    render(
+      <AutomationSwitchWidget
+        widget={makeWidget(1, 1)}
+        automations={[
+          automation('automation.evening_on', null),
+          automation('automation.evening_off', null),
+        ]}
+      />,
+    )
+
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+    expect(screen.getByText('OFF')).toBeDefined()
+    expect(screen.queryByText('ON')).toBeNull()
+  })
+
+  it('keeps the reading and track layout on a wider tile', () => {
+    render(
+      <AutomationSwitchWidget
+        widget={makeWidget(3, 1)}
+        automations={[
+          automation('automation.evening_on', '2026-09-12T20:00:00Z'),
+          automation('automation.evening_off', '2026-09-12T08:00:00Z'),
+        ]}
+      />,
+    )
+
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+    expect(screen.getByText('On')).toBeDefined()
+    expect(screen.queryByText('Off')).toBeNull()
   })
 })

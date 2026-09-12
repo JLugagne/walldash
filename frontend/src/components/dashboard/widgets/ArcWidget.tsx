@@ -2,7 +2,6 @@ import React from 'react'
 import { CircleGauge } from 'lucide-react'
 import { formatSensorValue } from '../format'
 import { WidgetFrame } from './WidgetFrame'
-import { Sparkline } from './Sparkline'
 
 export interface ArcWidgetProps {
   label: string
@@ -10,8 +9,6 @@ export interface ArcWidgetProps {
   min: number
   max: number
   unit?: string
-  /** Recent samples for the optional sparkline; nothing is drawn below two samples. */
-  history?: number[]
   stale: boolean
 }
 
@@ -44,9 +41,8 @@ function clampRatio(value: number | null, min: number, max: number): number {
 // the bottom (roughly 270 degrees), never a full-circle gauge. Drawn as an SVG with a square
 // viewBox so `preserveAspectRatio` (the SVG default, xMidYMid meet) always centres it in a square
 // regardless of the cell's actual aspect ratio (ADR 0004). Variant A adds the reading's unit as a
-// caption chip, the min/max bounds under the dial, and a sparkline of recent samples when the
-// caller has them.
-export const ArcWidget: React.FC<ArcWidgetProps> = ({ label, value, min, max, unit, history = [], stale }) => {
+// caption chip and the min/max bounds under the dial.
+export const ArcWidget: React.FC<ArcWidgetProps> = ({ label, value, min, max, unit, stale }) => {
   const ratio = clampRatio(value, min, max)
   const trackPath = describeArc(START_ANGLE_DEG, SWEEP_DEG)
   const valuePath = ratio > 0 ? describeArc(START_ANGLE_DEG, ratio * SWEEP_DEG) : ''
@@ -105,7 +101,6 @@ export const ArcWidget: React.FC<ArcWidgetProps> = ({ label, value, min, max, un
             {bounds.max.unit}
           </span>
         </div>
-        {history.length >= 2 && <Sparkline history={history} color="#4bb8c9" className="w-full h-5 shrink-0 mt-0.5" />}
       </div>
     </WidgetFrame>
   )

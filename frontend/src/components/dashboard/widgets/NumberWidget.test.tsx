@@ -17,7 +17,7 @@ describe('NumberWidget', () => {
     expect(fontSize).not.toMatch(/,\s*[\d.]+rem\)$/)
   })
 
-  it('keeps scaling the value font when bounds and a sparkline are present', () => {
+  it('keeps scaling the value font when bounds are present', () => {
     render(
       <NumberWidget
         label="Salon"
@@ -25,7 +25,6 @@ describe('NumberWidget', () => {
         unit="°C"
         min={10}
         max={30}
-        history={[20, 21, 22]}
         stale={false}
       />,
     )

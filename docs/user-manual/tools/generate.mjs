@@ -199,6 +199,13 @@ const AUTOMATION_SWITCH = {
   off_automation: 'automation.eteindre_toutes_les_lumieres',
 }
 
+const AUTOMATION_SWITCH_1X1 = {
+  display: 'switch',
+  entity_ids: [],
+  on_automation: 'automation.arrosage_automatique_jardin',
+  off_automation: 'automation.eteindre_toutes_les_lumieres',
+}
+
 const HOME_WIDGETS = [
   { type: 'sensor', title: 'Hall temperature', config: { entity_ids: ['sensor.temperature_salon'], display: 'arc', min: 10, max: 30, unit: '°C' }, col: 0, row: 0, col_span: 3, row_span: 3 },
   { type: 'weather', title: 'Chamonix', config: { display: 'weather', weather_mode: 'current', units: 'metric', ...WEATHER_LOCATION }, col: 3, row: 0, col_span: 3, row_span: 3 },
@@ -206,7 +213,8 @@ const HOME_WIDGETS = [
   { type: 'automation_switch', title: 'Evening', config: AUTOMATION_SWITCH, col: 6, row: 2, col_span: 3, row_span: 1 },
   { type: 'actuator', title: 'Hall lights', config: { entity_ids: ['light.salon_plafond'], display: 'toggle' }, col: 9, row: 0, col_span: 3, row_span: 1 },
   { type: 'actuator', title: 'Coffee machine', config: { entity_ids: ['switch.machine_a_cafe'], display: 'toggle' }, col: 9, row: 1, col_span: 3, row_span: 1 },
-  { type: 'actuator', title: 'Kitchen lights', config: { entity_ids: ['light.cuisine_spot'], display: 'toggle' }, col: 9, row: 2, col_span: 3, row_span: 1 },
+  { type: 'actuator', title: 'Kitchen lights', config: { entity_ids: ['light.cuisine_spot'], display: 'toggle' }, col: 9, row: 2, col_span: 2, row_span: 1 },
+  { type: 'automation_switch', title: 'Garden', config: AUTOMATION_SWITCH_1X1, col: 11, row: 2, col_span: 1, row_span: 1 },
   { type: 'sensor', title: 'Ski shed humidity', config: { entity_ids: ['sensor.humidite_sdb'], display: 'number', unit: '%' }, col: 0, row: 3, col_span: 3, row_span: 2 },
   { type: 'sensor', title: 'Office temperature', config: { entity_ids: ['sensor.temperature_salon'], display: 'bar', min: 10, max: 30, unit: '°C' }, col: 3, row: 3, col_span: 3, row_span: 2 },
   { type: 'weather', title: '5-day forecast', config: { display: 'weather', weather_mode: 'ndays', weather_days: 5, units: 'metric', ...WEATHER_LOCATION }, col: 6, row: 3, col_span: 6, row_span: 2 },

@@ -2,7 +2,6 @@ import React from 'react'
 import { Gauge } from 'lucide-react'
 import { formatSensorValue } from '../format'
 import { WidgetFrame } from './WidgetFrame'
-import { Sparkline } from './Sparkline'
 
 export interface NumberWidgetProps {
   label: string
@@ -11,8 +10,6 @@ export interface NumberWidgetProps {
   unit?: string
   min?: number
   max?: number
-  /** Recent samples for the optional sparkline; nothing is drawn below two samples. */
-  history?: number[]
   stale: boolean
   dense?: boolean
 }
@@ -33,25 +30,22 @@ function valueFontSize(text: string, unit: string, heightCap: number): string {
 // through container-query units, so a 1x1 cell and a 4x2 cell both fill without clipping. The
 // width term is scaled by the line's character count so a long word such as "Cloudy" shrinks to
 // fit a 1x1 cell instead of being ellipsized. Variant A adds the reading's dimension as a caption
-// chip, explicit min/max bounds when the Widget config sets them, and a sparkline of the recent
-// samples the caller has collected. Presentational only — the caller resolves the label, the last
-// known value, its history, and whether it is stale.
+// chip and explicit min/max bounds when the Widget config sets them. Presentational only — the
+// caller resolves the label, the last known value and whether it is stale.
 export const NumberWidget: React.FC<NumberWidgetProps> = ({
   label,
   value,
   unit,
   min,
   max,
-  history = [],
   stale,
   dense = false,
 }) => {
   const formatted = formatSensorValue(value, unit)
   const hasBounds = min !== undefined && max !== undefined
-  const hasHistory = history.length >= 2
   const boundsMin = hasBounds ? formatSensorValue(min, unit) : null
   const boundsMax = hasBounds ? formatSensorValue(max, unit) : null
-  const heightCap = hasBounds || hasHistory ? 38 : 45
+  const heightCap = hasBounds ? 38 : 45
 
   return (
     <WidgetFrame
@@ -88,7 +82,6 @@ export const NumberWidget: React.FC<NumberWidgetProps> = ({
             </span>
           </div>
         )}
-        {hasHistory && <Sparkline history={history} color="#42a67d" className="w-full h-5 shrink-0 mt-0.5" />}
       </div>
     </WidgetFrame>
   )

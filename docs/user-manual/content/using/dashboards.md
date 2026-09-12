@@ -28,7 +28,7 @@ An **Automation switch** is the quickest way to expose a pair of frequently used
 - turn the switch **on** → Walldash triggers the **On** automation;
 - turn the switch **off** → Walldash triggers the **Off** automation.
 
-The switch position reflects the **most recently triggered** of the two automations, so it stays in sync even when an automation is started from Home Assistant rather than from Walldash. Its caption shows the widget title and the automation matching the current position.
+The switch position reflects the **most recently triggered** of the two automations, so it stays in sync even when an automation is started from Home Assistant rather than from Walldash. On a 1×1 tile the switch fills the cell with a single **ON** or **OFF** button; wider tiles show the state text next to a toggle track. Tapping anywhere runs the automation for the other state.
 
 {{< figure src="/images/dashboard-edit.png" alt="Editing a dashboard in Setup mode" caption="Editing a dashboard in **Setup → Dashboards**: add widgets, drag them to rearrange the grid, and change the background." >}}
 

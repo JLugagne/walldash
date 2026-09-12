@@ -2,7 +2,6 @@ import React from 'react'
 import { BarChart3 } from 'lucide-react'
 import { formatSensorValue } from '../format'
 import { WidgetFrame } from './WidgetFrame'
-import { Sparkline } from './Sparkline'
 
 export interface BarWidgetProps {
   label: string
@@ -10,8 +9,6 @@ export interface BarWidgetProps {
   min: number
   max: number
   unit?: string
-  /** Recent samples for the optional sparkline; nothing is drawn below two samples. */
-  history?: number[]
   stale: boolean
   dense?: boolean
 }
@@ -23,16 +20,15 @@ function clampRatio(value: number | null, min: number, max: number): number {
 }
 
 // Sensor widget, Display "bar": a large reading over a horizontal fill between the Widget's Min
-// and Max, with the bounds called out underneath and a sparkline of recent samples when the caller
-// has collected them. The track alone carries the meter semantics so the value stays a plain
-// readout. Presentational only — bounds, history and freshness are resolved by the caller.
+// and Max, with the bounds called out underneath. The track alone carries the meter semantics so
+// the value stays a plain readout. Presentational only — bounds and freshness are resolved by the
+// caller.
 export const BarWidget: React.FC<BarWidgetProps> = ({
   label,
   value,
   min,
   max,
   unit,
-  history = [],
   stale,
   dense = false,
 }) => {
@@ -77,9 +73,6 @@ export const BarWidget: React.FC<BarWidgetProps> = ({
             {bounds.max.unit}
           </span>
         </div>
-      )}
-      {!dense && history.length >= 2 && (
-        <Sparkline history={history} color="#4bb8c9" className="w-full h-5 shrink-0" />
       )}
     </WidgetFrame>
   )
