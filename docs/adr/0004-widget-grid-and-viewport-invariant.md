@@ -22,6 +22,8 @@ Movement is done by pushing neighboring Widgets in the gesture direction, applie
 
 Positions resulting from a push are written by a dedicated layout route, in a single transaction, separate from Widget content updates.
 
+Below the phone breakpoint (`max-width: 639px`) the Dashboard leaves the fixed grid for a vertically scrolling flow capped at two columns: Widgets keep the reading order of the grid, their `col_span` collapses to one or two flow columns and their `row_span` drives the height. The flow is read-only and is the one place a Dashboard scrolls; the invariant below still applies to the fixed Widget Grid.
+
 ## Consequences
 
 - The invariant "no Widget outside the viewport" cannot be lost by forgetting an interface validation: it is false or true in the domain.

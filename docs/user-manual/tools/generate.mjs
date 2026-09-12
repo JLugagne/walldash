@@ -343,6 +343,9 @@ async function reseedDashboards() {
 // ---------------------------------------------------------------------------
 
 const IPAD_LANDSCAPE = { width: 1194, height: 834 }
+// Phone portrait for the mobile Dashboard flow screenshot (CSS viewport 390 px < the 640 px
+// breakpoint, so the app renders the two-column flow).
+const PHONE_PORTRAIT = { width: 390, height: 844 }
 // Screenshots are captured at CSS-pixel size: deviceScaleFactor 1 keeps the PNGs small.
 const DEVICE_SCALE_FACTOR = 1
 
@@ -360,11 +363,11 @@ async function capture({ groundId, dashboardId }) {
 
   const results = []
 
-  async function shot(name, hash, prepare) {
+  async function shot(name, hash, prepare, ctx = context) {
     const file = path.join(IMAGES_DIR, `${name}.png`)
     let lastError = null
     for (let attempt = 1; attempt <= 2; attempt += 1) {
-      const page = await context.newPage()
+      const page = await ctx.newPage()
       try {
         await page.goto(`${BASE}/#${hash}`, { waitUntil: 'load' })
         await page.waitForSelector('canvas', { timeout: 15000 }).catch(() => {})
@@ -402,6 +405,19 @@ async function capture({ groundId, dashboardId }) {
   await shot('setup-devices', '/setup/devices')
   await shot('setup-dashboards', '/setup/dashboards')
   await shot('setup-settings', '/setup/settings')
+
+  // Phone flow: same dashboard, viewport below the 640 px breakpoint. deviceScaleFactor 2 keeps
+  // the narrow image crisp in the manual.
+  const mobileContext = await browser.newContext({
+    viewport: PHONE_PORTRAIT,
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+    colorScheme: 'dark',
+    locale: 'en-US',
+  })
+  await shot('dashboard-mobile', '/dashboards', undefined, mobileContext)
+  await mobileContext.close()
 
   await browser.close()
 
