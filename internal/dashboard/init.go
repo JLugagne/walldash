@@ -128,6 +128,12 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		SecretKey:  tokenSecret,
 		AccessTTL:  15 * time.Minute,
 		RefreshTTL: 60 * 24 * time.Hour,
+		// ReuseGracePeriod widens the window during which replaying an already-consumed
+		// refresh token is treated as benign concurrency instead of theft. egauth's zero
+		// value selects its 10s default, which is too tight for bursty mobile reconnects
+		// (a phone waking from sleep can replay a consumed token seconds later); 30s
+		// absorbs those retries while keeping a stolen token's replay window short.
+		ReuseGracePeriod: 30 * time.Second,
 		ClaimsProvider: basic.ClaimsProviderFunc(func(ctx context.Context, userID uuid.UUID, tenantID string) (basic.Claims, error) {
 			acct, err := accountRepo.FindByID(ctx, userID.String())
 			if err != nil || acct.Status != domain.StatusActive {

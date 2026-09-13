@@ -110,6 +110,13 @@ func (s *TokensStore) FindRefreshToken(ctx context.Context, tenantID string, tok
 	return rt, nil
 }
 
+// reuseGrace is the window after a refresh token's consumption during which a replay is
+// treated as benign concurrency (a legitimate client racing itself) rather than theft. It
+// mirrors egauth's jwt.DefaultReuseGracePeriod; on this path the race is a lost atomic
+// consume, sub-second in practice. egauth's Rotate enforces its own configurable window
+// (basic.Config.ReuseGracePeriod) for replays that begin after the token was consumed.
+const reuseGrace = 10 * time.Second
+
 func (s *TokensStore) ConsumeRefreshToken(ctx context.Context, tenantID string, tokenHash string) error {
 	now := time.Now().UTC().Truncate(time.Second)
 	res, err := s.db.ExecContext(ctx, `UPDATE auth_refresh_tokens SET consumed_at = ? WHERE hash = ? AND tenant_id = ? AND consumed_at IS NULL`, now, tokenHash, tenantID)
@@ -131,6 +138,9 @@ func (s *TokensStore) ConsumeRefreshToken(ctx context.Context, tenantID string, 
 			return errors.Join(tokens.ErrRefreshTokenNotFound, err)
 		}
 		return errors.Join(domain.ErrDatabaseUnavailable, err)
+	}
+	if consumedAt.Valid && time.Since(consumedAt.Time) <= reuseGrace {
+		return tokens.ErrRefreshConcurrent
 	}
 	return tokens.ErrRefreshTokenReused
 }
