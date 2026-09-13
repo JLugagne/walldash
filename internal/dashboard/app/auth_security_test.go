@@ -22,7 +22,7 @@ func (f *fakeSessionCloser) CloseUser(subject string) {
 
 func TestSetRoleInvalidatesTargetSessions(t *testing.T) {
 	targetID := uuid.NewString()
-	target := domain.Account{ID: targetID, Role: domain.RoleDevice, Status: domain.StatusActive}
+	target := domain.Account{ID: targetID, Role: domain.RoleAdmin, Status: domain.StatusActive}
 	actor := domain.Account{ID: uuid.NewString(), Role: domain.RoleOwner, Status: domain.StatusActive}
 	revoker := &stubRefreshRevoker{}
 	bus := revocation.NewMemBus()
@@ -46,9 +46,9 @@ func TestSetRoleInvalidatesTargetSessions(t *testing.T) {
 	closer := &fakeSessionCloser{}
 	auth.SetSessionCloser(closer)
 
-	updated, err := auth.SetRole(context.Background(), actor, targetID, domain.RoleAdmin)
+	updated, err := auth.SetRole(context.Background(), actor, targetID, domain.RoleDevice)
 	require.NoError(t, err)
-	require.Equal(t, domain.RoleAdmin, updated.Role)
+	require.Equal(t, domain.RoleDevice, updated.Role)
 	require.True(t, revoker.called)
 	require.Equal(t, targetID, revoker.userID.String())
 	require.Equal(t, []string{targetID}, closer.closed)
@@ -109,4 +109,41 @@ func TestCanManageAccount(t *testing.T) {
 	require.ErrorIs(t, canManageAccount(admin, owner), domain.ErrForbidden)
 	require.ErrorIs(t, canManageAccount(device, owner), domain.ErrForbidden)
 	require.ErrorIs(t, canManageAccount(device, device), domain.ErrForbidden)
+}
+
+// TestSetRolePromotionKeepsSession pins the rule that promoting a device does not sign it out:
+// only privilege reduction ends the session. The access token is still invalidated so the next
+// request re-issues one carrying the new scopes, but the refresh family and live socket stay.
+func TestSetRolePromotionKeepsSession(t *testing.T) {
+	targetID := uuid.NewString()
+	target := domain.Account{ID: targetID, Role: domain.RoleDevice, Status: domain.StatusActive}
+	actor := domain.Account{ID: uuid.NewString(), Role: domain.RoleOwner, Status: domain.StatusActive}
+	revoker := &stubRefreshRevoker{}
+	bus := revocation.NewMemBus()
+	var published []revocation.Revocation
+	bus.Subscribe(revocation.TargetUser, revocation.HandlerFunc(func(_ context.Context, rev revocation.Revocation) error {
+		published = append(published, rev)
+		return nil
+	}))
+	repo := &accountstest.MockAccountRepository{
+		FindByIDFunc: func(_ context.Context, id string) (domain.Account, error) {
+			require.Equal(t, targetID, id)
+			return target, nil
+		},
+		SetRoleFunc: func(_ context.Context, id string, role domain.Role) (domain.Account, error) {
+			target.Role = role
+			return target, nil
+		},
+	}
+	auth := NewAuth(repo, nil, nil, revoker, bus, false)
+	closer := &fakeSessionCloser{}
+	auth.SetSessionCloser(closer)
+
+	updated, err := auth.SetRole(context.Background(), actor, targetID, domain.RoleAdmin)
+	require.NoError(t, err)
+	require.Equal(t, domain.RoleAdmin, updated.Role)
+	require.False(t, revoker.called, "promotion must not revoke the refresh family")
+	require.Empty(t, closer.closed, "promotion must not close live sockets")
+	require.Len(t, published, 1, "promotion should still force the access token to be re-issued")
+	assert.Equal(t, targetID, published[0].TargetID)
 }

@@ -174,7 +174,9 @@ the account's existence and status are re-checked on each rotation.
 
 **Revocation is immediate for live sessions.** Revoking a device deletes its refresh tokens,
 publishes an access-token revocation (so the already-issued access cookie is rejected right away)
-and closes its open `/api/ws` sockets; role changes invalidate the target's sessions the same way.
+and closes its open `/api/ws` sockets. Demoting a device (lowering its role) ends its session the
+same way, so a reduced role can never be outlived by a token; promoting a device instead keeps it
+signed in and only forces its access token to be re-issued with the new scopes.
 The only residual window is a server restart: the access-token revocation list is in memory, so
 after a restart a previously revoked but unexpired access token can be accepted until it expires —
 at most 15 minutes; refreshing always re-checks the account and fails once revoked.

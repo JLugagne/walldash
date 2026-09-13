@@ -25,6 +25,10 @@ const (
 	defaultPendingTTL = 15 * time.Minute
 	// defaultInviteTTL is how long an administrator-minted invitation stays valid.
 	defaultInviteTTL = 15 * time.Minute
+	// reasonPrivilegeGranted marks an access-token-only revocation published after a role
+	// promotion: the target's current access token is rejected so its next request re-issues
+	// one with the new scopes, while its refresh family and live socket stay valid.
+	reasonPrivilegeGranted revocation.Reason = "privilege_granted"
 )
 
 var (
@@ -272,6 +276,18 @@ func (a *Auth) SetRole(ctx context.Context, actor domain.Account, id string, rol
 	if err != nil {
 		return domain.Account{}, domain.ErrAccountNotFound
 	}
+	if role == target.Role {
+		return updated, nil
+	}
+	if roleRank(role) > roleRank(target.Role) {
+		// Promotion: keep the device signed in. Reject the already-issued access token so the
+		// next request re-issues one carrying the new scopes, but leave the refresh family
+		// and the live socket untouched.
+		a.publishRevocation(ctx, subject, reasonPrivilegeGranted)
+		return updated, nil
+	}
+	// Demotion: privileges are reduced, so end the session immediately — revoke the refresh
+	// family, reject issued access tokens and close live sockets.
 	if err := a.revoker.RevokeAllRefreshTokensForUser(ctx, "", subject); err != nil {
 		return domain.Account{}, err
 	}
@@ -293,4 +309,19 @@ func (a *Auth) SetLabel(ctx context.Context, actor domain.Account, id string, la
 		return err
 	}
 	return a.accounts.UpdateLabel(ctx, id, trimmed)
+}
+
+// roleRank orders roles by privilege so a change can be classified as a promotion or a
+// demotion. Unknown roles rank lowest.
+func roleRank(role domain.Role) int {
+	switch role {
+	case domain.RoleOwner:
+		return 3
+	case domain.RoleAdmin:
+		return 2
+	case domain.RoleDevice:
+		return 1
+	default:
+		return 0
+	}
 }
