@@ -9,6 +9,7 @@ import (
 	svcactions "github.com/JLugagne/walldash/internal/dashboard/domain/service/actions"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/middleware"
 	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
@@ -33,7 +34,7 @@ func NewActionsHandler(controller *inbound.Controller, commands svcactions.Actio
 // SetupActionRoutes registers action execution routes onto the router.
 func SetupActionRoutes(r *mux.Router, controller *inbound.Controller, commands svcactions.ActionCommands) {
 	handler := NewActionsHandler(controller, commands)
-	r.HandleFunc("/api/actions", handler.ExecuteAction).Methods(http.MethodPost)
+	r.HandleFunc("/api/actions", handler.ExecuteAction).Methods(http.MethodPost).Name(middleware.DeviceSafeRoutePrefix + "actions")
 }
 
 // ExecuteAction handles POST /api/actions.

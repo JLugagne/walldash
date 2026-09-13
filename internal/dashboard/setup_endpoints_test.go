@@ -245,6 +245,10 @@ func TestSetupEndpointsDeviceCannotWriteConfiguration(t *testing.T) {
 	require.NotEqual(t, http.StatusForbidden, resp.StatusCode, "devices may still trigger whitelisted actions")
 	resp.Body.Close()
 
+	resp = device.do(http.MethodPost, "/api/automations/automation.cinema/trigger", nil, nil)
+	require.NotEqual(t, http.StatusForbidden, resp.StatusCode, "devices may still trigger device-safe automations")
+	resp.Body.Close()
+
 	resp = owner.do(http.MethodPost, "/api/levels", map[string]any{"name": "Garage", "is_outdoor": false}, nil)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	resp.Body.Close()

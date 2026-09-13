@@ -9,6 +9,7 @@ import (
 	svcdashboards "github.com/JLugagne/walldash/internal/dashboard/domain/service/dashboards"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound/converters"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/middleware"
 	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
@@ -40,7 +41,7 @@ func SetupDashboardRoutes(r *mux.Router, controller *inbound.Controller, command
 	r.HandleFunc("/api/dashboards/{id}/widgets/{widgetId}", handler.UpdateWidget).Methods(http.MethodPut)
 	r.HandleFunc("/api/dashboards/{id}/widgets/{widgetId}", handler.DeleteWidget).Methods(http.MethodDelete)
 	r.HandleFunc("/api/dashboards/{id}/layout", handler.UpdateLayout).Methods(http.MethodPut)
-	r.HandleFunc("/api/automations/{id}/trigger", handler.TriggerAutomation).Methods(http.MethodPost)
+	r.HandleFunc("/api/automations/{id}/trigger", handler.TriggerAutomation).Methods(http.MethodPost).Name(middleware.DeviceSafeRoutePrefix + "automation-trigger")
 }
 
 // CreateDashboard handles POST /api/dashboards.

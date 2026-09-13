@@ -204,9 +204,9 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	queries.SetupSetupAuthRoutes(setupRouter, authQueries)
 
 	// Owner-only management operations: every state-changing request requires the
-	// setup:manage scope, except the public auth endpoints and the device-safe action route.
+	// setup:manage scope, except the public auth endpoints listed here and any route
+	// tagged as device-safe at registration time (middleware.DeviceSafeRoutePrefix).
 	adminWriteExempt := []string{
-		"/api/actions",
 		"/api/auth/connect",
 		"/api/auth/verify",
 		"/api/auth/refresh",
