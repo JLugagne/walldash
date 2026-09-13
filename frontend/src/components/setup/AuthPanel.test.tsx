@@ -64,6 +64,18 @@ const DEVICES = [
   },
 ]
 
+const DEVICES_WITH_REVOKED = [
+  ...DEVICES,
+  {
+    id: 'd3',
+    label: 'Old phone',
+    role: 'device',
+    status: 'revoked',
+    created_at: '2026-08-20T10:00:00Z',
+    last_seen: '2026-08-21T10:00:00Z',
+  },
+]
+
 beforeEach(() => {
   vi.restoreAllMocks()
 })
@@ -231,6 +243,24 @@ describe('AuthPanel', () => {
 
     expect(await screen.findByText('label must be 1..64 characters')).toBeDefined()
     expect(screen.getByText('Garage tablet')).toBeDefined()
+  })
+
+  it('hides revoked devices by default and reveals them when toggled', async () => {
+    mockRoutes({
+      'GET /api/auth/me': meRoute('owner'),
+      'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
+      'GET /api/setup/auth/invites': emptyInvites(),
+      'GET /api/setup/auth/devices': () => jsonResponse(200, { status: 'success', data: DEVICES_WITH_REVOKED }),
+    })
+
+    render(<AuthPanel />)
+
+    expect(await screen.findByText('Hall panel', {}, { timeout: 5000 })).toBeDefined()
+    expect(screen.queryByText('Old phone')).toBeNull()
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /hide revoked/i }))
+
+    expect(await screen.findByText('Old phone')).toBeDefined()
   })
 
   it('restricts the role selector for non-owner accounts', async () => {

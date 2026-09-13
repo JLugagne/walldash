@@ -63,6 +63,19 @@ describe('LoginScreen', () => {
     expect(await screen.findByText('Waiting for approval')).toBeDefined()
   })
 
+  it('does not offer a manual invitation-token field while waiting for approval', async () => {
+    mockRoutes({
+      'POST /api/auth/connect': () => jsonResponse(200, { status: 'success', data: { status: 'pending' } }),
+      'POST /api/auth/redeem': () => jsonResponse(202, { status: 'success', data: { status: 'pending' } }),
+    })
+
+    render(<LoginScreen onAuthenticated={vi.fn()} />)
+
+    expect(await screen.findByText('Waiting for approval')).toBeDefined()
+    expect(screen.queryByLabelText(/invitation token/i)).toBeNull()
+    expect(screen.queryByPlaceholderText(/invitation token/i)).toBeNull()
+  })
+
   it('resumes an existing pending enrollment instead of creating a new one, and keeps polling', async () => {
     vi.useFakeTimers()
     const onAuthenticated = vi.fn()

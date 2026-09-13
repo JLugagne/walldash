@@ -10,7 +10,7 @@ Walldash keeps your home dashboard on its own. Each tablet that opens it is a **
 
 The first device that opens Walldash becomes the **owner** automatically. There is nothing to type and nothing to find: just open Walldash and you are in.
 
-{{< figure src="/images/login.png" alt="Walldash screen shown the first time a device opens it" caption="The first time a device opens Walldash, it is welcomed straight in as the owner." >}}
+{{< figure src="/images/login.png" alt="Access screen on a new device waiting to be approved" caption="Later devices wait on this screen until an owner or admin approves them. There is never a code or token to type." >}}
 
 The owner manages every other device from **Setup → Access**.
 

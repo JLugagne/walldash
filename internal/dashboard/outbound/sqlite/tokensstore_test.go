@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/JLugagne/egauth/tokens"
@@ -18,13 +19,13 @@ import (
 
 func TestSQLiteTokensStoreContract(t *testing.T) {
 	adapter := setupTestDB(t)
-	store := sqlite.NewTokensStore(adapter.DB())
+	store := sqlite.NewTokensStore(adapter.DB(), 30*time.Second)
 	storetest.StoreContractTesting(t, store, false, struct{}{})
 }
 
 func TestSQLiteTokensStoreConcurrentConsume(t *testing.T) {
 	adapter := setupTestDB(t)
-	store := sqlite.NewTokensStore(adapter.DB())
+	store := sqlite.NewTokensStore(adapter.DB(), 30*time.Second)
 	ctx := context.Background()
 
 	rt := &tokens.RefreshToken{
@@ -69,7 +70,7 @@ func TestSQLiteTokensStoreConcurrentConsume(t *testing.T) {
 
 func TestSQLiteTokensStoreConsumeWithinGraceReportsConcurrent(t *testing.T) {
 	adapter := setupTestDB(t)
-	store := sqlite.NewTokensStore(adapter.DB())
+	store := sqlite.NewTokensStore(adapter.DB(), 30*time.Second)
 	ctx := context.Background()
 
 	rt := &tokens.RefreshToken{
@@ -90,7 +91,7 @@ func TestSQLiteTokensStoreConsumeWithinGraceReportsConcurrent(t *testing.T) {
 
 func TestSQLiteTokensStoreConsumeAfterGraceReportsReused(t *testing.T) {
 	adapter := setupTestDB(t)
-	store := sqlite.NewTokensStore(adapter.DB())
+	store := sqlite.NewTokensStore(adapter.DB(), 30*time.Second)
 	ctx := context.Background()
 
 	rt := &tokens.RefreshToken{
@@ -115,7 +116,7 @@ func TestSQLiteTokensStoreConsumeAfterGraceReportsReused(t *testing.T) {
 
 func TestBasicIssuerConcurrentRotateKeepsFamily(t *testing.T) {
 	adapter := setupTestDB(t)
-	store := sqlite.NewTokensStore(adapter.DB())
+	store := sqlite.NewTokensStore(adapter.DB(), 30*time.Second)
 	ctx := context.Background()
 
 	const tenant = "tenant-rotate"
@@ -166,4 +167,80 @@ func TestBasicIssuerConcurrentRotateKeepsFamily(t *testing.T) {
 	next, err := issuer.Rotate(ctx, tenant, winner.RefreshToken)
 	require.NoError(t, err, "winner's refresh token must still rotate; family must not be revoked")
 	require.NotEmpty(t, next.RefreshToken)
+}
+
+func TestSQLiteTokensStoreHonorsConfiguredGrace(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		adapter := setupTestDB(t)
+		store := sqlite.NewTokensStore(adapter.DB(), 30*time.Second)
+		ctx := t.Context()
+
+		rt := &tokens.RefreshToken{
+			Hash:      "configured-grace",
+			FamilyID:  uuid.Must(uuid.NewV7()),
+			UserID:    uuid.Must(uuid.NewV7()),
+			ExpiresAt: time.Now().Add(time.Hour),
+			CreatedAt: time.Now(),
+		}
+		require.NoError(t, store.SaveRefreshToken(ctx, "", rt))
+		require.NoError(t, store.ConsumeRefreshToken(ctx, "", rt.Hash))
+
+		// A device replaying its consumed token 15s later is still inside the configured
+		// 30s grace: this is benign concurrency, not theft.
+		time.Sleep(15 * time.Second)
+		err := store.ConsumeRefreshToken(ctx, "", rt.Hash)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, tokens.ErrRefreshConcurrent, "replay inside the configured grace must be benign")
+
+		// Past the grace window the same replay is genuine reuse and must be reported as such.
+		time.Sleep(16 * time.Second)
+		err = store.ConsumeRefreshToken(ctx, "", rt.Hash)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, tokens.ErrRefreshTokenReused, "replay past the configured grace must be treated as reuse")
+		assert.False(t, errors.Is(err, tokens.ErrRefreshConcurrent))
+	})
+}
+
+// TestBasicIssuerReuseGraceKeepsFamilySynctest guards the end-to-end contract a waking
+// device depends on: replaying a just-consumed refresh token inside the configured grace
+// window must not poison the token family. It uses synctest so the grace boundary is
+// exercised deterministically on a fake clock instead of a real 30s wait.
+func TestBasicIssuerReuseGraceKeepsFamilySynctest(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		adapter := setupTestDB(t)
+		store := sqlite.NewTokensStore(adapter.DB(), 30*time.Second)
+		ctx := t.Context()
+
+		const tenant = "tenant-grace"
+		userID := uuid.Must(uuid.NewV7())
+		issuer := basic.NewIssuer(basic.Config{
+			Store:            store,
+			Issuer:           "walldash",
+			SecretKey:        "0123456789abcdef0123456789abcdef",
+			AccessTTL:        time.Minute,
+			RefreshTTL:       time.Hour,
+			ReuseGracePeriod: 30 * time.Second,
+			ClaimsProvider: basic.ClaimsProviderFunc(func(ctx context.Context, uid uuid.UUID, tid string) (basic.Claims, error) {
+				return basic.Claims{Subject: uid, TenantID: tid}, nil
+			}),
+		})
+
+		pair, err := issuer.IssueTokenPair(ctx, basic.Claims{Subject: userID, TenantID: tenant})
+		require.NoError(t, err)
+
+		refreshed, err := issuer.Rotate(ctx, tenant, pair.RefreshToken)
+		require.NoError(t, err)
+
+		// The device replays its old refresh token 15s later: inside the configured grace
+		// this is the benign race the fix exists to absorb, not a logout trigger.
+		time.Sleep(15 * time.Second)
+		_, err = issuer.Rotate(ctx, tenant, pair.RefreshToken)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, tokens.ErrRefreshConcurrent)
+
+		// The family must survive: the rotation winner's token still rotates.
+		next, err := issuer.Rotate(ctx, tenant, refreshed.RefreshToken)
+		require.NoError(t, err, "family must not be revoked by a within-grace replay")
+		require.NotEmpty(t, next.RefreshToken)
+	})
 }

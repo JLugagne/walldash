@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
-import { KeyRound, Loader2, RefreshCw, ShieldCheck } from 'lucide-react'
+import { Loader2, RefreshCw, ShieldCheck } from 'lucide-react'
 import { apiFetch, readApiError } from '../../api'
 
 interface LoginScreenProps {
@@ -28,7 +27,6 @@ function ErrorBox({ message }: { message: string }) {
 export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
   const [phase, setPhase] = useState<'connecting' | 'pending' | 'invite'>('connecting')
   const [error, setError] = useState<string | null>(null)
-  const [invite, setInvite] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const pollRef = useRef<number | null>(null)
 
@@ -163,46 +161,6 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const onInviteSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault()
-      void redeemInvite(invite)
-    },
-    [invite, redeemInvite],
-  )
-
-  const inviteForm = (
-    <form className="space-y-3" onSubmit={onInviteSubmit}>
-      <div className="space-y-1.5">
-        <label
-          htmlFor="invite-token"
-          className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400"
-        >
-          <KeyRound className="h-3.5 w-3.5" />
-          Invitation token
-        </label>
-        <input
-          id="invite-token"
-          name="invite"
-          type="text"
-          autoComplete="off"
-          placeholder="Paste the invitation token or link"
-          value={invite}
-          onChange={(event) => setInvite(event.target.value)}
-          className="w-full rounded-xl border border-slate-800/80 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none focus:border-[#6d76e8]"
-        />
-      </div>
-      <button
-        type="submit"
-        disabled={!invite.trim() || submitting}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#6d76e8] px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-[#7b83ea] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-        <span>{submitting ? 'Signing in…' : 'Sign in with invitation'}</span>
-      </button>
-    </form>
-  )
-
   return (
     <div className="flex-1 flex items-center justify-center p-6">
       <div className="w-full max-w-sm rounded-2xl border border-slate-800/80 bg-slate-900/70 backdrop-blur-md p-6 shadow-2xl">
@@ -234,8 +192,6 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
 
             {error && <ErrorBox message={error} />}
 
-            {inviteForm}
-
             <button
               type="button"
               onClick={() => void connect()}
@@ -248,13 +204,11 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
         ) : (
           <div className="mt-6 space-y-4">
             <p className="text-[11.5px] leading-relaxed text-slate-400">
-              This device is not signed in yet. An owner can approve it from the setup panel, or
-              you can enter an invitation token below.
+              This device is not signed in yet. An owner can approve it from Setup → Access, or share
+              a single-use invitation link to open on this device.
             </p>
 
             {error && <ErrorBox message={error} />}
-
-            {inviteForm}
 
             <button
               type="button"

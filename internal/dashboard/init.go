@@ -119,7 +119,8 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	}
 
 	cookies := tokens.DefaultCookies()
-	tokenStore := sqlite.NewTokensStore(adapter.DB())
+	reuseGrace := 30 * time.Second
+	tokenStore := sqlite.NewTokensStore(adapter.DB(), reuseGrace)
 	accountRepo := sqlite.NewAccountRepository(adapter.DB())
 
 	errAccountInactive := errors.New("auth: account is missing or revoked")
@@ -134,7 +135,7 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		// value selects its 10s default, which is too tight for bursty mobile reconnects
 		// (a phone waking from sleep can replay a consumed token seconds later); 30s
 		// absorbs those retries while keeping a stolen token's replay window short.
-		ReuseGracePeriod: 30 * time.Second,
+		ReuseGracePeriod: reuseGrace,
 		ClaimsProvider: basic.ClaimsProviderFunc(func(ctx context.Context, userID uuid.UUID, tenantID string) (basic.Claims, error) {
 			acct, err := accountRepo.FindByID(ctx, userID.String())
 			if err != nil || acct.Status != domain.StatusActive {

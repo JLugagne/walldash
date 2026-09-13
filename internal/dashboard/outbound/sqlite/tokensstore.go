@@ -14,13 +14,17 @@ import (
 )
 
 type TokensStore struct {
-	db *sql.DB
+	db         *sql.DB
+	reuseGrace time.Duration
 }
 
 var _ tokens.Store[struct{}] = (*TokensStore)(nil)
 
-func NewTokensStore(db *sql.DB) *TokensStore {
-	return &TokensStore{db: db}
+func NewTokensStore(db *sql.DB, reuseGrace time.Duration) *TokensStore {
+	if reuseGrace <= 0 {
+		reuseGrace = defaultReuseGrace
+	}
+	return &TokensStore{db: db, reuseGrace: reuseGrace}
 }
 
 func scanRefreshToken(row accountRowScanner) (*tokens.RefreshToken, error) {
@@ -110,12 +114,11 @@ func (s *TokensStore) FindRefreshToken(ctx context.Context, tenantID string, tok
 	return rt, nil
 }
 
-// reuseGrace is the window after a refresh token's consumption during which a replay is
-// treated as benign concurrency (a legitimate client racing itself) rather than theft. It
-// mirrors egauth's jwt.DefaultReuseGracePeriod; on this path the race is a lost atomic
-// consume, sub-second in practice. egauth's Rotate enforces its own configurable window
-// (basic.Config.ReuseGracePeriod) for replays that begin after the token was consumed.
-const reuseGrace = 10 * time.Second
+// defaultReuseGrace matches egauth's jwt.DefaultReuseGracePeriod and applies only when
+// NewTokensStore receives a non-positive grace. Callers should pass the same
+// basic.Config.ReuseGracePeriod configured on the issuer so the store and issuer
+// always agree on the window during which a consumed refresh token's replay is benign.
+const defaultReuseGrace = 10 * time.Second
 
 func (s *TokensStore) ConsumeRefreshToken(ctx context.Context, tenantID string, tokenHash string) error {
 	now := time.Now().UTC().Truncate(time.Second)
@@ -139,7 +142,7 @@ func (s *TokensStore) ConsumeRefreshToken(ctx context.Context, tenantID string, 
 		}
 		return errors.Join(domain.ErrDatabaseUnavailable, err)
 	}
-	if consumedAt.Valid && time.Since(consumedAt.Time) <= reuseGrace {
+	if consumedAt.Valid && time.Since(consumedAt.Time) <= s.reuseGrace {
 		return tokens.ErrRefreshConcurrent
 	}
 	return tokens.ErrRefreshTokenReused

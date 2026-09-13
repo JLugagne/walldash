@@ -98,6 +98,7 @@ export function AuthPanel() {
   const [inviteRole, setInviteRole] = useState<AccountRole>('device')
   const [createdInvite, setCreatedInvite] = useState<CreatedInvite | null>(null)
   const [copied, setCopied] = useState(false)
+  const [hideRevoked, setHideRevoked] = useState(true)
 
   const loadPending = useCallback(async () => {
     try {
@@ -337,6 +338,10 @@ export function AuthPanel() {
     ? `${window.location.origin}/?invite=${encodeURIComponent(createdInvite.token)}`
     : ''
 
+  const visibleDevices = hideRevoked
+    ? devices.filter((device) => device.status !== 'revoked')
+    : devices
+
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-slate-800/80">
@@ -537,15 +542,27 @@ export function AuthPanel() {
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
               Devices
             </h2>
+            <div className="flex-1" />
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-slate-200 transition-colors cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={hideRevoked}
+                onChange={(event) => setHideRevoked(event.target.checked)}
+                className="h-3.5 w-3.5 rounded border-slate-700 bg-slate-900 accent-[#6d76e8] cursor-pointer"
+              />
+              <span>Hide revoked</span>
+            </label>
           </div>
           {loading && devices.length === 0 ? (
             <div className="flex items-center gap-2 text-slate-400 text-sm">
               <RefreshCw className="w-4 h-4 animate-spin" />
               <span>Loading devices…</span>
             </div>
-          ) : devices.length === 0 ? (
+          ) : visibleDevices.length === 0 ? (
             <div className="rounded-xl border border-slate-800/80 bg-slate-900/70 px-4 py-6 text-center">
-              <p className="text-sm text-slate-300">No device accounts yet</p>
+              <p className="text-sm text-slate-300">
+                {devices.length === 0 ? 'No device accounts yet' : 'No devices match the current filter'}
+              </p>
             </div>
           ) : (
             <div className="rounded-xl border border-slate-800/80 bg-slate-900/70 backdrop-blur-md overflow-hidden">
@@ -562,7 +579,7 @@ export function AuthPanel() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/80">
-                    {devices.map((device) => {
+                    {visibleDevices.map((device) => {
                       const isBusy = busyId === device.id
                       const ownerLocked = device.role === 'owner' && role !== 'owner'
                       return (
