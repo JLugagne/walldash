@@ -50,8 +50,8 @@ The **Access** area manages who can use Walldash and is available to **owner** a
 
 - **Pending approvals** — devices that have opened Walldash and are waiting to be let in. Each entry shows the device name. Choose **Approve** to sign it in, or **Deny** to turn it away.
 - **Invitations** — single-use links you create and share with a new device. Pick the role (**device** or **admin**), copy the link and send it. Each link works once and lasts **15 minutes**. You can revoke an invitation that has not been used yet.
-- **Devices** — every signed-in device with its name, role, status and last-seen time. Rename a device with the pencil icon, change its role (**admin** / **device**), or **revoke** it. Only the **owner** can grant or remove the **owner** role.
-- **Revoke** removes the device's access shortly after — within about **15 minutes**. To let it back in, approve it again or send a new invitation.
+- **Devices** — every signed-in device with its name, role, status and last-seen time. Rename a device with the pencil icon, change its role (**admin** / **device**), or **revoke** it. Owner rows are locked for admins: only an owner can rename or revoke an owner device, the last remaining owner cannot be removed, and only the **owner** can grant or remove the **owner** role.
+- **Revoke** ends the device's access immediately — its sessions and live connections are closed. To let it back in, approve it again or send a new invitation.
 
 See [Devices & access](/getting-started/sign-in/) for the full picture.
 

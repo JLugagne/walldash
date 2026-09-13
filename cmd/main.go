@@ -27,7 +27,10 @@ func main() {
 	haURL := configValue("HA_URL", "ha_url", "", options)
 	haToken := configValue("HA_TOKEN", "ha_token", "", options)
 	tokenSecret := configValue("TOKEN_SECRET", "token_secret", "", options)
-	secretKey := configValue("SECRET_KEY", "secret_key", "", options)
+	secretKey, err := resolveSecretKey(configValue("SECRET_KEY", "secret_key", "", options), configValue("SECRET_KEY_FILE", "secret_key_file", "", options))
+	if err != nil {
+		logrus.WithError(err).Fatal("invalid key-encryption key configuration")
+	}
 	rescueMode := configBool("RESCUE_MODE", "rescue_mode", false, options)
 	haURL, haToken = resolveHAConfig(haURL, haToken, os.Getenv(supervisorTokenEnv))
 	if haURL == "" {

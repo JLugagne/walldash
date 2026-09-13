@@ -19,11 +19,14 @@ func TestResolveTokenSecret(t *testing.T) {
 	require.NoError(t, err)
 	store := sqlite.NewSecretsStore(adapter.DB())
 
-	first, err := resolveTokenSecret(ctx, store, "", nil)
+	kek, err := keystore.NewKEK(bytes.Repeat([]byte{4}, 32))
+	require.NoError(t, err)
+
+	first, err := resolveTokenSecret(ctx, store, "", kek)
 	require.NoError(t, err)
 	require.Len(t, first, 32)
 
-	second, err := resolveTokenSecret(ctx, store, "", nil)
+	second, err := resolveTokenSecret(ctx, store, "", kek)
 	require.NoError(t, err)
 	require.Equal(t, first, second)
 
@@ -32,7 +35,7 @@ func TestResolveTokenSecret(t *testing.T) {
 	reopened, err := sqlite.New(ctx, dbPath)
 	require.NoError(t, err)
 	defer func() { _ = reopened.Close() }()
-	third, err := resolveTokenSecret(ctx, sqlite.NewSecretsStore(reopened.DB()), "", nil)
+	third, err := resolveTokenSecret(ctx, sqlite.NewSecretsStore(reopened.DB()), "", kek)
 	require.NoError(t, err)
 	require.Equal(t, first, third)
 

@@ -26,10 +26,6 @@ function mockRoutes(routes: Record<string, Handler>): ReturnType<typeof vi.fn> {
   return fetchMock
 }
 
-function csrfRoute(): Handler {
-  return () => jsonResponse(200, { status: 'success', data: { csrf_token: 'csrf' } })
-}
-
 function setUrl(search: string) {
   window.history.replaceState({}, '', `/${search}`)
 }
@@ -49,7 +45,6 @@ describe('LoginScreen', () => {
           status: 'success',
           data: { status: 'authenticated', device: { id: 'd1', label: 'Tablet', role: 'owner' } },
         }),
-      'GET /api/csrf-token': csrfRoute(),
     })
 
     render(<LoginScreen onAuthenticated={onAuthenticated} />)
@@ -60,7 +55,6 @@ describe('LoginScreen', () => {
   it('shows the waiting state when an owner must approve the device', async () => {
     mockRoutes({
       'POST /api/auth/connect': () => jsonResponse(200, { status: 'success', data: { status: 'pending' } }),
-      'GET /api/csrf-token': csrfRoute(),
       'POST /api/auth/redeem': () => jsonResponse(202, { status: 'success', data: { status: 'pending' } }),
     })
 
@@ -75,7 +69,6 @@ describe('LoginScreen', () => {
     let redeemCalls = 0
     const fetchMock = mockRoutes({
       'POST /api/auth/connect': () => jsonResponse(200, { status: 'success', data: { status: 'pending' } }),
-      'GET /api/csrf-token': csrfRoute(),
       'POST /api/auth/redeem': () => {
         redeemCalls += 1
         if (redeemCalls <= 2) {
@@ -117,7 +110,6 @@ describe('LoginScreen', () => {
     setUrl('?invite=abc.def')
     const onAuthenticated = vi.fn()
     mockRoutes({
-      'GET /api/csrf-token': csrfRoute(),
       'POST /api/auth/invite/redeem': () =>
         jsonResponse(200, {
           status: 'success',
@@ -133,7 +125,6 @@ describe('LoginScreen', () => {
   it('shows a friendly message when the invitation is rejected', async () => {
     setUrl('?invite=bad-token')
     mockRoutes({
-      'GET /api/csrf-token': csrfRoute(),
       'POST /api/auth/invite/redeem': () => jsonResponse(401, { status: 'error', code: 'invalid_invite' }),
     })
 
@@ -145,7 +136,6 @@ describe('LoginScreen', () => {
   it('shows a rate limit message when connect is throttled', async () => {
     mockRoutes({
       'POST /api/auth/connect': () => jsonResponse(429, { status: 'error' }),
-      'GET /api/csrf-token': csrfRoute(),
     })
 
     render(<LoginScreen onAuthenticated={vi.fn()} />)

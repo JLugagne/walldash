@@ -64,6 +64,7 @@ type Auth struct {
 	pending        map[string]*PendingEnrollment
 	revoker        RefreshRevoker
 	revocations    revocation.Bus
+	sessionCloser  SessionCloser
 }
 
 // NewAuth builds the authentication use-cases over its outbound dependencies. When
@@ -151,22 +152,6 @@ func (a *Auth) ListDevices(ctx context.Context) ([]domain.Account, error) {
 	return a.accounts.FindAll(ctx)
 }
 
-func (a *Auth) RevokeDevice(ctx context.Context, id string) (domain.Account, error) {
-	acct, err := a.accounts.Revoke(ctx, id)
-	if err != nil {
-		return domain.Account{}, err
-	}
-	subject, err := uuid.Parse(id)
-	if err != nil {
-		return domain.Account{}, domain.ErrAccountNotFound
-	}
-	if err := a.revoker.RevokeAllRefreshTokensForUser(ctx, "", subject); err != nil {
-		return domain.Account{}, err
-	}
-	a.publishRevocation(ctx, subject, revocation.ReasonAccountDisabled)
-	return acct, nil
-}
-
 // publishRevocation publishes an account-scoped revocation so already-issued access tokens
 // are rejected before their TTL expires, not just the refresh family.
 func (a *Auth) publishRevocation(ctx context.Context, subject uuid.UUID, reason revocation.Reason) {
@@ -182,24 +167,130 @@ func (a *Auth) publishRevocation(ctx context.Context, subject uuid.UUID, reason 
 	})
 }
 
+type SessionCloser interface {
+	CloseUser(subject string)
+}
+
+func (a *Auth) SetSessionCloser(c SessionCloser) {
+	a.sessionCloser = c
+}
+
+func (a *Auth) closeUser(subject string) {
+	if a.sessionCloser != nil {
+		a.sessionCloser.CloseUser(subject)
+	}
+}
+
+func canManageAccount(actor, target domain.Account) error {
+	switch actor.Role {
+	case domain.RoleOwner:
+		return nil
+	case domain.RoleAdmin:
+		if target.Role == domain.RoleOwner {
+			return domain.ErrForbidden
+		}
+		return nil
+	default:
+		return domain.ErrForbidden
+	}
+}
+
+func (a *Auth) guardLastOwner(ctx context.Context, target domain.Account) error {
+	if target.Role != domain.RoleOwner || target.Status != domain.StatusActive {
+		return nil
+	}
+	all, err := a.accounts.FindAll(ctx)
+	if err != nil {
+		return err
+	}
+	owners := 0
+	for _, acct := range all {
+		if acct.Role == domain.RoleOwner && acct.Status == domain.StatusActive {
+			owners++
+		}
+	}
+	if owners <= 1 {
+		return domain.ErrForbidden
+	}
+	return nil
+}
+
+func (a *Auth) RevokeDevice(ctx context.Context, actor domain.Account, id string) (domain.Account, error) {
+	target, err := a.accounts.FindByID(ctx, id)
+	if err != nil {
+		return domain.Account{}, err
+	}
+	if err := canManageAccount(actor, target); err != nil {
+		return domain.Account{}, err
+	}
+	if err := a.guardLastOwner(ctx, target); err != nil {
+		return domain.Account{}, err
+	}
+	acct, err := a.accounts.Revoke(ctx, id)
+	if err != nil {
+		return domain.Account{}, err
+	}
+	subject, err := uuid.Parse(id)
+	if err != nil {
+		return domain.Account{}, domain.ErrAccountNotFound
+	}
+	if err := a.revoker.RevokeAllRefreshTokensForUser(ctx, "", subject); err != nil {
+		return domain.Account{}, err
+	}
+	a.publishRevocation(ctx, subject, revocation.ReasonAccountDisabled)
+	a.closeUser(subject.String())
+	return acct, nil
+}
+
 func (a *Auth) SetRole(ctx context.Context, actor domain.Account, id string, role domain.Role) (domain.Account, error) {
 	if !role.Valid() {
 		return domain.Account{}, domain.ErrInvalidRole
+	}
+	if actor.Role != domain.RoleOwner && actor.Role != domain.RoleAdmin {
+		return domain.Account{}, domain.ErrForbidden
 	}
 	target, err := a.accounts.FindByID(ctx, id)
 	if err != nil {
 		return domain.Account{}, err
 	}
-	if actor.Role != domain.RoleOwner && (role == domain.RoleOwner || target.Role == domain.RoleOwner) {
+	if err := canManageAccount(actor, target); err != nil {
+		return domain.Account{}, err
+	}
+	if actor.Role != domain.RoleOwner && role == domain.RoleOwner {
 		return domain.Account{}, domain.ErrForbidden
 	}
-	return a.accounts.SetRole(ctx, id, role)
+	if role != domain.RoleOwner {
+		if err := a.guardLastOwner(ctx, target); err != nil {
+			return domain.Account{}, err
+		}
+	}
+	updated, err := a.accounts.SetRole(ctx, id, role)
+	if err != nil {
+		return domain.Account{}, err
+	}
+	subject, err := uuid.Parse(id)
+	if err != nil {
+		return domain.Account{}, domain.ErrAccountNotFound
+	}
+	if err := a.revoker.RevokeAllRefreshTokensForUser(ctx, "", subject); err != nil {
+		return domain.Account{}, err
+	}
+	a.publishRevocation(ctx, subject, revocation.ReasonLogoutEverywhere)
+	a.closeUser(subject.String())
+	return updated, nil
 }
 
-func (a *Auth) SetLabel(ctx context.Context, id string, label string) error {
+func (a *Auth) SetLabel(ctx context.Context, actor domain.Account, id string, label string) error {
 	trimmed := strings.TrimSpace(label)
 	if n := utf8.RuneCountInString(trimmed); n < 1 || n > 64 {
 		return domain.ErrInvalidLabel
+	}
+	target, err := a.accounts.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := canManageAccount(actor, target); err != nil {
+		return err
 	}
 	return a.accounts.UpdateLabel(ctx, id, trimmed)
 }

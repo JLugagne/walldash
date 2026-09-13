@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/JLugagne/egauth/tokens/basic"
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	svcactions "github.com/JLugagne/walldash/internal/dashboard/domain/service/actions"
 	"github.com/JLugagne/walldash/internal/pkg/logger"
@@ -42,16 +43,17 @@ var _ domain.DeviceBroadcaster = (*Hub)(nil)
 
 // Hub maintains active client connections and broadcasts device state events.
 type Hub struct {
-	clients        map[*Client]bool
-	register       chan *Client
-	unregister     chan *Client
-	broadcast      chan []byte
-	stop           chan struct{}
-	actionCommands svcactions.ActionCommands
-	allowedOrigins []string
-	upgrader       websocket.Upgrader
-	mu             sync.Mutex
-	running        bool
+	clients          map[*Client]bool
+	register         chan *Client
+	unregister       chan *Client
+	broadcast        chan []byte
+	stop             chan struct{}
+	actionCommands   svcactions.ActionCommands
+	sessionValidator func(ctx context.Context, subject string) error
+	allowedOrigins   []string
+	upgrader         websocket.Upgrader
+	mu               sync.Mutex
+	running          bool
 }
 
 // NewHub creates a new WebSocket Hub instance with optional allowed origins for CORS/CSWSH protection.
@@ -187,9 +189,10 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := &Client{
-		hub:  h,
-		conn: conn,
-		send: make(chan []byte, 256),
+		hub:     h,
+		conn:    conn,
+		send:    make(chan []byte, 256),
+		subject: authenticatedSubject(r),
 	}
 
 	h.register <- client
@@ -207,13 +210,24 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	go client.readPump(sessionCtx)
 }
 
+// authenticatedSubject returns the subject bound to the request by the token-auth
+// middleware, or "" when the hub is reached without an authenticated session.
+func authenticatedSubject(r *http.Request) string {
+	claims, ok := basic.ClaimsFromContext(r.Context())
+	if !ok || claims == nil {
+		return ""
+	}
+	return claims.Subject.String()
+}
+
 // Client represents a single WebSocket client session.
 type Client struct {
-	hub    *Hub
-	conn   *websocket.Conn
-	send   chan []byte
-	mu     sync.Mutex
-	closed bool
+	hub     *Hub
+	conn    *websocket.Conn
+	send    chan []byte
+	mu      sync.Mutex
+	closed  bool
+	subject string
 }
 
 func (c *Client) closeSend() {
@@ -277,6 +291,17 @@ func (c *Client) readPump(ctx context.Context) {
 					"error": "invalid action message format",
 				})
 				c.sendMsg(errMsg)
+				continue
+			}
+
+			// Re-check the session before every action: the handshake-time
+			// authorization can be revoked while the socket stays open.
+			c.hub.mu.Lock()
+			validator := c.hub.sessionValidator
+			c.hub.mu.Unlock()
+			if validator != nil && (c.subject == "" || validator(ctx, c.subject) != nil) {
+				c.sendMsg(sessionRevokedMessage())
+				c.closeSend()
 				continue
 			}
 
@@ -354,4 +379,48 @@ func (c *Client) writePump() {
 			}
 		}
 	}
+}
+
+// SetSessionValidator installs a hook invoked before every inbound action message. When
+// the hook returns an error (revoked or inactive account, unknown subject, ...) the hub
+// sends an error frame to the client and closes the connection without executing the
+// action.
+func (h *Hub) SetSessionValidator(v func(ctx context.Context, subject string) error) {
+	h.mu.Lock()
+	h.sessionValidator = v
+	h.mu.Unlock()
+}
+
+// CloseUser terminates every connected client authenticated as subject. Matching clients
+// receive a SESSION_REVOKED error frame before their send channel is closed; writePump
+// then flushes pending frames and performs the websocket close handshake.
+func (h *Hub) CloseUser(subject string) {
+	if subject == "" {
+		// Clients without a bound subject are not addressable and must never be
+		// closed by an empty-key lookup.
+		return
+	}
+
+	h.mu.Lock()
+	targets := make([]*Client, 0)
+	for client := range h.clients {
+		if client.subject == subject {
+			targets = append(targets, client)
+		}
+	}
+	h.mu.Unlock()
+
+	for _, client := range targets {
+		client.sendMsg(sessionRevokedMessage())
+		client.closeSend()
+	}
+}
+
+func sessionRevokedMessage() []byte {
+	msg, _ := json.Marshal(map[string]string{
+		"type":  "error",
+		"code":  "SESSION_REVOKED",
+		"error": "session is no longer valid",
+	})
+	return msg
 }

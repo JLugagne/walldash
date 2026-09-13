@@ -1,6 +1,8 @@
 package dashboard_test
 
 import (
+	"encoding/json"
+	"math"
 	"testing"
 
 	"github.com/JLugagne/walldash/domain"
@@ -183,5 +185,102 @@ func TestUpdateLayoutRequestValidation(t *testing.T) {
 		}
 		err := validate.Struct(req)
 		require.Error(t, err)
+	})
+}
+
+func TestCreateWidgetRequestLayoutOverflowRejected(t *testing.T) {
+	validate := validator.New()
+	base := pkgdashboard.CreateWidgetRequest{
+		Type:    "sensor",
+		ColSpan: 1,
+		RowSpan: 1,
+		Config: pkgdashboard.WidgetConfigDTO{
+			EntityIDs: []string{"sensor.temperature_salon"},
+			Display:   "number",
+		},
+	}
+
+	t.Run("audit payload with col=MaxInt64 is rejected", func(t *testing.T) {
+		var req pkgdashboard.CreateWidgetRequest
+		raw := `{"type":"sensor","title":"overflow","col":9223372036854775807,"row":0,"col_span":1,"row_span":1,"config":{"display":"number","entity_ids":["sensor.temperature_salon"]}}`
+		require.NoError(t, json.Unmarshal([]byte(raw), &req))
+		require.Error(t, validate.Struct(req))
+	})
+
+	t.Run("row MaxInt64 is rejected", func(t *testing.T) {
+		req := base
+		req.Row = math.MaxInt64
+		require.Error(t, validate.Struct(req))
+	})
+
+	t.Run("col_span MaxInt64 is rejected", func(t *testing.T) {
+		req := base
+		req.ColSpan = math.MaxInt64
+		require.Error(t, validate.Struct(req))
+	})
+
+	t.Run("row_span MaxInt64 is rejected", func(t *testing.T) {
+		req := base
+		req.RowSpan = math.MaxInt64
+		require.Error(t, validate.Struct(req))
+	})
+
+	t.Run("coordinate above the 1024 bound is rejected", func(t *testing.T) {
+		req := base
+		req.Col = 1025
+		require.Error(t, validate.Struct(req))
+	})
+
+	t.Run("span above the 1024 bound is rejected", func(t *testing.T) {
+		req := base
+		req.RowSpan = 1025
+		require.Error(t, validate.Struct(req))
+	})
+
+	t.Run("layout at the 1024 bound passes", func(t *testing.T) {
+		req := base
+		req.Col = 1024
+		req.Row = 1024
+		req.ColSpan = 1024
+		req.RowSpan = 1024
+		require.NoError(t, validate.Struct(req))
+	})
+}
+
+func TestUpdateLayoutRequestLayoutOverflowRejected(t *testing.T) {
+	validate := validator.New()
+	base := func() pkgdashboard.UpdateLayoutRequest {
+		return pkgdashboard.UpdateLayoutRequest{
+			Positions: []pkgdashboard.WidgetPositionDTO{
+				{ID: "w-1", Col: 0, Row: 0, ColSpan: 1, RowSpan: 1},
+			},
+		}
+	}
+
+	t.Run("col MaxInt64 is rejected", func(t *testing.T) {
+		req := base()
+		req.Positions[0].Col = math.MaxInt64
+		require.Error(t, validate.Struct(req))
+	})
+
+	t.Run("col_span MaxInt64 is rejected", func(t *testing.T) {
+		req := base()
+		req.Positions[0].ColSpan = math.MaxInt64
+		require.Error(t, validate.Struct(req))
+	})
+
+	t.Run("position above the 1024 bound is rejected", func(t *testing.T) {
+		req := base()
+		req.Positions[0].Row = 1025
+		require.Error(t, validate.Struct(req))
+	})
+
+	t.Run("layout at the 1024 bound passes", func(t *testing.T) {
+		req := base()
+		req.Positions[0].Col = 1024
+		req.Positions[0].Row = 1024
+		req.Positions[0].ColSpan = 1024
+		req.Positions[0].RowSpan = 1024
+		require.NoError(t, validate.Struct(req))
 	})
 }

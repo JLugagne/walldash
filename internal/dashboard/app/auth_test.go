@@ -44,14 +44,18 @@ func TestAuthRevokeDevice(t *testing.T) {
 	revoker := &stubRefreshRevoker{}
 	var revoked string
 	repo := &accountstest.MockAccountRepository{
+		FindByIDFunc: func(_ context.Context, accountID string) (domain.Account, error) {
+			return domain.Account{ID: accountID, Status: domain.StatusActive, Role: domain.RoleDevice}, nil
+		},
 		RevokeFunc: func(_ context.Context, accountID string) (domain.Account, error) {
 			revoked = accountID
 			return domain.Account{ID: accountID, Status: domain.StatusRevoked, Role: domain.RoleDevice}, nil
 		},
 	}
 	auth := NewAuth(repo, nil, nil, revoker, nil, false)
+	actor := domain.Account{ID: uuid.NewString(), Role: domain.RoleOwner, Status: domain.StatusActive}
 
-	acct, err := auth.RevokeDevice(context.Background(), id)
+	acct, err := auth.RevokeDevice(context.Background(), actor, id)
 	require.NoError(t, err)
 	require.Equal(t, domain.StatusRevoked, acct.Status)
 	require.Equal(t, id, revoked)
@@ -62,13 +66,14 @@ func TestAuthRevokeDevice(t *testing.T) {
 func TestAuthRevokeDeviceNotFound(t *testing.T) {
 	revoker := &stubRefreshRevoker{}
 	repo := &accountstest.MockAccountRepository{
-		RevokeFunc: func(context.Context, string) (domain.Account, error) {
+		FindByIDFunc: func(context.Context, string) (domain.Account, error) {
 			return domain.Account{}, domain.ErrAccountNotFound
 		},
 	}
 	auth := NewAuth(repo, nil, nil, revoker, nil, false)
+	actor := domain.Account{ID: uuid.NewString(), Role: domain.RoleOwner, Status: domain.StatusActive}
 
-	_, err := auth.RevokeDevice(context.Background(), uuid.NewString())
+	_, err := auth.RevokeDevice(context.Background(), actor, uuid.NewString())
 	require.ErrorIs(t, err, domain.ErrAccountNotFound)
 	require.False(t, revoker.called)
 }
@@ -126,7 +131,14 @@ func TestAuthSetRoleRules(t *testing.T) {
 
 func TestAuthSetLabel(t *testing.T) {
 	target := domain.Account{ID: uuid.NewString(), Role: domain.RoleDevice, Status: domain.StatusActive, Label: "old"}
+	actor := domain.Account{ID: uuid.NewString(), Role: domain.RoleOwner, Status: domain.StatusActive}
 	repo := &accountstest.MockAccountRepository{
+		FindByIDFunc: func(_ context.Context, id string) (domain.Account, error) {
+			if id != target.ID {
+				return domain.Account{}, domain.ErrAccountNotFound
+			}
+			return target, nil
+		},
 		UpdateLabelFunc: func(_ context.Context, id string, label string) error {
 			if id != target.ID {
 				return domain.ErrAccountNotFound
@@ -138,20 +150,20 @@ func TestAuthSetLabel(t *testing.T) {
 	auth := NewAuth(repo, nil, nil, &stubRefreshRevoker{}, nil, false)
 
 	t.Run("trims and stores a valid label", func(t *testing.T) {
-		require.NoError(t, auth.SetLabel(context.Background(), target.ID, "  Kitchen tablet  "))
+		require.NoError(t, auth.SetLabel(context.Background(), actor, target.ID, "  Kitchen tablet  "))
 		require.Equal(t, "Kitchen tablet", target.Label)
 	})
 
 	t.Run("rejects an empty label", func(t *testing.T) {
-		require.ErrorIs(t, auth.SetLabel(context.Background(), target.ID, "   "), domain.ErrInvalidLabel)
+		require.ErrorIs(t, auth.SetLabel(context.Background(), actor, target.ID, "   "), domain.ErrInvalidLabel)
 	})
 
 	t.Run("rejects a label longer than 64 characters", func(t *testing.T) {
-		require.ErrorIs(t, auth.SetLabel(context.Background(), target.ID, strings.Repeat("a", 65)), domain.ErrInvalidLabel)
+		require.ErrorIs(t, auth.SetLabel(context.Background(), actor, target.ID, strings.Repeat("a", 65)), domain.ErrInvalidLabel)
 	})
 
 	t.Run("propagates an unknown account", func(t *testing.T) {
-		require.ErrorIs(t, auth.SetLabel(context.Background(), "missing", "ok"), domain.ErrAccountNotFound)
+		require.ErrorIs(t, auth.SetLabel(context.Background(), actor, "missing", "ok"), domain.ErrAccountNotFound)
 	})
 }
 
@@ -164,14 +176,18 @@ func TestRevokeDevicePublishesAccessTokenRevocation(t *testing.T) {
 	}))
 
 	repo := &accountstest.MockAccountRepository{
+		FindByIDFunc: func(_ context.Context, id string) (domain.Account, error) {
+			return domain.Account{ID: id, Status: domain.StatusActive, Role: domain.RoleDevice}, nil
+		},
 		RevokeFunc: func(_ context.Context, id string) (domain.Account, error) {
 			return domain.Account{ID: id, Status: domain.StatusRevoked}, nil
 		},
 	}
 	auth := NewAuth(repo, nil, nil, &stubRefreshRevoker{}, bus, false)
+	actor := domain.Account{ID: uuid.NewString(), Role: domain.RoleOwner, Status: domain.StatusActive}
 
 	id := uuid.NewString()
-	_, err := auth.RevokeDevice(context.Background(), id)
+	_, err := auth.RevokeDevice(context.Background(), actor, id)
 	require.NoError(t, err)
 
 	require.Len(t, got, 1)

@@ -16,7 +16,6 @@ func TestPendingApprovalFlow(t *testing.T) {
 	require.Contains(t, readBody(t, resp), `"role":"owner"`)
 
 	joiner := newAuthTestClient(t, server)
-	joiner.fetchCSRF()
 
 	resp = joiner.do(http.MethodPost, "/api/auth/connect", nil, nil)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -81,13 +80,11 @@ func TestInviteEnrollmentFlow(t *testing.T) {
 	require.Equal(t, "admin", invitePayload.Data.Role)
 
 	joiner := newAuthTestClient(t, server)
-	joiner.fetchCSRF()
 	resp = joiner.do(http.MethodPost, "/api/auth/invite/redeem", map[string]string{"token": invitePayload.Data.Token}, nil)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Contains(t, readBody(t, resp), `"role":"admin"`)
 
 	reuse := newAuthTestClient(t, server)
-	reuse.fetchCSRF()
 	resp = reuse.do(http.MethodPost, "/api/auth/invite/redeem", map[string]string{"token": invitePayload.Data.Token}, nil)
 	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	requireJSendCode(t, resp, "invalid_invite")

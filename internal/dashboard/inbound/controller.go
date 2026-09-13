@@ -2,6 +2,7 @@ package inbound
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	rootDomain "github.com/JLugagne/walldash/domain"
@@ -60,6 +61,9 @@ func (c *Controller) SendFail(w http.ResponseWriter, r *http.Request, data any, 
 		log.WithError(err).Warn("request validation or pre-condition failed")
 	}
 
+	if respondTooLarge(w, err) {
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
 
@@ -97,6 +101,9 @@ func (c *Controller) SendError(w http.ResponseWriter, r *http.Request, err error
 		log.WithError(err).Error("unhandled server error during request processing")
 	}
 
+	if respondTooLarge(w, err) {
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusInternalServerError)
 
@@ -115,4 +122,19 @@ func (c *Controller) SendError(w http.ResponseWriter, r *http.Request, err error
 		Message: msg,
 		Code:    code,
 	})
+}
+
+func respondTooLarge(w http.ResponseWriter, err error) bool {
+	var maxErr *http.MaxBytesError
+	if !errors.As(err, &maxErr) {
+		return false
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusRequestEntityTooLarge)
+	_ = json.NewEncoder(w).Encode(ResponseError{
+		Status:  "error",
+		Message: "request body too large",
+		Code:    "request_too_large",
+	})
+	return true
 }

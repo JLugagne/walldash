@@ -52,8 +52,6 @@ describe('App shell', () => {
       const pathname = new URL(raw, 'http://localhost').pathname
       const method = (init?.method ?? 'GET').toUpperCase()
       if (method === 'GET' && pathname === '/api/auth/me') return jsonResponse(401, { status: 'error' })
-      if (method === 'GET' && pathname === '/api/csrf-token')
-        return jsonResponse(200, { status: 'success', data: { csrf_token: 'csrf' } })
       if (method === 'POST' && pathname === '/api/auth/refresh')
         return jsonResponse(401, { status: 'error' })
       if (method === 'POST' && pathname === '/api/auth/connect')

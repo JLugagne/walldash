@@ -40,7 +40,7 @@ When the binary detects it runs inside an add-on container, it adapts without an
 - **Persistent storage**: when the `/data` volume exists, the database defaults to `/data/walldash.db`, surviving updates and reboots.
 - **Version**: the binary version is injected at build time (`BUILD_VERSION` build arg → `main.Version`), keeping the `/api/health` version and the add-on `version:` in sync.
 - **Health check**: `GET /api/health` serves as the add-on `watchdog` URL.
-- **Authentication**: when no device has enrolled yet the first one to open Walldash becomes the **owner** automatically (no code is logged); later devices are approved from **Setup → Access** or enrolled with a single-use 15-minute invitation link. `rescue_mode` lets the next device claim the owner role when the owner device is lost. `TOKEN_SECRET` is auto-generated and persisted in `/data` when unset; keep it stable across restarts. Set `SECRET_KEY` (the `secret_key` option) to encrypt that stored signing key so `/data` snapshots do not expose it; removing `SECRET_KEY` after it has been used fails closed. Revocation kills refresh tokens immediately but access tokens remain valid until their 15-minute TTL expires. Reaching the add-on over HTTPS is required for the `__Host-`/`Secure` cookies; if the reverse proxy rewrites `Host`, set the `domain` option to the browser-facing hostname (or list extra origins in `allowed_origins`/`ALLOWED_ORIGINS`).
+- **Authentication**: when no device has enrolled yet the first one to open Walldash becomes the **owner** automatically (no code is logged); later devices are approved from **Setup → Access** or enrolled with a single-use 15-minute invitation link. `rescue_mode` lets the next device claim the owner role when the owner device is lost. `TOKEN_SECRET` is auto-generated when unset and kept stable across restarts; the signing key is sealed at rest with the `secret_key` option or, when that is unset, a generated key-encryption key next to the database (`/data/walldash.db.kek`, mode `0600`). A full `/data` snapshot carries the database and the KEK together, so it is credential-grade material: treat snapshots as secrets. For protection against snapshots that leave the host, set `TOKEN_SECRET`, or point the `secret_key_file` option at an operator-mounted path excluded from backups; removing the KEK after it has been used fails closed, and if the auto-KEK file is lost, set `TOKEN_SECRET` to start again (signs out every device). Revoking a device clears its refresh tokens, rejects its access token and closes its live WebSockets immediately; after a Walldash restart a previously revoked but unexpired access token can linger for at most its 15-minute TTL (actions stay blocked), so revoke again if in doubt. Reaching the add-on over HTTPS is required for the `__Host-`/`Secure` cookies; if the reverse proxy rewrites `Host`, set the `domain` option to the browser-facing hostname (or list extra origins in `allowed_origins`/`ALLOWED_ORIGINS`).
 - **Init system**: s6-overlay is PID 1, so the add-on `config.yaml` must set `init: false` (required since S6 V3, otherwise the add-on will not start).
 
 Full precedence per setting: environment variable → `/data/options.json` → default (see `README.md`).
@@ -53,14 +53,15 @@ Each one has the same environment-variable equivalent, which always wins when se
 | Option | Env var | Default | Description |
 | --- | --- | --- | --- |
 | `log_level` | `LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warn`, `error`. |
-| `token_secret` | `TOKEN_SECRET` | _(empty → auto-generated)_ | HS256 key used to sign access/refresh tokens, at least 32 bytes. Leave empty to generate one on first boot and persist it in `/data`; changing it signs out every device. |
-| `secret_key` | `SECRET_KEY` | _(empty)_ | Optional key-encryption key (exactly 32 characters) that encrypts the stored `TOKEN_SECRET` with AES-256-GCM, so a `/data` copy or snapshot does not expose the signing key. Keep it stable and backed up; removing it after use fails closed. |
+| `token_secret` | `TOKEN_SECRET` | _(empty → auto-generated)_ | HS256 key used to sign access/refresh tokens, at least 32 bytes. Leave empty to generate one on first boot; it is persisted sealed with the configured (or auto-generated) key-encryption key. Changing it signs out every device. |
+| `secret_key` | `SECRET_KEY` | _(empty)_ | Optional 32-byte key-encryption key (AES-256-GCM) that encrypts the stored `TOKEN_SECRET`. Because `/data/options.json` and the database share the `/data` volume, this option alone does not protect against full `/data` snapshots; prefer `secret_key_file` on a path excluded from backups. Keep it stable and backed up; removing it after use fails closed. |
+| `secret_key_file` | `SECRET_KEY_FILE` | _(empty)_ | Path to a file containing the key-encryption key (whitespace-trimmed, exactly 32 bytes), read when `secret_key` is empty. Point it at an operator-mounted path excluded from backups to protect against snapshots that leave the host. An unreadable or empty file aborts startup. |
 | `allowed_origins` | `ALLOWED_ORIGINS` | _(empty)_ | Comma-separated browser-facing origins trusted for CORS, CSRF and the refresh/logout same-origin check. Accepts `https://host` or a bare `host`. Only needed when the reverse proxy rewrites `Host`. |
 | `domain` | `DOMAIN` | _(empty)_ | Public hostname of this instance (bare host, `http://host` or `https://host`; optional port kept, path/query ignored). Merged with `allowed_origins`. Only needed when the reverse proxy rewrites `Host`. |
 | `rescue_mode` | `RESCUE_MODE` | `false` | Recovery switch. When `true`, the next unauthenticated device to connect claims the `owner` role even if accounts already exist. One-shot (consumed after the first use); set it back to `false` once recovery is complete. |
 
-The `token_secret`, `secret_key`, `allowed_origins`, `domain` and `rescue_mode` options are
-declared in the companion `config.yaml` as `password?` / `str?` / `bool` and are all optional.
+The `token_secret`, `secret_key`, `secret_key_file`, `allowed_origins`, `domain` and `rescue_mode`
+options are declared in the companion `config.yaml` as `password?` / `str?` / `bool` and are all optional.
 
 ### Runtime notes
 
@@ -70,8 +71,10 @@ declared in the companion `config.yaml` as `password?` / `str?` / `bool` and are
   `X-Forwarded-Proto: https`.
 - **First device**: open Walldash on the first tablet; it becomes the `owner` automatically.
   No code is written to the log. Add further devices from **Setup → Access** (approve or invite).
-- **Revocation latency**: revoking a device kills its refresh tokens immediately, but an access
-  token already issued remains valid until its 15-minute TTL expires.
+- **Revocation**: revoking a device clears its refresh tokens, rejects its access token and closes
+  its live WebSockets immediately. After a Walldash restart the in-memory access-token revocation
+  list is empty, so a previously revoked but unexpired token can linger until its 15-minute TTL
+  expires (actions remain blocked and refresh always fails).
 - **Single replica only**: pending enrollments and in-memory rescue state are held in memory, so run exactly one
   container per database.
 
@@ -274,8 +277,9 @@ unreachable, login loop over HTTP, proxy Host rewriting and `allowed_origins`, l
 - [ ] Dashboard reachable over **HTTPS** from a device without a Home Assistant session.
 - [ ] First device becomes `owner` automatically; no code appears in the add-on log.
 - [ ] A second device is approved from Setup → Access (or enrolled through an invitation link).
-- [ ] A revoked device cannot refresh; its current access token stops working within the 15 min TTL.
+- [ ] A revoked device cannot refresh, its current access token is rejected immediately and its open WebSockets are closed.
 - [ ] `TOKEN_SECRET` is auto-generated on first boot and reused across an add-on restart (sessions survive).
+- [ ] With default options, the generated KEK file (`/data/walldash.db.kek`) exists with mode `0600` and the signing key stored in `app_secrets` is sealed (`enc:v1:`), so a full `/data` snapshot is treated as credential-grade material.
 - [ ] Device toggle from the dashboard reflects in Home Assistant.
 - [ ] Database persists across add-on restart and update.
 - [ ] Version reported by `/api/health` matches the `config.yaml` version.

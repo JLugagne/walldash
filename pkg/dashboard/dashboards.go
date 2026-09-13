@@ -53,14 +53,16 @@ type WidgetConfigDTO struct {
 
 // CreateWidgetRequest contains payload for adding a new widget to a dashboard.
 // Title is optional: the UI falls back to the config label then to the Home Assistant device name.
+// Layout integers are capped at 1024 (validate lte), far above any real Widget Grid
+// size, so the domain arithmetic that validates the viewport can never overflow.
 type CreateWidgetRequest struct {
 	Type    string          `json:"type" validate:"required"`
 	Title   string          `json:"title" validate:"max=100"`
 	Order   int             `json:"order"`
-	Col     int             `json:"col" validate:"gte=0"`
-	Row     int             `json:"row" validate:"gte=0"`
-	ColSpan int             `json:"col_span" validate:"gt=0"`
-	RowSpan int             `json:"row_span" validate:"gt=0"`
+	Col     int             `json:"col" validate:"gte=0,lte=1024"`
+	Row     int             `json:"row" validate:"gte=0,lte=1024"`
+	ColSpan int             `json:"col_span" validate:"gt=0,lte=1024"`
+	RowSpan int             `json:"row_span" validate:"gt=0,lte=1024"`
 	Config  WidgetConfigDTO `json:"config"`
 }
 
@@ -72,12 +74,14 @@ type UpdateWidgetRequest struct {
 }
 
 // WidgetPositionDTO is the payload of a single widget's placement in a layout write.
+// Layout integers are capped at 1024 (validate lte), far above any real Widget Grid
+// size, so the domain arithmetic that validates the viewport can never overflow.
 type WidgetPositionDTO struct {
 	ID      string `json:"id" validate:"required"`
-	Col     int    `json:"col" validate:"gte=0"`
-	Row     int    `json:"row" validate:"gte=0"`
-	ColSpan int    `json:"col_span" validate:"gt=0"`
-	RowSpan int    `json:"row_span" validate:"gt=0"`
+	Col     int    `json:"col" validate:"gte=0,lte=1024"`
+	Row     int    `json:"row" validate:"gte=0,lte=1024"`
+	ColSpan int    `json:"col_span" validate:"gt=0,lte=1024"`
+	RowSpan int    `json:"row_span" validate:"gt=0,lte=1024"`
 }
 
 // UpdateLayoutRequest replaces the positions of some or all widgets of a dashboard in one write.

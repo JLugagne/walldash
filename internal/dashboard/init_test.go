@@ -13,6 +13,7 @@ import (
 
 	"github.com/JLugagne/egauth/tokens/basic"
 	dashboard "github.com/JLugagne/walldash/internal/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	pkgdashboard "github.com/JLugagne/walldash/pkg/dashboard"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -37,7 +38,10 @@ func TestDashboardNew(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, dash)
 
-	pair, err := dash.Issuer.IssueTokenPair(ctx, basic.Claims{Subject: uuid.New(), Scopes: []string{"setup:manage"}})
+	subject := uuid.New()
+	pair, err := dash.Issuer.IssueTokenPair(ctx, basic.Claims{Subject: subject, Scopes: []string{"setup:manage"}})
+	require.NoError(t, err)
+	_, err = dash.Accounts.Create(ctx, domain.Account{ID: subject.String(), Status: domain.StatusActive, Role: domain.RoleOwner, Label: "test-owner"})
 	require.NoError(t, err)
 	authCookie := &http.Cookie{Name: dash.Cookies.AccessName, Value: pair.AccessToken, Path: "/"}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -54,20 +58,11 @@ func TestDashboardNew(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
-	// 2. Obtain CSRF token via GET /api/csrf-token
+	// 2. The dead CSRF token endpoint has been removed
 	req = httptest.NewRequest(http.MethodGet, "/api/csrf-token", nil)
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusOK, rec.Code)
-
-	var csrfResp struct {
-		Status string                         `json:"status"`
-		Data   pkgdashboard.CSRFTokenResponse `json:"data"`
-	}
-	err = json.NewDecoder(rec.Body).Decode(&csrfResp)
-	require.NoError(t, err)
-	csrfToken := csrfResp.Data.CSRFToken
-	require.NotEmpty(t, csrfToken)
+	require.Equal(t, http.StatusNotFound, rec.Code)
 
 	// 3. Verify CORS preflight on /api/levels
 	preflightReq := httptest.NewRequest(http.MethodOptions, "/api/levels", nil)
@@ -78,9 +73,9 @@ func TestDashboardNew(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, preflightRec.Code)
 	assert.NotEmpty(t, preflightRec.Header().Get("Access-Control-Allow-Origin"))
 	assert.Contains(t, preflightRec.Header().Get("Access-Control-Allow-Methods"), "POST")
-	assert.Contains(t, preflightRec.Header().Get("Access-Control-Allow-Headers"), "X-CSRF-Token")
+	assert.Contains(t, preflightRec.Header().Get("Access-Control-Allow-Headers"), "Content-Type")
 
-	// 4. Verify CSRF rejection on state-changing method without CSRF header
+	// 4. Cross-origin state-changing requests are rejected by the origin gate
 	createPayload := pkgdashboard.CreateLevelRequest{
 		Name:      "Ground Floor",
 		IsOutdoor: false,
@@ -92,9 +87,8 @@ func TestDashboardNew(t *testing.T) {
 	handler.ServeHTTP(unauthRec, unauthReq)
 	assert.Equal(t, http.StatusForbidden, unauthRec.Code, "cross-origin mutation must be rejected")
 
-	// 5. Create a Level via POST /api/levels with valid X-CSRF-Token
+	// 5. Create a Level via POST /api/levels from the trusted origin
 	req = httptest.NewRequest(http.MethodPost, "/api/levels", bytes.NewReader(body))
-	req.Header.Set("X-CSRF-Token", csrfToken)
 	req.Header.Set("Origin", "http://localhost:8080")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -226,4 +220,11 @@ func TestDashboardNew(t *testing.T) {
 	err = json.Unmarshal(msg1, &event1)
 	require.NoError(t, err)
 	assert.NotEmpty(t, event1["type"])
+	// 11. Oversized JSON bodies are rejected with 413
+	oversized := []byte(`{"entity_id":"` + strings.Repeat("a", 2<<20) + `"}`)
+	req = httptest.NewRequest(http.MethodPost, "/api/actions", bytes.NewReader(oversized))
+	req.Header.Set("Origin", "http://localhost:8080")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
 }

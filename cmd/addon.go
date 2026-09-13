@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"os"
 	"strconv"
@@ -216,4 +217,26 @@ func configBool(envKey, optionKey string, fallback bool, options map[string]stri
 	default:
 		return fallback
 	}
+}
+
+// resolveSecretKey resolves the key-encryption key from the inline SECRET_KEY
+// value or, when that is empty, from the file pointed at by SECRET_KEY_FILE.
+// An unreadable or empty file is a fatal configuration error; the inline value
+// always wins so an operator can override a mounted file without editing it.
+func resolveSecretKey(inline, filePath string) (string, error) {
+	if inline != "" {
+		return inline, nil
+	}
+	if filePath == "" {
+		return "", nil
+	}
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("reading SECRET_KEY_FILE %s: %w", filePath, err)
+	}
+	key := strings.TrimSpace(string(data))
+	if key == "" {
+		return "", fmt.Errorf("SECRET_KEY_FILE %s is empty", filePath)
+	}
+	return key, nil
 }

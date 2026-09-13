@@ -43,11 +43,7 @@ function switchButton(): HTMLElement {
 
 describe('AutomationSwitchWidget', () => {
   beforeEach(() => {
-    globalThis.fetch = vi.fn((input: RequestInfo | URL) => {
-      const url = String(input)
-      if (url.includes('/api/csrf-token')) return okResponse({ data: { csrf_token: 'token' } })
-      return okResponse()
-    }) as unknown as typeof fetch
+    globalThis.fetch = vi.fn(() => okResponse()) as unknown as typeof fetch
   })
 
   it('shows On when the on automation was triggered most recently', () => {

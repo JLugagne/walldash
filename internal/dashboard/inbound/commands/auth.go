@@ -173,13 +173,26 @@ func clientIP(r *http.Request) string {
 
 // RevokeDevice disables a device account and kills all of its refresh tokens.
 func (h *AuthHandler) RevokeDevice(w http.ResponseWriter, r *http.Request) {
+	actor, ok := tokens.ActorFromContext(r.Context())
+	if !ok {
+		middleware.WriteJSendError(w, http.StatusUnauthorized, "UNAUTHORIZED", "authentication required")
+		return
+	}
+	current, err := h.auth.GetAccount(r.Context(), actor.UserID.String())
+	if err != nil {
+		h.controller.SendFail(w, r, nil, err)
+		return
+	}
 	id := mux.Vars(r)["id"]
-	if _, err := h.auth.RevokeDevice(r.Context(), id); err != nil {
-		if errors.Is(err, domain.ErrAccountNotFound) {
+	if _, err := h.auth.RevokeDevice(r.Context(), current, id); err != nil {
+		switch {
+		case errors.Is(err, domain.ErrForbidden):
+			middleware.WriteJSendError(w, http.StatusForbidden, "FORBIDDEN", "operation not permitted")
+		case errors.Is(err, domain.ErrAccountNotFound):
 			middleware.WriteJSendError(w, http.StatusNotFound, "ACCOUNT_NOT_FOUND", "account not found")
-			return
+		default:
+			h.controller.SendError(w, r, err)
 		}
-		h.controller.SendError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -242,6 +255,16 @@ func SetupSetupAuthRoutes(r *mux.Router, h *AuthHandler) {
 }
 
 func (h *AuthHandler) SetLabel(w http.ResponseWriter, r *http.Request) {
+	actor, ok := tokens.ActorFromContext(r.Context())
+	if !ok {
+		middleware.WriteJSendError(w, http.StatusUnauthorized, "UNAUTHORIZED", "authentication required")
+		return
+	}
+	current, err := h.auth.GetAccount(r.Context(), actor.UserID.String())
+	if err != nil {
+		h.controller.SendFail(w, r, nil, err)
+		return
+	}
 	var body struct {
 		Label string `json:"label"`
 	}
@@ -250,8 +273,10 @@ func (h *AuthHandler) SetLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := mux.Vars(r)["id"]
-	if err := h.auth.SetLabel(r.Context(), id, body.Label); err != nil {
+	if err := h.auth.SetLabel(r.Context(), current, id, body.Label); err != nil {
 		switch {
+		case errors.Is(err, domain.ErrForbidden):
+			middleware.WriteJSendError(w, http.StatusForbidden, "FORBIDDEN", "operation not permitted")
 		case errors.Is(err, domain.ErrInvalidLabel):
 			middleware.WriteJSendError(w, http.StatusBadRequest, "INVALID_LABEL", "invalid label")
 		case errors.Is(err, domain.ErrAccountNotFound):

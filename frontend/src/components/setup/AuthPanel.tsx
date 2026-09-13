@@ -609,7 +609,7 @@ export function AuthPanel() {
                                 <button
                                   type="button"
                                   aria-label={`Rename ${device.label || device.id}`}
-                                  disabled={isBusy}
+                                  disabled={isBusy || ownerLocked}
                                   onClick={() => startRename(device)}
                                   className="shrink-0 rounded-md p-1 text-slate-500 hover:text-white hover:bg-slate-800/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                                 >
@@ -652,7 +652,7 @@ export function AuthPanel() {
                             <button
                               type="button"
                               aria-label={`Revoke ${device.label || device.id}`}
-                              disabled={isBusy || device.status === 'revoked'}
+                              disabled={isBusy || ownerLocked || device.status === 'revoked'}
                               onClick={() => void revokeDevice(device)}
                               className="inline-flex items-center gap-1 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:text-rose-200 hover:bg-rose-500/20 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >

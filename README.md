@@ -172,9 +172,12 @@ Tokens are cookies, so nothing has to be stored on the device. The access cookie
 minutes and the refresh cookie lasts 60 days and rotates on every `POST /api/auth/refresh`;
 the account's existence and status are re-checked on each rotation.
 
-**Revocation is bounded, not instant.** Revoking a device deletes its refresh tokens
-immediately, so it can never refresh again, but an access token already issued stays valid until
-it expires — up to 15 minutes (there is no deny-list, by design).
+**Revocation is immediate for live sessions.** Revoking a device deletes its refresh tokens,
+publishes an access-token revocation (so the already-issued access cookie is rejected right away)
+and closes its open `/api/ws` sockets; role changes invalidate the target's sessions the same way.
+The only residual window is a server restart: the access-token revocation list is in memory, so
+after a restart a previously revoked but unexpired access token can be accepted until it expires —
+at most 15 minutes; refreshing always re-checks the account and fails once revoked.
 `POST /api/auth/logout` revokes only the current device's refresh family and clears its cookies;
 the account itself stays active.
 
@@ -203,9 +206,10 @@ default), no extra configuration is needed.
 ### WebSocket
 
 `/api/ws` (live device state) also requires a valid **access** cookie. When it expires the client
-refreshes over HTTP and reconnects; the socket handshake cannot refresh on its own. A revoked
-device therefore stops receiving live updates within at most 15 minutes, like any other
-protected call.
+refreshes over HTTP and reconnects; the socket handshake cannot refresh on its own. Revoking a
+device closes its open sockets and the account is re-validated before every action, so a revoked
+device stops receiving live updates immediately; after a Walldash restart the access token itself
+still expires within 15 minutes at most, while actions remain blocked and refresh always fails.
 
 ### Recovery
 
@@ -225,13 +229,21 @@ Settings resolve with the following precedence: **environment variable** → **a
 | `DB_PATH` | `walldash.db` (or `/data/walldash.db` when the `/data` volume exists) | SQLite database path. |
 | `HA_URL` | `http://homeassistant.local:8123` | Home Assistant base URL. |
 | `HA_TOKEN` | _(empty)_ | Long-lived access token. Not needed when running as an add-on: `SUPERVISOR_TOKEN` is used automatically via the Supervisor API proxy. The Supervisor token is never attached to a custom `HA_URL`. |
-| `TOKEN_SECRET` | _(auto-generated + persisted)_ | HS256 key used to sign access/refresh tokens, at least 32 bytes. Leave empty to generate one on first boot and persist it in the database; keep it stable, changing it invalidates all sessions. |
-| `SECRET_KEY` | _(empty)_ | Optional 32-character key-encryption key (AES-256-GCM) that encrypts the auto-generated `TOKEN_SECRET` before it is stored, so a database copy or snapshot does not expose the signing key. Keep it stable and backed up; removing it after use fails closed. Also settable as the add-on option `secret_key`. |
+| `TOKEN_SECRET` | _(auto-generated + persisted)_ | HS256 key used to sign access/refresh tokens, at least 32 bytes. Leave empty to generate one on first boot and persist it sealed in the database; keep it stable, changing it invalidates all sessions. |
+| `SECRET_KEY` | _(empty)_ | Optional inline 32-byte key-encryption key (AES-256-GCM) that encrypts the auto-generated `TOKEN_SECRET` before it is stored. Wins over `SECRET_KEY_FILE`. Keep it stable and backed up; removing it after use fails closed. Also settable as the add-on option `secret_key`. |
+| `SECRET_KEY_FILE` | _(empty)_ | Path to a file containing the key-encryption key (whitespace-trimmed, exactly 32 bytes), read when `SECRET_KEY` is empty. Preferred when the database lives in a snapshot-backed volume: point it at a path excluded from backups. An unreadable or empty file aborts startup. Also settable as the add-on option `secret_key_file`. |
 | `RESCUE_MODE` | `false` | Recovery switch. When `true`, the next unauthenticated device claims the `owner` role even if accounts already exist. One-shot (consumed after the first use); set it back to `false` once recovery is complete. Also settable as the add-on option `rescue_mode`. |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error`. |
 | `ALLOWED_ORIGINS` | _(empty)_ | Comma-separated trusted origins for CORS, CSRF and the same-origin check, needed when a reverse proxy rewrites the `Host` header. Accepts `https://host` or a bare `host`. Also settable as the add-on option `allowed_origins`. |
 | `DOMAIN` | _(empty)_ | Public hostname of this Walldash instance, used for the CORS `Access-Control-Allow-Origin` header and the CSRF/same-origin checks. Accepts a bare host, `http://host` or `https://host`; an optional port is kept and any path/query is ignored. Merged with `ALLOWED_ORIGINS`. Also settable as the add-on option `domain`. |
 | `FRONTEND_DIR` | _(embedded assets)_ | Serve the frontend from a directory instead of the embedded build. |
+
+**Secrets at rest.** When `TOKEN_SECRET` is unset and no key-encryption key is configured, the
+signing key is sealed with a random KEK stored next to the database (`<DB_PATH>.kek`, mode `0600`).
+A full `/data` snapshot contains both the database and that key, so it is credential-grade material:
+treat snapshots as secrets. For protection against snapshots that leave the host, set `TOKEN_SECRET`
+or point `SECRET_KEY_FILE` at a path excluded from backups. If the KEK file is lost, set
+`TOKEN_SECRET` to start again (this signs out every device).
 
 ---
 

@@ -39,14 +39,14 @@ Each invitation works once and stops working after 15 minutes. Create a new one 
 | Role | What it can do |
 | --- | --- |
 | **owner** | Everything, including giving the owner role to another device. |
-| **admin** | Manage devices, create invitations, approve waiting devices and revoke access. |
+| **admin** | Manage devices, create invitations, approve waiting devices and revoke access. Admins cannot revoke or rename an **owner** device. |
 | **device** | Use the dashboard and 3D views only. |
 
-Only the **owner** can pass on the **owner** role. An admin cannot make itself owner.
+Only the **owner** can pass on the **owner** role, and an admin cannot make itself owner. Owner devices are also protected from admins: only an owner can rename or revoke one, and the last remaining owner can never be removed.
 
 ## Keeping devices signed in
 
-A device stays signed in for **60 days**, and renews itself quietly, so you rarely need to do anything. Revoking a device removes its access shortly after — within about **15 minutes**. After that, it must be approved or invited again.
+A device stays signed in for **60 days**, and renews itself quietly, so you rarely need to do anything. Revoking a device ends its access immediately: its sessions and live connections are closed. After that, it must be approved or invited again.
 
 ## If the owner device is lost
 

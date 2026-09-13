@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -168,10 +169,10 @@ func (w Widget) ValidateIn(cols, rows int) error {
 	if err := w.Validate(); err != nil {
 		return err
 	}
-	if w.Col+w.ColSpan > cols {
+	if w.ColSpan > cols || w.Col > cols-w.ColSpan {
 		return errors.Join(ErrInvalidWidget, errors.New("widget "+w.ID+" overflows the grid width"))
 	}
-	if w.Row+w.RowSpan > rows {
+	if w.RowSpan > rows || w.Row > rows-w.RowSpan {
 		return errors.Join(ErrInvalidWidget, errors.New("widget "+w.ID+" overflows the grid height"))
 	}
 	return nil
@@ -180,10 +181,13 @@ func (w Widget) ValidateIn(cols, rows int) error {
 // Overlaps reports whether the two widget rectangles share at least one grid cell.
 // Rectangles that only touch by an edge do not overlap.
 func (w Widget) Overlaps(other Widget) bool {
-	return w.Col < other.Col+other.ColSpan &&
-		other.Col < w.Col+w.ColSpan &&
-		w.Row < other.Row+other.RowSpan &&
-		other.Row < w.Row+w.RowSpan
+	if w.ColSpan <= 0 || w.RowSpan <= 0 || other.ColSpan <= 0 || other.RowSpan <= 0 {
+		return false
+	}
+	return lessThanSum(w.Col, other.Col, other.ColSpan) &&
+		lessThanSum(other.Col, w.Col, w.ColSpan) &&
+		lessThanSum(w.Row, other.Row, other.RowSpan) &&
+		lessThanSum(other.Row, w.Row, w.RowSpan)
 }
 
 func (w Widget) validateEntities() error {
@@ -369,4 +373,17 @@ func (w Widget) validateAutomationSwitch() error {
 		}
 	}
 	return nil
+}
+
+// lessThanSum reports whether coord < start+span without overflowing the int
+// range: when start+span would wrap, the sum is treated as effectively infinite,
+// so every representable coord is below it. Non-positive spans are never below.
+func lessThanSum(coord, start, span int) bool {
+	if span <= 0 {
+		return false
+	}
+	if start > math.MaxInt-span {
+		return true
+	}
+	return coord < start+span
 }

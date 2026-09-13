@@ -28,9 +28,9 @@ A new device waits on the access screen until an owner or admin lets it in.
 
 See [Devices & access](/getting-started/sign-in/) for the steps.
 
-## I revoked a device but it still works
+## I revoked a device but it still responds
 
-A revoked device loses access shortly after — within about **15 minutes**. Wait a few minutes and try again.
+Revocation takes effect immediately: the device's sessions and live connections are closed. If the screen still shows an old state, reload the page — it lands back on the access screen. If it still gets through after Walldash has been restarted, revoke it again: the short-lived remainder of its previous session then expires within **15 minutes** at the latest.
 
 ## The owner device is lost
 

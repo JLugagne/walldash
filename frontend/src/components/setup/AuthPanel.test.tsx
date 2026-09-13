@@ -26,10 +26,6 @@ function mockRoutes(routes: Record<string, Handler>): ReturnType<typeof vi.fn> {
   return fetchMock
 }
 
-function csrfRoute(): Handler {
-  return () => jsonResponse(200, { status: 'success', data: { csrf_token: 'csrf' } })
-}
-
 function meRoute(role: string): Handler {
   return () => jsonResponse(200, { status: 'success', data: { id: 'me', label: 'Owner', role } })
 }
@@ -94,7 +90,6 @@ describe('AuthPanel', () => {
       'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: PENDING }),
       'GET /api/setup/auth/invites': emptyInvites(),
       'GET /api/setup/auth/devices': () => jsonResponse(200, { status: 'success', data: DEVICES }),
-      'GET /api/csrf-token': csrfRoute(),
       'POST /api/setup/auth/pending/p1/approve': () =>
         jsonResponse(200, { status: 'success', data: { id: 'dev1', label: 'Kitchen tablet', role: 'device' } }),
     })
@@ -119,7 +114,6 @@ describe('AuthPanel', () => {
       'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
       'GET /api/setup/auth/invites': emptyInvites(),
       'GET /api/setup/auth/devices': () => jsonResponse(200, { status: 'success', data: DEVICES }),
-      'GET /api/csrf-token': csrfRoute(),
       'POST /api/setup/auth/invites': () =>
         jsonResponse(200, {
           status: 'success',
@@ -145,7 +139,6 @@ describe('AuthPanel', () => {
         if (deviceLoads === 1) return jsonResponse(401, { status: 'error' })
         return jsonResponse(200, { status: 'success', data: DEVICES })
       },
-      'GET /api/csrf-token': csrfRoute(),
       'POST /api/auth/refresh': () => jsonResponse(204, {}),
     })
 
@@ -161,7 +154,6 @@ describe('AuthPanel', () => {
       'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
       'GET /api/setup/auth/invites': emptyInvites(),
       'GET /api/setup/auth/devices': () => jsonResponse(200, { status: 'success', data: DEVICES }),
-      'GET /api/csrf-token': csrfRoute(),
       'POST /api/setup/auth/devices/d2/revoke': () => jsonResponse(204, {}),
     })
 
@@ -189,7 +181,6 @@ describe('AuthPanel', () => {
         deviceLoads += 1
         return jsonResponse(200, { status: 'success', data: DEVICES })
       },
-      'GET /api/csrf-token': csrfRoute(),
       'POST /api/setup/auth/devices/d2/label': () =>
         jsonResponse(200, { status: 'success', data: { id: 'd2', label: 'Kitchen panel' } }),
     })
@@ -225,7 +216,6 @@ describe('AuthPanel', () => {
       'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
       'GET /api/setup/auth/invites': emptyInvites(),
       'GET /api/setup/auth/devices': () => jsonResponse(200, { status: 'success', data: DEVICES }),
-      'GET /api/csrf-token': csrfRoute(),
       'POST /api/setup/auth/devices/d2/label': () =>
         jsonResponse(400, { status: 'error', message: 'label must be 1..64 characters' }),
     })
@@ -261,5 +251,11 @@ describe('AuthPanel', () => {
     expect(options).toContain('admin')
     expect(options).toContain('device')
     expect(options).not.toContain('owner')
+
+    expect(screen.queryByLabelText(/role for hall panel/i)).toBeNull()
+    const renameOwner = screen.getByRole('button', { name: /rename hall panel/i }) as HTMLButtonElement
+    const revokeOwner = screen.getByRole('button', { name: /revoke hall panel/i }) as HTMLButtonElement
+    expect(renameOwner.disabled).toBe(true)
+    expect(revokeOwner.disabled).toBe(true)
   })
 })

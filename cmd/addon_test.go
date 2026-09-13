@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -192,5 +193,49 @@ func TestConfigBool(t *testing.T) {
 	t.Setenv("WALLDASH_RESCUE_ENV", "yes")
 	if got := configBool("WALLDASH_RESCUE_ENV", "rescue_mode", false, options); !got {
 		t.Fatalf("expected yes to enable rescue, got %v", got)
+	}
+}
+
+func TestResolveSecretKey(t *testing.T) {
+	inline := strings.Repeat("a", 32)
+	dir := t.TempDir()
+	validFile := filepath.Join(dir, "secret_key")
+	if err := os.WriteFile(validFile, []byte("  "+inline+"\n"), 0o600); err != nil {
+		t.Fatalf("write secret key file: %v", err)
+	}
+	emptyFile := filepath.Join(dir, "empty")
+	if err := os.WriteFile(emptyFile, []byte("  \n"), 0o600); err != nil {
+		t.Fatalf("write empty secret key file: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		inline   string
+		filePath string
+		want     string
+		wantErr  bool
+	}{
+		{name: "inline wins over file", inline: inline, filePath: validFile, want: inline},
+		{name: "reads trimmed file content", filePath: validFile, want: inline},
+		{name: "no configuration yields empty key", want: ""},
+		{name: "missing file is fatal", filePath: filepath.Join(dir, "missing"), wantErr: true},
+		{name: "empty file is fatal", filePath: emptyFile, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resolveSecretKey(tt.inline, tt.filePath)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected an error, got key %q", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("expected %q, got %q", tt.want, got)
+			}
+		})
 	}
 }

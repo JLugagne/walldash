@@ -48,6 +48,54 @@ func TestController(t *testing.T) {
 		assert.Equal(t, "fail", body["status"])
 	})
 
+	t.Run("SendFail maps MaxBytesError to a 413 request_too_large envelope", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/test", nil)
+
+		c.SendFail(rec, req, nil, &http.MaxBytesError{Limit: 1 << 20})
+
+		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+		assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+		var body map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &body)
+		require.NoError(t, err)
+		assert.Equal(t, "error", body["status"])
+		assert.Equal(t, "request_too_large", body["code"])
+		assert.NotEmpty(t, body["message"])
+	})
+
+	t.Run("SendFail maps a wrapped MaxBytesError to a 413 envelope", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/test", nil)
+
+		c.SendFail(rec, req, nil, errors.Join(&http.MaxBytesError{Limit: 1 << 20}, errors.New("decode failed")))
+
+		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+
+		var body map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &body)
+		require.NoError(t, err)
+		assert.Equal(t, "request_too_large", body["code"])
+	})
+
+	t.Run("SendError maps MaxBytesError to a 413 request_too_large envelope", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/test", nil)
+
+		c.SendError(rec, req, &http.MaxBytesError{Limit: 1 << 20})
+
+		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+		assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+
+		var body map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &body)
+		require.NoError(t, err)
+		assert.Equal(t, "error", body["status"])
+		assert.Equal(t, "request_too_large", body["code"])
+		assert.NotEmpty(t, body["message"])
+	})
+
 	t.Run("SendError writes 500 or error status with error message", func(t *testing.T) {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)

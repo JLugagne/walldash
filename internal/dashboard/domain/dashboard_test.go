@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -627,5 +628,82 @@ func TestAutomationSwitchWidget(t *testing.T) {
 		malformed := automationSwitchWidget()
 		malformed.Config.OffAutomation = "evening_off"
 		require.ErrorIs(t, malformed.Validate(), domain.ErrInvalidWidget)
+	})
+}
+
+func TestWidgetValidateInRejectsOverflowingLayout(t *testing.T) {
+	t.Run("col addition wraps but is rejected", func(t *testing.T) {
+		w := sensorNumberWidget()
+		w.Col = math.MaxInt64
+		w.ColSpan = 1
+		err := w.ValidateIn(domain.DefaultGridCols, domain.DefaultGridRows)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidWidget)
+	})
+
+	t.Run("row addition wraps but is rejected", func(t *testing.T) {
+		w := sensorNumberWidget()
+		w.Row = math.MaxInt64
+		w.RowSpan = 1
+		err := w.ValidateIn(domain.DefaultGridCols, domain.DefaultGridRows)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidWidget)
+	})
+
+	t.Run("span larger than the grid is rejected", func(t *testing.T) {
+		w := sensorNumberWidget()
+		w.ColSpan = math.MaxInt64
+		err := w.ValidateIn(domain.DefaultGridCols, domain.DefaultGridRows)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidWidget)
+	})
+
+	t.Run("dashboard validation rejects the overflowing widget", func(t *testing.T) {
+		w := sensorNumberWidget()
+		w.DashboardID = "grid-1"
+		w.Col = math.MaxInt64
+		w.ColSpan = 1
+		dashboard := domain.Dashboard{
+			ID:      "grid-1",
+			Name:    "Grid",
+			Cols:    domain.DefaultGridCols,
+			Rows:    domain.DefaultGridRows,
+			Widgets: []domain.Widget{w},
+		}
+		err := dashboard.Validate()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrInvalidWidget)
+	})
+
+	t.Run("valid layout at the far corner still passes", func(t *testing.T) {
+		w := sensorNumberWidget()
+		w.Col = domain.DefaultGridCols - w.ColSpan
+		w.Row = domain.DefaultGridRows - w.RowSpan
+		require.NoError(t, w.ValidateIn(domain.DefaultGridCols, domain.DefaultGridRows))
+	})
+}
+
+func TestWidgetOverlapsIsOverflowSafe(t *testing.T) {
+	rect := func(col, row, colSpan, rowSpan int) domain.Widget {
+		return domain.Widget{Col: col, Row: row, ColSpan: colSpan, RowSpan: rowSpan}
+	}
+
+	t.Run("spans that wrap do not hide an overlap", func(t *testing.T) {
+		a := rect(math.MaxInt64-5, 0, 10, 1)
+		b := rect(math.MaxInt64-1, 0, 10, 1)
+		assert.True(t, a.Overlaps(b))
+		assert.True(t, b.Overlaps(a))
+	})
+
+	t.Run("far apart rectangles still do not overlap", func(t *testing.T) {
+		a := rect(math.MaxInt64-5, 0, 5, 1)
+		b := rect(0, 0, 1, 1)
+		assert.False(t, a.Overlaps(b))
+		assert.False(t, b.Overlaps(a))
+	})
+
+	t.Run("non-positive spans never overlap", func(t *testing.T) {
+		assert.False(t, rect(0, 0, 0, 1).Overlaps(rect(0, 0, 1, 1)))
+		assert.False(t, rect(0, 0, 1, 1).Overlaps(rect(0, 0, -1, 1)))
 	})
 }

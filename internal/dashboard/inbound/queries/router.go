@@ -9,17 +9,12 @@ import (
 	svclevels "github.com/JLugagne/walldash/internal/dashboard/domain/service/levels"
 	svcweather "github.com/JLugagne/walldash/internal/dashboard/domain/service/weather"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound"
-	"github.com/JLugagne/walldash/internal/dashboard/inbound/middleware"
 	"github.com/gorilla/mux"
 )
 
-func SetupRoutes(r *mux.Router, controller *inbound.Controller, queries svchealth.HealthQueries, tokenManager ...middleware.TokenManager) {
+func SetupRoutes(r *mux.Router, controller *inbound.Controller, queries svchealth.HealthQueries) {
 	healthHandler := NewHealthHandler(controller, queries)
 	r.HandleFunc("/api/health", healthHandler.GetHealth).Methods(http.MethodGet)
-
-	if len(tokenManager) > 0 && tokenManager[0] != nil {
-		SetupCSRFRoutes(r, controller, tokenManager[0])
-	}
 
 	if levelQueries, ok := queries.(svclevels.LevelQueries); ok {
 		SetupLevelRoutes(r, controller, levelQueries)

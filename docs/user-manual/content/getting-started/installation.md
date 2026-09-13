@@ -13,7 +13,7 @@ The add-on is the easiest way to install Walldash. It connects to your Home Assi
 3. Find **Walldash** in the store, install it, then start it.
 4. Open the web address shown on the add-on page in a browser on your tablet or touchscreen.
 
-Your data is kept inside Home Assistant and survives updates and restarts. The tablets connect straight to Walldash, so they never need a Home Assistant login.
+Your data is kept inside Home Assistant and survives updates and restarts. The tablets connect straight to Walldash, so they never need a Home Assistant login. Home Assistant snapshots include Walldash's data and the key that signs device sessions, so treat snapshots like passwords (see [Settings](/reference/configuration/)).
 
 To add more tablets later, see [Devices & access](/getting-started/sign-in/).
 

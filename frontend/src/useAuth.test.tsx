@@ -37,10 +37,6 @@ function mockRoutes(routes: Record<string, Handler>): ReturnType<typeof vi.fn> {
   return fetchMock
 }
 
-function csrfRoute(): Handler {
-  return () => jsonResponse(200, { status: 'success', data: { csrf_token: 'csrf' } })
-}
-
 const ACCOUNT = { id: 'd1', label: 'Tablet', role: 'owner', status: 'active' }
 
 function Probe() {
@@ -68,7 +64,6 @@ describe('useAuth', () => {
           ? jsonResponse(401, { status: 'error' })
           : jsonResponse(200, { status: 'success', data: ACCOUNT })
       },
-      'GET /api/csrf-token': csrfRoute(),
       'POST /api/auth/refresh': () => emptyResponse(204),
     })
 
@@ -85,7 +80,6 @@ describe('useAuth', () => {
   it('stays unauthenticated when the silent refresh fails', async () => {
     mockRoutes({
       'GET /api/auth/me': () => jsonResponse(401, { status: 'error' }),
-      'GET /api/csrf-token': csrfRoute(),
       'POST /api/auth/refresh': () => jsonResponse(401, { status: 'error' }),
     })
 

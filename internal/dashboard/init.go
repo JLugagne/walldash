@@ -59,15 +59,14 @@ type Config struct {
 
 // Dashboard represents the initialized composition root for the dashboard service.
 type Dashboard struct {
-	App          *app.App
-	Adapter      *sqlite.Adapter
-	Hub          *websocket.Hub
-	TokenManager middleware.TokenManager
-	Issuer       *basic.Issuer
-	TokenStore   *sqlite.TokensStore
-	Cookies      tokens.Cookies
-	Accounts     accounts.AccountRepository
-	Auth         *app.Auth
+	App        *app.App
+	Adapter    *sqlite.Adapter
+	Hub        *websocket.Hub
+	Issuer     *basic.Issuer
+	TokenStore *sqlite.TokensStore
+	Cookies    tokens.Cookies
+	Accounts   accounts.AccountRepository
+	Auth       *app.Auth
 }
 
 // Close gracefully shuts down dashboard resources such as database connections.
@@ -103,6 +102,13 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		if err != nil {
 			_ = adapter.Close()
 			return nil, fmt.Errorf("SECRET_KEY must be exactly 32 bytes: %w", err)
+		}
+		kek = k
+	} else if conf.TokenSecret == "" {
+		k, err := loadOrCreateAutoKEK(conf.DBPath)
+		if err != nil {
+			_ = adapter.Close()
+			return nil, err
 		}
 		kek = k
 	}
@@ -156,6 +162,14 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	wsHub := websocket.NewHub(application, conf.AllowedOrigins...)
 	go wsHub.Run()
 	application.SetBroadcaster(wsHub)
+	authApp.SetSessionCloser(wsHub)
+	wsHub.SetSessionValidator(func(ctx context.Context, subject string) error {
+		acct, err := accountRepo.FindByID(ctx, subject)
+		if err != nil || acct.Status != domain.StatusActive {
+			return errAccountInactive
+		}
+		return nil
+	})
 
 	// Middlewares setup
 	corsConfig := middleware.DefaultCORSConfig()
@@ -163,6 +177,7 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		corsConfig.AllowedOrigins = conf.AllowedOrigins
 	}
 	router.Use(middleware.SecurityHeaders)
+	router.Use(middleware.DefaultBodyLimit())
 	router.Use(middleware.CORS(corsConfig))
 
 	// Preflight handler so Gorilla Mux matches OPTIONS for all routes
@@ -170,7 +185,6 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		// Handled by CORS middleware
 	}))
 
-	tokenManager := middleware.NewCSRFTokenManager()
 	if !conf.DisableCSRF {
 		trustedOrigins := conf.AllowedOrigins
 		router.Use(func(next http.Handler) http.Handler {
@@ -187,7 +201,7 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	)).Methods(http.MethodGet)
 
 	// Register inbound routes
-	queries.SetupRoutes(router, controller, application, tokenManager)
+	queries.SetupRoutes(router, controller, application)
 	commands.SetupRoutes(router, controller, application)
 	authCommands := commands.NewAuthHandler(controller, authApp, cookies, issuer, tokenStore, revocationBus, trustedOriginHosts(conf.AllowedOrigins))
 	commands.SetupAuthRoutes(router, authCommands)
@@ -219,7 +233,6 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		"/api/auth/refresh",
 		"/api/auth/logout",
 		"/api/auth/status",
-		"/api/csrf-token",
 		"/api/ws",
 	}
 	router.Use(middleware.Conditional(middleware.RequireAuth(issuer, cookies, revocationTracker), middleware.ExemptAuth(publicAPIPaths...)))
@@ -228,15 +241,14 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	setupFrontendServing(router, conf.FrontendDir, conf.AssetsFS)
 
 	return &Dashboard{
-		App:          application,
-		Adapter:      adapter,
-		Hub:          wsHub,
-		TokenManager: tokenManager,
-		Issuer:       issuer,
-		TokenStore:   tokenStore,
-		Cookies:      cookies,
-		Accounts:     accountRepo,
-		Auth:         authApp,
+		App:        application,
+		Adapter:    adapter,
+		Hub:        wsHub,
+		Issuer:     issuer,
+		TokenStore: tokenStore,
+		Cookies:    cookies,
+		Accounts:   accountRepo,
+		Auth:       authApp,
 	}, nil
 }
 
@@ -328,13 +340,23 @@ func resolveTokenSecret(ctx context.Context, store *sqlite.SecretsStore, configu
 			return "", err
 		}
 		if len(plain) > 0 {
-			if kek != nil && !sealed {
-				if wrapped, wrapErr := wrapSecret(plain, kek); wrapErr == nil {
-					_ = store.Set(ctx, sqlite.TokenSecretName, wrapped)
+			if !sealed {
+				if kek == nil {
+					return "", errors.New("stored token secret is not encrypted and no key-encryption key is configured; set TOKEN_SECRET or SECRET_KEY")
+				}
+				wrapped, err := wrapSecret(plain, kek)
+				if err != nil {
+					return "", fmt.Errorf("re-encrypting legacy token secret: %w", err)
+				}
+				if err := store.Set(ctx, sqlite.TokenSecretName, wrapped); err != nil {
+					return "", fmt.Errorf("re-encrypting legacy token secret: %w", err)
 				}
 			}
 			return string(plain), nil
 		}
+	}
+	if kek == nil {
+		return "", errors.New("cannot store a generated token secret without a key-encryption key; set TOKEN_SECRET or SECRET_KEY")
 	}
 	raw := make([]byte, minBytes)
 	if _, err := rand.Read(raw); err != nil {
@@ -357,9 +379,6 @@ func resolveTokenSecret(ctx context.Context, store *sqlite.SecretsStore, configu
 	}
 	if len(plain) == 0 {
 		return "", errors.New("failed to persist generated token secret")
-	}
-	if kek == nil {
-		logrus.Warn("TOKEN_SECRET is not set: generated a JWT signing key and stored it in the database; set TOKEN_SECRET or SECRET_KEY so database snapshots do not expose it")
 	}
 	return string(plain), nil
 }
@@ -416,4 +435,59 @@ func unwrapSecret(stored []byte, kek *keystore.KEK) ([]byte, bool, error) {
 		return nil, true, fmt.Errorf("opening token secret (wrong SECRET_KEY?): %w", err)
 	}
 	return plain, true, nil
+}
+
+// loadOrCreateAutoKEK returns the key-encryption key used when neither
+// TOKEN_SECRET nor SECRET_KEY is configured. The 32-byte key lives in a
+// dedicated file next to the database so it never travels inside the SQLite
+// file; it is created with 0600 permissions on first use and reused afterwards.
+func loadOrCreateAutoKEK(dbPath string) (*keystore.KEK, error) {
+	path := dbPath + ".kek"
+	key, err := os.ReadFile(path)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("reading key-encryption key file %s: %w", path, err)
+		}
+		key, err = createAutoKEKFile(path)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		_ = os.Chmod(path, 0o600)
+	}
+	kek, err := keystore.NewKEK(key)
+	if err != nil {
+		return nil, fmt.Errorf("key-encryption key file %s is invalid: %w", path, err)
+	}
+	logrus.WithField("path", path).Warn("TOKEN_SECRET and SECRET_KEY are not set: the generated token signing key is sealed with an auto-generated key-encryption key file stored next to the database, so a full /data snapshot contains both; for protection against snapshots that leave the host, set TOKEN_SECRET or point SECRET_KEY_FILE at a path excluded from backups, and treat snapshots as secrets (changing TOKEN_SECRET signs out every device)")
+	return kek, nil
+}
+
+// createAutoKEKFile writes a random 32-byte key-encryption key to path with
+// 0600 permissions. If another process won the race and created the file
+// first, its content is read and returned instead.
+func createAutoKEKFile(path string) ([]byte, error) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, fmt.Errorf("generating key-encryption key: %w", err)
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			existing, readErr := os.ReadFile(path)
+			if readErr != nil {
+				return nil, fmt.Errorf("reading key-encryption key file %s: %w", path, readErr)
+			}
+			return existing, nil
+		}
+		return nil, fmt.Errorf("creating key-encryption key file %s: %w", path, err)
+	}
+	if _, err := file.Write(key); err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("writing key-encryption key file %s: %w", path, err)
+	}
+	if err := file.Close(); err != nil {
+		return nil, fmt.Errorf("writing key-encryption key file %s: %w", path, err)
+	}
+	return key, nil
 }

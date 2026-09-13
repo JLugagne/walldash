@@ -108,7 +108,6 @@ func TestSetupEndpointsDeviceForbidden(t *testing.T) {
 	require.Equal(t, "owner", ownerRole)
 
 	device := newAuthTestClient(t, server)
-	device.fetchCSRF()
 	_, deviceRole := enrollClient(t, ctx, dash, device)
 	require.Equal(t, "device", deviceRole)
 
@@ -122,23 +121,28 @@ func TestSetupEndpointsDeviceForbidden(t *testing.T) {
 }
 
 func TestSetupEndpointsRevokeKillsRefresh(t *testing.T) {
-	ctx, dash, _, owner := setupAuthServer(t)
-	ownerID, _ := enrollClient(t, ctx, dash, owner)
+	ctx, dash, server, owner := setupAuthServer(t)
+	_, ownerRole := enrollClient(t, ctx, dash, owner)
+	require.Equal(t, "owner", ownerRole)
 
-	refresh := owner.cookie(dash.Cookies.RefreshName)
+	device := newAuthTestClient(t, server)
+	deviceID, deviceRole := enrollClient(t, ctx, dash, device)
+	require.Equal(t, "device", deviceRole)
+
+	refresh := device.cookie(dash.Cookies.RefreshName)
 	require.NotEmpty(t, refresh)
 
-	resp := owner.do(http.MethodPost, "/api/setup/auth/devices/"+ownerID+"/revoke", nil, nil)
+	resp := owner.do(http.MethodPost, "/api/setup/auth/devices/"+deviceID+"/revoke", nil, nil)
 	require.Equal(t, http.StatusNoContent, resp.StatusCode)
 	resp.Body.Close()
 
-	resp = owner.do(http.MethodPost, "/api/auth/refresh", nil, func(req *http.Request) {
+	resp = device.do(http.MethodPost, "/api/auth/refresh", nil, func(req *http.Request) {
 		req.AddCookie(&http.Cookie{Name: dash.Cookies.RefreshName, Value: refresh})
 	})
 	require.NotEqual(t, http.StatusNoContent, resp.StatusCode)
 	resp.Body.Close()
 
-	acct, err := dash.Auth.GetAccount(ctx, ownerID)
+	acct, err := dash.Auth.GetAccount(ctx, deviceID)
 	require.NoError(t, err)
 	require.Equal(t, "revoked", string(acct.Status))
 }
@@ -163,7 +167,6 @@ func TestSetupEndpointsRenameDevice(t *testing.T) {
 	require.Equal(t, "owner", ownerRole)
 
 	device := newAuthTestClient(t, server)
-	device.fetchCSRF()
 	deviceID, deviceRole := enrollClient(t, ctx, dash, device)
 	require.Equal(t, "device", deviceRole)
 
@@ -224,7 +227,6 @@ func TestSetupEndpointsRenameForbidden(t *testing.T) {
 	require.Equal(t, "owner", ownerRole)
 
 	device := newAuthTestClient(t, server)
-	device.fetchCSRF()
 	deviceID, deviceRole := enrollClient(t, ctx, dash, device)
 	require.Equal(t, "device", deviceRole)
 
@@ -239,7 +241,6 @@ func TestSetupEndpointsDeviceCannotWriteConfiguration(t *testing.T) {
 	require.Equal(t, "owner", ownerRole)
 
 	device := newAuthTestClient(t, server)
-	device.fetchCSRF()
 	_, deviceRole := enrollClient(t, ctx, dash, device)
 	require.Equal(t, "device", deviceRole)
 
@@ -274,7 +275,6 @@ func TestSetupEndpointsRevokeInvalidatesAccessToken(t *testing.T) {
 	require.Equal(t, "owner", ownerRole)
 
 	device := newAuthTestClient(t, server)
-	device.fetchCSRF()
 	deviceID, deviceRole := enrollClient(t, ctx, dash, device)
 	require.Equal(t, "device", deviceRole)
 

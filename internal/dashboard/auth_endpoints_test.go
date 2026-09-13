@@ -24,7 +24,6 @@ type authTestClient struct {
 	t      *testing.T
 	base   string
 	client *http.Client
-	csrf   string
 }
 
 func setupAuthServer(t *testing.T) (context.Context, *Dashboard, *httptest.Server, *authTestClient) {
@@ -44,7 +43,6 @@ func setupAuthServer(t *testing.T) (context.Context, *Dashboard, *httptest.Serve
 	})
 
 	client := newAuthTestClient(t, server)
-	client.fetchCSRF()
 	return ctx, dash, server, client
 }
 
@@ -70,9 +68,6 @@ func (c *authTestClient) do(method, path string, body any, mutate func(*http.Req
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if c.csrf != "" {
-		req.Header.Set("X-CSRF-Token", c.csrf)
-	}
 	req.Header.Set("Origin", c.base)
 	if mutate != nil {
 		mutate(req)
@@ -80,22 +75,6 @@ func (c *authTestClient) do(method, path string, body any, mutate func(*http.Req
 	resp, err := c.client.Do(req)
 	require.NoError(c.t, err)
 	return resp
-}
-
-func (c *authTestClient) fetchCSRF() {
-	c.t.Helper()
-	resp := c.do(http.MethodGet, "/api/csrf-token", nil, nil)
-	defer resp.Body.Close()
-	require.Equal(c.t, http.StatusOK, resp.StatusCode)
-
-	var out struct {
-		Data struct {
-			CSRFToken string `json:"csrf_token"`
-		} `json:"data"`
-	}
-	require.NoError(c.t, json.NewDecoder(resp.Body).Decode(&out))
-	require.NotEmpty(c.t, out.Data.CSRFToken)
-	c.csrf = out.Data.CSRFToken
 }
 
 func (c *authTestClient) cookie(name string) string {
