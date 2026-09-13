@@ -4,7 +4,7 @@
       url: /
     - name: Installation
       url: /getting-started/installation/
-    - name: Sign in & device access
+    - name: Devices & access
       url: /getting-started/sign-in/
     - name: First run & onboarding
       url: /getting-started/onboarding/
@@ -24,9 +24,9 @@
 
 - title: Reference
   items:
-    - name: Configuration
+    - name: Settings
       url: /reference/configuration/
-    - name: Custom domain & HTTPS
+    - name: Publishing on the internet
       url: /reference/reverse-proxy/
     - name: Troubleshooting
       url: /reference/troubleshooting/

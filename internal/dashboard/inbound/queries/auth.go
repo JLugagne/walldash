@@ -67,15 +67,18 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Pending lists the live device enrollments and their OTP codes for the setup tab.
+// Pending lists the live device enrollments waiting for owner approval. It never exposes a
+// secret: approval happens server-side, not by entering a code on the device.
 func (h *AuthHandler) Pending(w http.ResponseWriter, r *http.Request) {
 	pending := h.auth.ListPending(r.Context())
 	data := make([]map[string]any, 0, len(pending))
 	for _, entry := range pending {
 		data = append(data, map[string]any{
+			"pending_id": entry.PendingID,
 			"device_id":  entry.DeviceID,
 			"label":      entry.Label,
-			"code":       entry.Code,
+			"approved":   entry.Approved,
+			"created_at": entry.CreatedAt,
 			"expires_at": entry.ExpiresAt,
 		})
 	}
@@ -103,9 +106,10 @@ func (h *AuthHandler) Devices(w http.ResponseWriter, r *http.Request) {
 	h.controller.SendSuccess(w, r, data)
 }
 
-// SetupSetupAuthRoutes registers the protected setup query endpoints on a router whose
-// base path is /api/setup/auth.
+// SetupSetupAuthRoutes registers the protected setup query endpoints on a router whose base
+// path is /api/setup/auth.
 func SetupSetupAuthRoutes(r *mux.Router, h *AuthHandler) {
 	r.HandleFunc("/pending", h.Pending).Methods(http.MethodGet)
 	r.HandleFunc("/devices", h.Devices).Methods(http.MethodGet)
+	r.HandleFunc("/invites", h.Invites).Methods(http.MethodGet)
 }

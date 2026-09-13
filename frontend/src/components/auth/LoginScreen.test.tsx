@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import { LoginScreen } from './LoginScreen'
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -30,48 +30,116 @@ function csrfRoute(): Handler {
   return () => jsonResponse(200, { status: 'success', data: { csrf_token: 'csrf' } })
 }
 
+function setUrl(search: string) {
+  window.history.replaceState({}, '', `/${search}`)
+}
+
 beforeEach(() => {
   vi.restoreAllMocks()
+  vi.useRealTimers()
+  setUrl('')
 })
 
 describe('LoginScreen', () => {
-  it('runs the pending -> code -> success flow', async () => {
+  it('signs the first device in automatically as owner', async () => {
     const onAuthenticated = vi.fn()
     mockRoutes({
-      'POST /api/auth/connect': () => jsonResponse(200, { status: 'success', data: { status: 'pending' } }),
-      'GET /api/csrf-token': csrfRoute(),
-      'POST /api/auth/verify': () =>
+      'POST /api/auth/connect': () =>
         jsonResponse(200, {
           status: 'success',
-          data: { device: { id: 'd1', label: 'Tablet', role: 'owner' } },
+          data: { status: 'authenticated', device: { id: 'd1', label: 'Tablet', role: 'owner' } },
         }),
+      'GET /api/csrf-token': csrfRoute(),
     })
 
     render(<LoginScreen onAuthenticated={onAuthenticated} />)
 
-    expect(await screen.findByText('Waiting for approval')).toBeDefined()
-
-    fireEvent.change(screen.getByLabelText(/6-digit code/i), { target: { value: '004217' } })
-    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
-
     await waitFor(() => expect(onAuthenticated).toHaveBeenCalledTimes(1))
   })
 
-  it('shows a friendly message when the code is rejected', async () => {
+  it('shows the waiting state when an owner must approve the device', async () => {
     mockRoutes({
       'POST /api/auth/connect': () => jsonResponse(200, { status: 'success', data: { status: 'pending' } }),
       'GET /api/csrf-token': csrfRoute(),
-      'POST /api/auth/verify': () => jsonResponse(401, { status: 'error', code: 'invalid_code' }),
+      'POST /api/auth/redeem': () => jsonResponse(202, { status: 'success', data: { status: 'pending' } }),
     })
 
     render(<LoginScreen onAuthenticated={vi.fn()} />)
 
     expect(await screen.findByText('Waiting for approval')).toBeDefined()
+  })
 
-    fireEvent.change(screen.getByLabelText(/6-digit code/i), { target: { value: '000000' } })
-    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+  it('resumes an existing pending enrollment instead of creating a new one, and keeps polling', async () => {
+    vi.useFakeTimers()
+    const onAuthenticated = vi.fn()
+    let redeemCalls = 0
+    const fetchMock = mockRoutes({
+      'POST /api/auth/connect': () => jsonResponse(200, { status: 'success', data: { status: 'pending' } }),
+      'GET /api/csrf-token': csrfRoute(),
+      'POST /api/auth/redeem': () => {
+        redeemCalls += 1
+        if (redeemCalls <= 2) {
+          return jsonResponse(202, { status: 'success', data: { status: 'pending' } })
+        }
+        return jsonResponse(200, {
+          status: 'success',
+          data: { status: 'authenticated', device: { id: 'd1', label: 'Tablet', role: 'owner' } },
+        })
+      },
+    })
 
-    expect(await screen.findByText(/did not match/i)).toBeDefined()
+    render(<LoginScreen onAuthenticated={onAuthenticated} />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    expect(screen.getByText('Waiting for approval')).toBeDefined()
+    // The existing pending cookie is reused: no new approval request is created.
+    const createdNewEnrollment = fetchMock.mock.calls.some(([input]) =>
+      String(input).includes('/api/auth/connect'),
+    )
+    expect(createdNewEnrollment).toBe(false)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000)
+    })
+    expect(onAuthenticated).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000)
+    })
+    expect(onAuthenticated).toHaveBeenCalledTimes(1)
+
+    vi.useRealTimers()
+  })
+
+  it('redeems an invitation carried by the URL', async () => {
+    setUrl('?invite=abc.def')
+    const onAuthenticated = vi.fn()
+    mockRoutes({
+      'GET /api/csrf-token': csrfRoute(),
+      'POST /api/auth/invite/redeem': () =>
+        jsonResponse(200, {
+          status: 'success',
+          data: { status: 'authenticated', device: { id: 'd2', label: 'Tablet', role: 'device' } },
+        }),
+    })
+
+    render(<LoginScreen onAuthenticated={onAuthenticated} />)
+
+    await waitFor(() => expect(onAuthenticated).toHaveBeenCalledTimes(1))
+  })
+
+  it('shows a friendly message when the invitation is rejected', async () => {
+    setUrl('?invite=bad-token')
+    mockRoutes({
+      'GET /api/csrf-token': csrfRoute(),
+      'POST /api/auth/invite/redeem': () => jsonResponse(401, { status: 'error', code: 'invalid_invite' }),
+    })
+
+    render(<LoginScreen onAuthenticated={vi.fn()} />)
+
+    expect(await screen.findByText(/invalid or has already been used/i)).toBeDefined()
   })
 
   it('shows a rate limit message when connect is throttled', async () => {

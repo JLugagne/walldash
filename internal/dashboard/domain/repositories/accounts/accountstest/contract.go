@@ -16,6 +16,7 @@ type MockAccountRepository struct {
 	CreateFunc      func(ctx context.Context, account domain.Account) (domain.Account, error)
 	FindByIDFunc    func(ctx context.Context, id string) (domain.Account, error)
 	FindAllFunc     func(ctx context.Context) ([]domain.Account, error)
+	CountFunc       func(ctx context.Context) (int, error)
 	SetRoleFunc     func(ctx context.Context, id string, role domain.Role) (domain.Account, error)
 	UpdateLabelFunc func(ctx context.Context, id string, label string) error
 	RevokeFunc      func(ctx context.Context, id string) (domain.Account, error)
@@ -132,6 +133,14 @@ func AccountRepositoryContractTesting(t *testing.T, repo accounts.AccountReposit
 		assert.True(t, ids["acct-contract-default"])
 	})
 
+	t.Run("Contract: Count returns the number of accounts", func(t *testing.T) {
+		all, err := repo.FindAll(ctx)
+		require.NoError(t, err)
+		count, err := repo.Count(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, len(all), count)
+	})
+
 	t.Run("Contract: SetRole updates the role", func(t *testing.T) {
 		updated, err := repo.SetRole(ctx, "acct-contract-device", domain.RoleAdmin)
 		require.NoError(t, err)
@@ -207,4 +216,11 @@ func (m *MockAccountRepository) UpdateLabel(ctx context.Context, id string, labe
 		panic("called not defined UpdateLabelFunc")
 	}
 	return m.UpdateLabelFunc(ctx, id, label)
+}
+
+func (m *MockAccountRepository) Count(ctx context.Context) (int, error) {
+	if m.CountFunc == nil {
+		panic("called not defined CountFunc")
+	}
+	return m.CountFunc(ctx)
 }

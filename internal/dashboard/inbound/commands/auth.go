@@ -50,68 +50,45 @@ func SetupAuthRoutes(r *mux.Router, h *AuthHandler) {
 	limiter := ratelimit.NewTokenBucket(5, 12*time.Second)
 	limited := middleware.RateLimit(limiter, nil)
 	r.Handle("/api/auth/connect", limited(http.HandlerFunc(h.Connect))).Methods(http.MethodPost)
-	r.Handle("/api/auth/verify", limited(http.HandlerFunc(h.Verify))).Methods(http.MethodPost)
+	// Redeem is deliberately not rate limited: it carries an opaque single-use
+	// pending cookie (no guessable credential) and is polled while a device waits
+	// for owner approval, so throttling it would break the waiting screen.
+	r.HandleFunc("/api/auth/redeem", h.Redeem).Methods(http.MethodPost)
+	r.Handle("/api/auth/invite/redeem", limited(http.HandlerFunc(h.RedeemInvite))).Methods(http.MethodPost)
 	r.HandleFunc("/api/auth/refresh", h.Refresh).Methods(http.MethodPost)
 	r.HandleFunc("/api/auth/logout", h.Logout).Methods(http.MethodPost)
 }
 
-// Connect starts a device enrollment and sets the opaque pending cookie. The OTP code is
-// never returned to the caller.
+// Connect authenticates the first device automatically (or a rescue device), or registers the
+// caller as a pending enrollment waiting for owner approval. No secret is ever returned.
 func (h *AuthHandler) Connect(w http.ResponseWriter, r *http.Request) {
-	rec, err := h.auth.StartEnrollment(r.Context(), r.UserAgent(), clientIP(r))
+	outcome, err := h.auth.Connect(r.Context(), r.UserAgent(), clientIP(r))
 	if err != nil {
 		h.controller.SendError(w, r, err)
 		return
 	}
+	if outcome.Status == app.EnrollmentAuthenticated {
+		h.cookies.SetAccess(w, outcome.Tokens.AccessToken)
+		h.cookies.SetRefresh(w, outcome.Tokens.RefreshToken, outcome.Tokens.RefreshTokenExpiresAt, true)
+		clearPendingCookie(w)
+		h.controller.SendSuccess(w, r, map[string]any{
+			"status": "authenticated",
+			"device": devicePayload(outcome.Account),
+		})
+		return
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     pendingCookieName,
-		Value:    rec.PendingID,
+		Value:    outcome.Pending.PendingID,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   900,
 	})
-	h.controller.SendSuccess(w, r, map[string]string{"status": "pending"})
-}
-
-// Verify exchanges the pending cookie and OTP code for an account and a token pair.
-func (h *AuthHandler) Verify(w http.ResponseWriter, r *http.Request) {
-	pendingID, ok := pendingCookie(r)
-	if !ok {
-		middleware.WriteJSendError(w, http.StatusUnauthorized, "invalid_code", "invalid or expired code")
-		return
-	}
-
-	var body struct {
-		Code string `json:"code"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		middleware.WriteJSendError(w, http.StatusUnauthorized, "invalid_code", "invalid or expired code")
-		return
-	}
-	code := strings.TrimSpace(body.Code)
-	if code == "" {
-		middleware.WriteJSendError(w, http.StatusUnauthorized, "invalid_code", "invalid or expired code")
-		return
-	}
-
-	acct, pair, err := h.auth.VerifyEnrollment(r.Context(), pendingID, code)
-	if err != nil {
-		middleware.WriteJSendError(w, http.StatusUnauthorized, "invalid_code", "invalid or expired code")
-		return
-	}
-
-	h.cookies.SetAccess(w, pair.AccessToken)
-	h.cookies.SetRefresh(w, pair.RefreshToken, pair.RefreshTokenExpiresAt, true)
-	clearPendingCookie(w)
-
 	h.controller.SendSuccess(w, r, map[string]any{
-		"device": map[string]any{
-			"id":    acct.ID,
-			"label": acct.Label,
-			"role":  acct.Role,
-		},
+		"status":     "pending",
+		"expires_at": outcome.Pending.ExpiresAt,
 	})
 }
 
@@ -252,12 +229,16 @@ func (h *AuthHandler) SetRole(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// SetupSetupAuthRoutes registers the protected setup command endpoints on a router whose
-// base path is /api/setup/auth.
+// SetupSetupAuthRoutes registers the protected setup command endpoints on a router whose base
+// path is /api/setup/auth.
 func SetupSetupAuthRoutes(r *mux.Router, h *AuthHandler) {
 	r.HandleFunc("/devices/{id}/revoke", h.RevokeDevice).Methods(http.MethodPost)
 	r.HandleFunc("/devices/{id}/role", h.SetRole).Methods(http.MethodPost)
 	r.HandleFunc("/devices/{id}/label", h.SetLabel).Methods(http.MethodPost)
+	r.HandleFunc("/pending/{id}/approve", h.ApprovePending).Methods(http.MethodPost)
+	r.HandleFunc("/pending/{id}/deny", h.DenyPending).Methods(http.MethodPost)
+	r.HandleFunc("/invites", h.CreateInvite).Methods(http.MethodPost)
+	r.HandleFunc("/invites/{selector}/revoke", h.RevokeInvite).Methods(http.MethodPost)
 }
 
 func (h *AuthHandler) SetLabel(w http.ResponseWriter, r *http.Request) {

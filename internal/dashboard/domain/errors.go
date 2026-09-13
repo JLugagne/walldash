@@ -129,4 +129,24 @@ var (
 		Code:    "INVALID_LABEL",
 		Message: "invalid account label",
 	}
+	ErrInviteNotFound = &Error{
+		Code:    "INVITE_NOT_FOUND",
+		Message: "invitation not found",
+	}
+	ErrInviteExpired = &Error{
+		Code:    "INVITE_EXPIRED",
+		Message: "invitation expired",
+	}
+	ErrInviteRevoked = &Error{
+		Code:    "INVITE_REVOKED",
+		Message: "invitation revoked",
+	}
+	ErrInviteConsumed = &Error{
+		Code:    "INVITE_CONSUMED",
+		Message: "invitation already used",
+	}
+	ErrInvalidInviteRole = &Error{
+		Code:    "INVALID_INVITE_ROLE",
+		Message: "invitations may only grant the device or admin role",
+	}
 )

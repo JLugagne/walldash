@@ -1,60 +1,24 @@
 ---
 title: "Installation"
-description: "Install Walldash as a Home Assistant add-on or with Docker Compose, and connect it to your Home Assistant instance."
+description: "Install Walldash as a Home Assistant add-on, then open it on your first device."
 weight: 10
 ---
 
 ## As a Home Assistant add-on (recommended)
 
-The add-on is the simplest option: it connects to Home Assistant through the Supervisor API, so **no token setup is required**.
+The add-on is the easiest way to install Walldash. It connects to your Home Assistant automatically, so there is nothing to configure.
 
 1. In Home Assistant, open **Settings** → **Add-ons** → **Add-on Store**.
-2. Open the menu (**⋮**) → **Repositories** and add:
-   ```
-   https://github.com/JLugagne/ha-addons
-   ```
+2. Open the menu (**⋮**) → **Repositories** and add `https://github.com/JLugagne/ha-addons`.
 3. Find **Walldash** in the store, install it, then start it.
-4. Serve Walldash over **HTTPS** (put a TLS reverse proxy in front of it) and open the web UI on your tablets. Plain HTTP cannot hold the authentication cookies.
-5. Enroll the first device with the one-time code from the add-on log — see [Sign in & device access](/getting-started/sign-in/).
+4. Open the web address shown on the add-on page in a browser on your tablet or touchscreen.
 
-Data is stored in the add-on `/data` volume and survives updates and reboots. The wall tablets connect directly to Walldash, so **no Home Assistant login is needed** on them — each device signs in once with its own one-time code, and the first device becomes the owner.
+Your data is kept inside Home Assistant and survives updates and restarts. The tablets connect straight to Walldash, so they never need a Home Assistant login.
 
-## With Docker Compose
+To add more tablets later, see [Devices & access](/getting-started/sign-in/).
 
-Use this option if you run Home Assistant Core in Docker or want Walldash on a separate host.
+## With Docker (optional)
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/JLugagne/walldash.git
-   cd walldash
-   ```
-2. Create your configuration file:
-   ```bash
-   cp .env.example .env
-   ```
-3. Fill in your Home Assistant details:
-   ```env
-   HA_URL=http://homeassistant.local:8123
-   HA_TOKEN=your_long_lived_access_token_here
-   PORT=8080
-   DB_PATH=/app/data/walldash.db
-   ```
-4. Start it:
-   ```bash
-   docker compose up -d
-   ```
-5. Put a TLS reverse proxy in front of it and open `https://<your-domain>` on your tablets. Plain HTTP cannot hold the authentication cookies.
-6. Read the first `otp_issued` code from `docker compose logs` and enter it on the sign-in screen — see [Sign in & device access](/getting-started/sign-in/).
+If you prefer to run Walldash yourself, a ready-made container image and the Docker instructions are available in the [repository README](https://github.com/JLugagne/walldash).
 
-## Generating an access token
-
-The token is only needed for Docker deployments and manual setups. The add-on uses the Supervisor token automatically.
-
-1. Open your Home Assistant web interface.
-2. Click your user profile icon (bottom left).
-3. Scroll to the **Security** tab → **Long-Lived Access Tokens**.
-4. Click **Create Token**, name it `Walldash`, and copy the value into your `.env` file.
-
-> Walldash only ever performs an allow-listed set of actions against Home Assistant: **on/off toggles** and **automation triggering**. It never forwards arbitrary service calls.
-
-When `HA_URL` or `HA_TOKEN` is missing, Walldash starts in **demo mode** and shows a set of built-in example devices. This is useful to explore the interface before connecting a real instance.
+Open Walldash on your first device — it becomes the owner.

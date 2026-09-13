@@ -28,6 +28,7 @@ func main() {
 	haToken := configValue("HA_TOKEN", "ha_token", "", options)
 	tokenSecret := configValue("TOKEN_SECRET", "token_secret", "", options)
 	secretKey := configValue("SECRET_KEY", "secret_key", "", options)
+	rescueMode := configBool("RESCUE_MODE", "rescue_mode", false, options)
 	haURL, haToken = resolveHAConfig(haURL, haToken, os.Getenv(supervisorTokenEnv))
 	if haURL == "" {
 		haURL = "http://homeassistant.local:8123"
@@ -36,6 +37,9 @@ func main() {
 		logrus.WithField("ha_host", haHost(haURL)).Warn("HA_URL uses plain HTTP: the Home Assistant access token will be sent in cleartext; use https:// or a trusted management network")
 	}
 	logrus.WithFields(logrus.Fields{"ha_source": haSourceLabel(haURL), "ha_host": haHost(haURL), "ha_token_set": haToken != ""}).Info("home assistant configuration resolved")
+	if rescueMode {
+		logrus.Warn("rescue_mode is enabled: the next unauthenticated device will claim the owner role, then the mode is consumed; set rescue_mode to false once recovery is complete")
+	}
 	frontendDir := os.Getenv("FRONTEND_DIR")
 	allowedOrigins := resolveAllowedOrigins(options)
 
@@ -49,6 +53,7 @@ func main() {
 		AllowedOrigins: allowedOrigins,
 		TokenSecret:    tokenSecret,
 		SecretKey:      secretKey,
+		RescueMode:     rescueMode,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

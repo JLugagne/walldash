@@ -57,54 +57,10 @@ function run(cmd, args, opts = {}) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 // ---------------------------------------------------------------------------
-// Backend log tailing — the device OTP is only exposed in the logs (and the
-// authenticated setup tab) on first enrollment, so the harness reads it there.
+// Backend log mirroring. Device onboarding no longer emits any secret, so the
+// harness simply forwards the child's output.
 // ---------------------------------------------------------------------------
 
-const otpBacklog = []
-const otpWaiters = []
-
-function publishOtp(code) {
-  const waiter = otpWaiters.shift()
-  if (waiter) waiter(code)
-  else otpBacklog.push(code)
-}
-
-// nextOtp resolves with the next `otp_issued` code, or rejects after a timeout.
-function nextOtp(timeoutMs = 15000) {
-  if (otpBacklog.length) return Promise.resolve(otpBacklog.shift())
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      const index = otpWaiters.indexOf(waiter)
-      if (index !== -1) otpWaiters.splice(index, 1)
-      reject(new Error('timed out waiting for an otp_issued log line'))
-    }, timeoutMs)
-    const waiter = (code) => {
-      clearTimeout(timer)
-      resolve(code)
-    }
-    otpWaiters.push(waiter)
-  })
-}
-
-function handleBackendLine(line, out) {
-  out.write(`${line}\n`)
-  if (!line.includes('otp_issued')) return
-  let code = null
-  try {
-    const parsed = JSON.parse(line)
-    if (parsed && typeof parsed.code === 'string') code = parsed.code
-  } catch {
-    /* not JSON */
-  }
-  if (!code) {
-    const match = line.match(/\bcode["']?\s*[:=]\s*["']?(\d{4,8})/)
-    if (match) code = match[1]
-  }
-  if (code) publishOtp(code)
-}
-
-// wireBackendLogs forwards the child's output and scans it for OTP codes.
 function wireBackendLogs(child) {
   for (const [stream, out] of [
     [child.stdout, process.stdout],
@@ -118,11 +74,11 @@ function wireBackendLogs(child) {
       while ((index = buffer.indexOf('\n')) !== -1) {
         const line = buffer.slice(0, index).replace(/\r$/, '')
         buffer = buffer.slice(index + 1)
-        handleBackendLine(line, out)
+        out.write(`${line}\n`)
       }
     })
     stream.on('end', () => {
-      if (buffer) handleBackendLine(buffer, out)
+      if (buffer) out.write(`${buffer}\n`)
     })
   }
 }
@@ -206,10 +162,10 @@ function cookieHeader(jar = session.cookies) {
   return [...jar.entries()].map(([name, value]) => `${name}=${value}`).join('; ')
 }
 
-// authenticate signs the harness in as the first device (`owner`): POST
-// connect, read the one-time code from the backend logs, then POST verify.
+// authenticate signs the harness in as the first device. On an empty accounts
+// table `POST /api/auth/connect` promotes it to owner and sets the auth cookies
+// directly — there is no one-time code involved any more.
 async function authenticate(label = 'Walldash manual (harness)') {
-  const codePromise = nextOtp()
   const connectRes = await fetch(`${BASE}/api/auth/connect`, {
     method: 'POST',
     headers: { Origin: BASE, 'User-Agent': label },
@@ -218,22 +174,10 @@ async function authenticate(label = 'Walldash manual (harness)') {
   if (!connectRes.ok) {
     throw new Error(`auth connect → HTTP ${connectRes.status}: ${(await connectRes.text()).slice(0, 200)}`)
   }
-  const code = await codePromise
-  const verifyRes = await fetch(`${BASE}/api/auth/verify`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Origin: BASE,
-      'User-Agent': label,
-      Cookie: cookieHeader(),
-    },
-    body: JSON.stringify({ code }),
-  })
-  storeCookies(verifyRes)
-  if (!verifyRes.ok) {
-    throw new Error(`auth verify → HTTP ${verifyRes.status}: ${(await verifyRes.text()).slice(0, 200)}`)
+  const payload = await connectRes.json()
+  if (payload?.data?.status !== 'authenticated') {
+    throw new Error(`auth connect did not authenticate this device (status: ${payload?.data?.status})`)
   }
-  const payload = await verifyRes.json()
   return payload?.data?.device
 }
 
@@ -243,7 +187,7 @@ async function clearAuthState(dbPath) {
   const { DatabaseSync } = await import('node:sqlite')
   const db = new DatabaseSync(dbPath)
   try {
-    for (const table of ['auth_refresh_tokens', 'auth_accounts']) {
+    for (const table of ['auth_invites', 'auth_refresh_tokens', 'auth_accounts']) {
       try {
         db.exec(`DELETE FROM ${table};`)
       } catch {
@@ -559,8 +503,8 @@ async function capture({ groundId, dashboardId }) {
   }
 
   // Sign-in screen: a fresh, cookie-less context lands on LoginScreen, which
-  // requests an enrollment on mount ("Waiting for approval" + 6-digit code
-  // field). This also leaves a pending code for setup-access.png.
+  // starts a pending enrollment (an owner already exists at this point). This
+  // also leaves a pending device for setup-access.png.
   const loginContext = await browser.newContext({
     viewport: IPAD_LANDSCAPE,
     deviceScaleFactor: DEVICE_SCALE_FACTOR,
@@ -571,7 +515,6 @@ async function capture({ groundId, dashboardId }) {
   })
   await shot('login', '/', async (page) => {
     await page.getByText('Waiting for approval').waitFor({ timeout: 10000 })
-    await page.locator('#otp-code').waitFor({ timeout: 10000 })
   }, loginContext, { canvas: false })
   await loginContext.close()
 
@@ -592,9 +535,11 @@ async function capture({ groundId, dashboardId }) {
   await shot('setup-devices', '/setup/devices')
   await shot('setup-dashboards', '/setup/dashboards')
   await shot('setup-settings', '/setup/settings')
+  // Seed an invitation so the Access panel shows both sections, then capture it.
+  await api('/api/setup/auth/invites', { method: 'POST', body: { role: 'device' } })
   await shot('setup-access', '/setup/access', async (page) => {
     await page.getByRole('heading', { name: 'Access' }).waitFor({ timeout: 10000 })
-    await page.getByText('Pending enrollments').waitFor({ timeout: 8000 })
+    await page.getByText('Pending approvals').waitFor({ timeout: 8000 })
   }, context, { canvas: false })
 
   // Phone flow: same dashboard, viewport below the 640 px breakpoint. deviceScaleFactor 2 keeps
@@ -667,11 +612,10 @@ async function main() {
       HA_TOKEN: '',
       PORT: String(PORT),
       DB_PATH: dbPath,
-      // info (not warn) so the `otp_issued` code is logged for the harness.
-      LOG_LEVEL: 'info',
+      LOG_LEVEL: 'warn',
       FRONTEND_DIR: path.join(FRONTEND_DIR, 'dist'),
     },
-    // Piped (not inherited) so the harness can parse the `otp_issued` code.
+    // Piped (not inherited) so the harness can mirror the backend output.
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   wireBackendLogs(backend)

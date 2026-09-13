@@ -19,8 +19,8 @@ weight: 1
 ## Where to start
 
 {{< cards >}}
-{{< card href="/getting-started/installation/" title="Installation" desc="Add Walldash to Home Assistant or run it with Docker Compose." >}}
-{{< card href="/getting-started/sign-in/" title="Sign in" desc="Enroll each tablet with a one-time code and manage device roles." >}}
+{{< card href="/getting-started/installation/" title="Installation" desc="Add Walldash to Home Assistant and open it on your first device." >}}
+{{< card href="/getting-started/sign-in/" title="Devices & access" desc="Each tablet gets its own access, approved from the setup screen." >}}
 {{< card href="/getting-started/onboarding/" title="First run" desc="Import your plan or start from a blank level." >}}
 {{< card href="/using/floor-view/" title="Daily use" desc="Learn the 3D floor view, layers and device controls." >}}
 {{< /cards >}}

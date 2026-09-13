@@ -73,7 +73,7 @@ login screen even though the browser URL is HTTPS.
 | `502 Bad Gateway` | NPM cannot reach Walldash: check forward host/port, and that the container/add-on is running. From the NPM host, `curl http://<host>:<port>/api/health` must return `ok`. |
 | Toggles work but states never update live | **Websockets Support** is off on the Proxy Host — enable it. |
 | Browser mixed-content warnings / redirect loop | **Force SSL** on, and open only the `https://` URL. |
-| Login screen loops after entering the OTP | The auth cookies were dropped: make sure the proxy forwards `X-Forwarded-Proto: https`, and set `DOMAIN` (or `allowed_origins`) if it rewrites `Host`. |
+| Login screen loops after signing in | The auth cookies were dropped: make sure the proxy forwards `X-Forwarded-Proto: https`, and set `DOMAIN` (or `allowed_origins`) if it rewrites `Host`. |
 | Certificate fails (HTTP challenge) | Port 80 must reach NPM from the internet — check the router forward, or switch to DNS challenge. |
 | Works on LAN but not remotely | Router port-forward `80`/`443` → NPM host missing, or DNS record pointing at the wrong (e.g. CGNAT) IP. |
 

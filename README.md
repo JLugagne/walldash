@@ -73,7 +73,7 @@
 1. Add the add-on repository to Home Assistant: **Settings** → **Add-ons** → **Add-on Store** → menu (⋮) → **Repositories**, then add `https://github.com/JLugagne/ha-addons`.
 2. Install **Walldash** from the store and start it. No Home Assistant API token setup is required: the add-on connects through the Supervisor API automatically.
 3. Reach the Walldash web UI on your wall tablets **over HTTPS** (terminate TLS in a reverse proxy in front of the add-on, see [`docs/reverse-proxy.md`](docs/reverse-proxy.md)). Plain HTTP cannot hold the authentication cookies.
-4. Enroll the first device with the one-time code from the add-on log (see [Device authentication](#-device-authentication-otp)). Data is stored in the add-on `/data` volume and survives updates and reboots.
+4. Open Walldash on the first tablet; it becomes the **owner** automatically (see [Device authentication](#-device-authentication)). Data is stored in the add-on `/data` volume and survives updates and reboots.
 
 See [`docs/home-assistant-add-on.md`](docs/home-assistant-add-on.md) for packaging details, add-on options, and the release process.
 
@@ -121,40 +121,47 @@ To generate a Long-Lived Access Token:
 
 ---
 
-## 🔐 Device Authentication (OTP)
+## 🔐 Device Authentication
 
 Walldash authenticates each screen itself — tablets never log in with a Home Assistant account.
 Every device is its own anonymous Walldash account with its own subject UUID, which keeps wall
 panels usable in kiosk mode (no Home Assistant session, no long-lived HA token on the device)
 while still letting you decide which screens may change the dashboard.
 
-### Why a one-time code
+### How a device joins
 
-There is no password to share and nothing to provision in Home Assistant. Instead a device
-proves it belongs to this Walldash instance by entering a short-lived, single-use one-time code
-(OTP) that an operator reads from the server side. The API never returns the code, so a device
-cannot simply enroll itself.
+There is no password to share and nothing to provision in Home Assistant. Access is granted in
+three ways:
 
-### Enrollment flow
+1. **First device (bootstrap).** When the accounts table is empty, the first device to call
+   `POST /api/auth/connect` is immediately created as **owner** and signed in. Nothing secret
+   is logged: the first person to open a fresh instance owns it, so complete setup promptly and
+   keep the instance on a trusted network.
+2. **Owner approval.** Any later device that connects with no invitation becomes a **pending**
+   enrollment. An owner or admin sees its label in **Setup → Access** and clicks **Approve**
+   (or **Deny**); the waiting device then redeems its pending cookie and signs in as `device`.
+3. **Invitations.** An owner or admin can mint a **single-use invitation** in
+   **Setup → Access**, valid for **15 minutes** and revocable. The plaintext link/token is shown
+   once; a device that opens it (`…/?invite=<token>`) or submits the token signs in with the
+   invited role. Only `device` and `admin` can be invited.
 
-1. A device with no auth cookie calls `POST /api/auth/connect`. Walldash creates a **pending**
-   device account bound to that device and issues an OTP valid for **15 minutes**.
-2. The code is delivered where an operator can read it — never in the HTTP response:
-   - written to the container/add-on log as `otp_issued` (the JSON field is `code`); this is the
-     intended channel and the only one available for the very first device;
-   - listed in **Setup → Access** once an `owner` or `admin` device exists.
-3. The user types the code into the app, which calls `POST /api/auth/verify`. On success
-   Walldash promotes the pending device to a real account and sets two cookies:
-   - an **access token** — 15 minutes;
-   - a **refresh token** — 60 days, rotated on every refresh.
-4. The first device ever to verify becomes **owner**; every later device becomes **device**.
+In every case the device receives two cookies:
+
+- an **access token** — 15 minutes, carrying the account's roles and capability scopes
+  (`setup:manage` for owner/admin);
+- a **refresh token** — 60 days, rotated on every refresh.
+
+`rescue_mode` is a recovery switch for a lost owner device: while enabled, the next
+unauthenticated device to connect claims the owner role even though accounts exist. It is
+consumed after that single use and re-armed by a restart, so set it back to `false` once
+recovery is complete. The server logs a warning at startup and when it is used.
 
 ### Roles
 
 | Role | Can do |
 | --- | --- |
-| `owner` | The first enrolled device. Everything an `admin` can do, plus grant/remove the `owner` role, promote/demote `admin`, and revoke any device. |
-| `admin` | Manage devices (promote to `admin`, demote to `device`), revoke devices, and read pending enrollment codes. |
+| `owner` | The first device (or a rescue device). Everything an `admin` can do, plus grant/remove the `owner` role, promote/demote `admin`, and revoke any device. |
+| `admin` | Manage devices (promote to `admin`, demote to `device`), create invitations, approve pending devices, and revoke devices. |
 | `device` | Use the dashboard only; no Setup access. |
 
 Only an `owner` may grant or remove the `owner` role, so an `admin` cannot escalate itself.
@@ -200,11 +207,11 @@ refreshes over HTTP and reconnects; the socket handshake cannot refresh on its o
 device therefore stops receiving live updates within at most 15 minutes, like any other
 protected call.
 
-### First-device bootstrap
+### Recovery
 
-Before any authenticated device exists there is no **Setup → Access** yet, so read the very first
-`otp_issued` code from the container/add-on log and enter it on the first tablet. That device
-becomes `owner`.
+If the owner device is lost, enable the add-on `rescue_mode` option (or `RESCUE_MODE=true`), then
+open Walldash on the device that should become the new owner. Once it has claimed the role, set
+`rescue_mode` back to `false`. There is no code to read and nothing secret is written to the logs.
 
 ---
 
@@ -220,6 +227,7 @@ Settings resolve with the following precedence: **environment variable** → **a
 | `HA_TOKEN` | _(empty)_ | Long-lived access token. Not needed when running as an add-on: `SUPERVISOR_TOKEN` is used automatically via the Supervisor API proxy. The Supervisor token is never attached to a custom `HA_URL`. |
 | `TOKEN_SECRET` | _(auto-generated + persisted)_ | HS256 key used to sign access/refresh tokens, at least 32 bytes. Leave empty to generate one on first boot and persist it in the database; keep it stable, changing it invalidates all sessions. |
 | `SECRET_KEY` | _(empty)_ | Optional 32-character key-encryption key (AES-256-GCM) that encrypts the auto-generated `TOKEN_SECRET` before it is stored, so a database copy or snapshot does not expose the signing key. Keep it stable and backed up; removing it after use fails closed. Also settable as the add-on option `secret_key`. |
+| `RESCUE_MODE` | `false` | Recovery switch. When `true`, the next unauthenticated device claims the `owner` role even if accounts already exist. One-shot (consumed after the first use); set it back to `false` once recovery is complete. Also settable as the add-on option `rescue_mode`. |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error`. |
 | `ALLOWED_ORIGINS` | _(empty)_ | Comma-separated trusted origins for CORS, CSRF and the same-origin check, needed when a reverse proxy rewrites the `Host` header. Accepts `https://host` or a bare `host`. Also settable as the add-on option `allowed_origins`. |
 | `DOMAIN` | _(empty)_ | Public hostname of this Walldash instance, used for the CORS `Access-Control-Allow-Origin` header and the CSRF/same-origin checks. Accepts a bare host, `http://host` or `https://host`; an optional port is kept and any path/query is ignored. Merged with `ALLOWED_ORIGINS`. Also settable as the add-on option `domain`. |

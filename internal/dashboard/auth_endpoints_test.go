@@ -142,6 +142,8 @@ func requireJSendCode(t *testing.T, resp *http.Response, want string) {
 	assert.Equal(t, want, out.Code)
 }
 
+// TestAuthEndpointsFlow exercises first-run owner bootstrap, session refresh/logout and the
+// WebSocket auth requirement end to end.
 func TestAuthEndpointsFlow(t *testing.T) {
 	ctx, dash, server, client := setupAuthServer(t)
 
@@ -153,28 +155,18 @@ func TestAuthEndpointsFlow(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.False(t, decodeAuthenticated(t, resp))
 
+	// The first device on an empty database becomes the owner with no code at all.
 	resp = client.do(http.MethodPost, "/api/auth/connect", nil, nil)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	connectBody := readBody(t, resp)
-	require.Contains(t, connectBody, `"status":"pending"`)
+	require.Contains(t, connectBody, `"status":"authenticated"`)
+	require.Contains(t, connectBody, `"role":"owner"`)
 	require.NotContains(t, connectBody, `"code"`)
-
-	pending := dash.Auth.ListPending(ctx)
-	require.Len(t, pending, 1)
-	code := pending[0].Code
-	require.Len(t, code, 6)
-
-	resp = client.do(http.MethodGet, "/api/health", nil, nil)
-	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-
-	resp = client.do(http.MethodPost, "/api/auth/verify", map[string]string{"code": code}, nil)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	verifyBody := readBody(t, resp)
-	require.Contains(t, verifyBody, `"role":"owner"`)
 	require.Empty(t, dash.Auth.ListPending(ctx))
 
 	resp = client.do(http.MethodGet, "/api/health", nil, nil)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
 
 	resp = client.do(http.MethodGet, "/api/auth/me", nil, nil)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -218,27 +210,8 @@ func TestAuthEndpointsFlow(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, wsResp.StatusCode)
 }
 
-func TestAuthVerifyRejectsBadCode(t *testing.T) {
-	ctx, dash, _, client := setupAuthServer(t)
-
-	resp := client.do(http.MethodPost, "/api/auth/connect", nil, nil)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	resp.Body.Close()
-
-	pending := dash.Auth.ListPending(ctx)
-	require.Len(t, pending, 1)
-	bad := "000000"
-	if bad == pending[0].Code {
-		bad = "111111"
-	}
-
-	resp = client.do(http.MethodPost, "/api/auth/verify", map[string]string{"code": bad}, nil)
-	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-	requireJSendCode(t, resp, "invalid_code")
-}
-
 func TestWebSocketRequiresValidAccessCookie(t *testing.T) {
-	ctx, dash, server, client := setupAuthServer(t)
+	_, dash, server, client := setupAuthServer(t)
 
 	wsURL := "wss" + strings.TrimPrefix(server.URL, "https") + "/api/ws"
 	dialer := websocket.Dialer{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
@@ -268,13 +241,6 @@ func TestWebSocketRequiresValidAccessCookie(t *testing.T) {
 
 	t.Run("with valid access cookie upgrades", func(t *testing.T) {
 		resp := client.do(http.MethodPost, "/api/auth/connect", nil, nil)
-		require.Equal(t, http.StatusOK, resp.StatusCode)
-		resp.Body.Close()
-
-		pending := dash.Auth.ListPending(ctx)
-		require.Len(t, pending, 1)
-
-		resp = client.do(http.MethodPost, "/api/auth/verify", map[string]string{"code": pending[0].Code}, nil)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		resp.Body.Close()
 

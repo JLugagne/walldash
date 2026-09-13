@@ -10,17 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// enrollClient signs a client in as the first device (owner bootstrap) or as an approved device,
+// returning the device id and role.
 func enrollClient(t *testing.T, ctx context.Context, dash *Dashboard, client *authTestClient) (string, string) {
 	t.Helper()
-	resp := client.do(http.MethodPost, "/api/auth/connect", nil, nil)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	resp.Body.Close()
-
-	pending := dash.Auth.ListPending(ctx)
-	require.NotEmpty(t, pending)
-
-	resp = client.do(http.MethodPost, "/api/auth/verify", map[string]string{"code": pending[len(pending)-1].Code}, nil)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var out struct {
 		Status string `json:"status"`
 		Data   struct {
@@ -30,6 +23,25 @@ func enrollClient(t *testing.T, ctx context.Context, dash *Dashboard, client *au
 			} `json:"device"`
 		} `json:"data"`
 	}
+
+	resp := client.do(http.MethodPost, "/api/auth/connect", nil, nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	body := readBody(t, resp)
+
+	// The first device on an empty database is authenticated immediately as owner.
+	if strings.Contains(body, `"status":"authenticated"`) {
+		require.NoError(t, json.Unmarshal([]byte(body), &out))
+		return out.Data.Device.ID, out.Data.Device.Role
+	}
+
+	// Otherwise the device is pending: approve it server-side (as the owner would) and redeem.
+	pending := dash.Auth.ListPending(ctx)
+	require.NotEmpty(t, pending)
+	_, err := dash.Auth.ApprovePending(ctx, pending[len(pending)-1].PendingID)
+	require.NoError(t, err)
+
+	resp = client.do(http.MethodPost, "/api/auth/redeem", nil, nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 	resp.Body.Close()
 	require.Equal(t, "success", out.Status)
@@ -51,9 +63,10 @@ func TestSetupEndpointsOwnerView(t *testing.T) {
 	var pendingResp struct {
 		Status string `json:"status"`
 		Data   []struct {
+			PendingID string `json:"pending_id"`
 			DeviceID  string `json:"device_id"`
 			Label     string `json:"label"`
-			Code      string `json:"code"`
+			Approved  bool   `json:"approved"`
 			ExpiresAt string `json:"expires_at"`
 		} `json:"data"`
 	}
@@ -62,7 +75,8 @@ func TestSetupEndpointsOwnerView(t *testing.T) {
 	require.Equal(t, "success", pendingResp.Status)
 	require.Len(t, pendingResp.Data, 1)
 	require.NotEmpty(t, pendingResp.Data[0].DeviceID)
-	require.Len(t, pendingResp.Data[0].Code, 6)
+	require.NotEmpty(t, pendingResp.Data[0].PendingID)
+	require.False(t, pendingResp.Data[0].Approved)
 	require.NotEmpty(t, pendingResp.Data[0].ExpiresAt)
 
 	resp = owner.do(http.MethodGet, "/api/setup/auth/devices", nil, nil)

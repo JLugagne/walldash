@@ -17,8 +17,6 @@ import (
 
 	"github.com/JLugagne/egauth/keystore"
 	"github.com/JLugagne/egauth/origin"
-	"github.com/JLugagne/egauth/otp"
-	otpmemory "github.com/JLugagne/egauth/otp/memory"
 	"github.com/JLugagne/egauth/revocation"
 	"github.com/JLugagne/egauth/tokens"
 	"github.com/JLugagne/egauth/tokens/basic"
@@ -53,6 +51,10 @@ type Config struct {
 	// auto-generated JWT signing secret is envelope-encrypted (AES-256-GCM) before it is
 	// persisted, so a database copy or snapshot alone never yields the signing key.
 	SecretKey string
+	// RescueMode lets the next unauthenticated device claim the owner role even when
+	// accounts already exist. It is a one-shot recovery switch (consumed after one use)
+	// and must be disabled again once recovery is complete.
+	RescueMode bool
 }
 
 // Dashboard represents the initialized composition root for the dashboard service.
@@ -61,7 +63,6 @@ type Dashboard struct {
 	Adapter      *sqlite.Adapter
 	Hub          *websocket.Hub
 	TokenManager middleware.TokenManager
-	OTPService   otp.Service
 	Issuer       *basic.Issuer
 	TokenStore   *sqlite.TokensStore
 	Cookies      tokens.Cookies
@@ -112,12 +113,6 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	}
 
 	cookies := tokens.DefaultCookies()
-	otpSvc := otp.NewService(
-		otpmemory.NewStore(),
-		otp.WithTTL(15*time.Minute),
-		otp.WithMaxAttempts(5),
-		otp.WithCooldown(30*time.Second),
-	)
 	tokenStore := sqlite.NewTokensStore(adapter.DB())
 	accountRepo := sqlite.NewAccountRepository(adapter.DB())
 
@@ -151,7 +146,8 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	revocationBus := revocation.NewMemBus()
 	revocationTracker := tokens.NewRevocationTracker(revocationBus)
 
-	authApp := app.NewAuth(otpSvc, accountRepo, issuer, tokenStore, revocationBus)
+	inviteRepo := sqlite.NewInviteRepository(adapter.DB())
+	authApp := app.NewAuth(accountRepo, inviteRepo, issuer, tokenStore, revocationBus, conf.RescueMode)
 
 	haClient := homeassistant.NewClient(conf.HAUrl, conf.HAToken, nil)
 	application := app.New(adapter, adapter, adapter, adapter, haClient, adapter, adapter, adapter, conf.Version)
@@ -208,7 +204,8 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	// tagged as device-safe at registration time (middleware.DeviceSafeRoutePrefix).
 	adminWriteExempt := []string{
 		"/api/auth/connect",
-		"/api/auth/verify",
+		"/api/auth/redeem",
+		"/api/auth/invite/redeem",
 		"/api/auth/refresh",
 		"/api/auth/logout",
 	}
@@ -217,7 +214,8 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 
 	publicAPIPaths := []string{
 		"/api/auth/connect",
-		"/api/auth/verify",
+		"/api/auth/redeem",
+		"/api/auth/invite/redeem",
 		"/api/auth/refresh",
 		"/api/auth/logout",
 		"/api/auth/status",
@@ -234,7 +232,6 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		Adapter:      adapter,
 		Hub:          wsHub,
 		TokenManager: tokenManager,
-		OTPService:   otpSvc,
 		Issuer:       issuer,
 		TokenStore:   tokenStore,
 		Cookies:      cookies,

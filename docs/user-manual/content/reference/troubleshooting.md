@@ -4,40 +4,53 @@ description: "Common issues with Walldash and how to solve them."
 weight: 30
 ---
 
+## I cannot reach the Walldash web page
+
+- Make sure Walldash is running. For the Home Assistant add-on, open the add-on page and check that it is started.
+- Check that the tablet is on the same network as the machine running Walldash.
+- Open the web address shown on the add-on page, or the one your installer gave you.
+- If you use a reverse proxy, make sure it handles the connection correctly — see [Publishing on the internet](/reference/reverse-proxy/).
+
 ## The dashboard shows example devices
 
-Walldash is running in **demo mode**, which means `HA_URL` or `HA_TOKEN` is empty. Set both and restart the container. When running as a Home Assistant add-on, the token is provided automatically — check the add-on logs for the resolved Home Assistant configuration.
+Walldash is showing its built-in demo home instead of your real devices. For the Home Assistant add-on, open the add-on page and check that Walldash is started and connected to Home Assistant.
 
-## I keep returning to the sign-in screen (login loop)
+## Some devices are missing or cannot be controlled
 
-This almost always means the browser is not on HTTPS. Walldash's auth cookies are `__Host-` + `Secure`, and browsers silently drop them over plain HTTP, so the sign-in never sticks. Reach Walldash through HTTPS.
+Walldash only controls the devices it supports: lights, switches, plugs and automations. A device that is read-only, or that Walldash does not support yet, may appear without a control button. If a device you expect is missing completely, check that it is set up in Home Assistant first.
 
-If you already use a reverse proxy, check that it forwards `X-Forwarded-Proto: https` so Walldash sees the original scheme. If the proxy rewrites the `Host` header, set `DOMAIN` to the browser-facing hostname; otherwise the CORS and same-origin checks reject the request. See [Custom domain & HTTPS](/reference/reverse-proxy/) and [Configuration](/reference/configuration/).
+## A device cannot sign in
 
-## I cannot find the first one-time code
+A new device waits on the access screen until an owner or admin lets it in.
 
-The **first device** has no authenticated **Setup → Access** tab yet, so read the code from the server log instead. Look for an `otp_issued` line in the add-on log or `docker compose logs`; it contains the six-digit code, the device label and the client IP. Enter it on the sign-in screen to bootstrap the installation as **owner**. After that, later codes also appear under **Setup → Access**.
+1. On an owner or admin device, open **Setup → Access**.
+2. Either approve the waiting device under **Pending approvals**, or create an invitation and open its link on the new device.
+
+See [Devices & access](/getting-started/sign-in/) for the steps.
 
 ## I revoked a device but it still works
 
-Revocation is not instant. Revoking deletes the device's refresh tokens immediately, but an access token that was already issued remains valid until it expires — up to **15 minutes** — because there is no deny-list. The device stops working when its access token expires and it cannot refresh.
+A revoked device loses access shortly after — within about **15 minutes**. Wait a few minutes and try again.
 
-## Device states do not update
+## The owner device is lost
 
-Real-time updates use a WebSocket at `/api/ws`. If you access Walldash through a reverse proxy, make sure **WebSockets support** is enabled. States will still update on a manual page refresh even when the WebSocket is blocked.
+You can make another device the owner with Rescue mode:
 
-## A device is listed but cannot be controlled
+1. In the add-on configuration, turn on the **Rescue mode** option.
+2. Restart the add-on.
+3. Open Walldash on the device that should become the new owner.
+4. Turn **Rescue mode** back off.
 
-Walldash only controls **allow-listed** operations: on/off toggles and automation triggering. Domains without a supported control (for example a read-only diagnostic sensor) appear but have no primary action.
+See [Settings](/reference/configuration/) for where the option lives.
 
-## The 3D view is empty or distorted after an import
+## The 3D view looks empty or distorted
 
-Very large or degenerate `.sh3d` geometry can produce unusual plans. Open the level in the 2D editor and check that rooms form closed polygons and that walls have a sane thickness. Re-exporting the file from Sweet Home 3D with a simpler model usually fixes it.
+A very large or unusual plan can confuse the 3D view. Open the level in the 2D editor and check that rooms are closed and walls look right. Re-exporting a simpler plan from Sweet Home 3D usually fixes it.
 
 ## I lost my layout after an update
 
-Data lives in the `/data` volume (add-on) or in the `DB_PATH` file (Docker). Make sure that volume or file is mounted persistently. Use the **export** feature to keep a portable JSON backup.
+Use the **export** feature in Walldash to save a copy of your home, and restore it if something goes wrong. When running as an add-on, your data is stored inside Home Assistant and survives updates.
 
-## Where are the logs?
+## Still stuck?
 
-Set `LOG_LEVEL=debug` for verbose logs. In the add-on, logs are available from the add-on page in Home Assistant; with Docker, use `docker compose logs -f`.
+Open an issue on the project's GitHub page and describe what you see.

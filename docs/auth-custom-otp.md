@@ -1,5 +1,11 @@
 # Custom OTP authentication — integration plan
 
+> **Superseded.** Walldash no longer uses OTP codes. Device access now uses first-run
+> owner bootstrap, owner-approved pending enrollments, single-use 15-minute invitations and
+> a `rescue_mode` recovery switch. See `README.md` (Device Authentication) and
+> `docs/adr/0006-first-device-auto-owner-invitations-and-rescue.md`. This document is kept
+> for historical context only.
+
 Status: implemented (see §15 for deviations found during implementation)
 Decisions source: `.questions/2026-09-12-auth-custom-otp.md`
 Libraries: `github.com/JLugagne/egauth/otp` + `github.com/JLugagne/egauth/tokens` (+ `tokens/basic`, `tokens/memory`)

@@ -170,3 +170,27 @@ func TestResolveAllowedOriginsReadsAddonOption(t *testing.T) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}
 }
+
+func TestConfigBool(t *testing.T) {
+	options := map[string]string{"rescue_mode": "true"}
+
+	if got := configBool("WALLDASH_MISSING_RESCUE_ENV", "rescue_mode", false, options); !got {
+		t.Fatalf("expected add-on option to enable rescue, got %v", got)
+	}
+	if got := configBool("WALLDASH_MISSING_RESCUE_ENV2", "missing", true, options); !got {
+		t.Fatalf("expected fallback true, got %v", got)
+	}
+	if got := configBool("WALLDASH_MISSING_RESCUE_ENV3", "missing", false, options); got {
+		t.Fatalf("expected fallback false, got %v", got)
+	}
+
+	t.Setenv("WALLDASH_RESCUE_ENV", "off")
+	if got := configBool("WALLDASH_RESCUE_ENV", "rescue_mode", true, options); got {
+		t.Fatalf("expected the environment variable to win and disable rescue, got %v", got)
+	}
+
+	t.Setenv("WALLDASH_RESCUE_ENV", "yes")
+	if got := configBool("WALLDASH_RESCUE_ENV", "rescue_mode", false, options); !got {
+		t.Fatalf("expected yes to enable rescue, got %v", got)
+	}
+}

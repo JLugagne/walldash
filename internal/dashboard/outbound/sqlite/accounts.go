@@ -183,3 +183,13 @@ func (r *accountRepo) UpdateLabel(ctx context.Context, id string, label string) 
 	}
 	return nil
 }
+
+func (r *accountRepo) Count(ctx context.Context) (int, error) {
+	log := logger.LoggerFromContext(ctx)
+	var count int
+	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM auth_accounts`).Scan(&count); err != nil {
+		log.WithError(err).Error("failed to count accounts")
+		return 0, errors.Join(domain.ErrDatabaseUnavailable, err)
+	}
+	return count, nil
+}

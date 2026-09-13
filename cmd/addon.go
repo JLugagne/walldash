@@ -202,3 +202,18 @@ func originHostKey(origin string) string {
 	}
 	return strings.ToLower(origin)
 }
+
+// configBool resolves a boolean setting with the same precedence as configValue: environment
+// variable first, then add-on option, then fallback. It accepts true/false, 1/0, yes/no and
+// on/off (case-insensitive) and falls back when the value is absent or unparseable.
+func configBool(envKey, optionKey string, fallback bool, options map[string]string) bool {
+	raw := configValue(envKey, optionKey, "", options)
+	switch strings.ToLower(raw) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
+}

@@ -2,7 +2,7 @@
 
 Walldash is distributed as a Home Assistant add-on with **direct port access** (no Ingress),
 so wall-mounted tablets open the dashboard without a Home Assistant login. Each tablet signs
-in with Walldash's own per-device OTP flow (see the main `README.md`), not with a Home
+in with Walldash's own per-device flow (see the main `README.md`), not with a Home
 Assistant account. The add-on must be reached over **HTTPS**: the authentication cookies use
 `__Host-` + `Secure`, which browsers drop over plain HTTP.
 The runtime image follows the official recommendations: Home Assistant base image
@@ -40,7 +40,7 @@ When the binary detects it runs inside an add-on container, it adapts without an
 - **Persistent storage**: when the `/data` volume exists, the database defaults to `/data/walldash.db`, surviving updates and reboots.
 - **Version**: the binary version is injected at build time (`BUILD_VERSION` build arg → `main.Version`), keeping the `/api/health` version and the add-on `version:` in sync.
 - **Health check**: `GET /api/health` serves as the add-on `watchdog` URL.
-- **Authentication**: devices enroll with a per-device one-time code (`otp_issued` in the add-on log, and **Setup → Access** once an owner exists). The first verified device becomes `owner`. `TOKEN_SECRET` is auto-generated and persisted in `/data` when unset; keep it stable across restarts. Set `SECRET_KEY` (the `secret_key` option) to encrypt that stored signing key so `/data` snapshots do not expose it; removing `SECRET_KEY` after it has been used fails closed. Revocation kills refresh tokens immediately but access tokens remain valid until their 15-minute TTL expires. Reaching the add-on over HTTPS is required for the `__Host-`/`Secure` cookies; if the reverse proxy rewrites `Host`, set the `domain` option to the browser-facing hostname (or list extra origins in `allowed_origins`/`ALLOWED_ORIGINS`).
+- **Authentication**: when no device has enrolled yet the first one to open Walldash becomes the **owner** automatically (no code is logged); later devices are approved from **Setup → Access** or enrolled with a single-use 15-minute invitation link. `rescue_mode` lets the next device claim the owner role when the owner device is lost. `TOKEN_SECRET` is auto-generated and persisted in `/data` when unset; keep it stable across restarts. Set `SECRET_KEY` (the `secret_key` option) to encrypt that stored signing key so `/data` snapshots do not expose it; removing `SECRET_KEY` after it has been used fails closed. Revocation kills refresh tokens immediately but access tokens remain valid until their 15-minute TTL expires. Reaching the add-on over HTTPS is required for the `__Host-`/`Secure` cookies; if the reverse proxy rewrites `Host`, set the `domain` option to the browser-facing hostname (or list extra origins in `allowed_origins`/`ALLOWED_ORIGINS`).
 - **Init system**: s6-overlay is PID 1, so the add-on `config.yaml` must set `init: false` (required since S6 V3, otherwise the add-on will not start).
 
 Full precedence per setting: environment variable → `/data/options.json` → default (see `README.md`).
@@ -57,9 +57,10 @@ Each one has the same environment-variable equivalent, which always wins when se
 | `secret_key` | `SECRET_KEY` | _(empty)_ | Optional key-encryption key (exactly 32 characters) that encrypts the stored `TOKEN_SECRET` with AES-256-GCM, so a `/data` copy or snapshot does not expose the signing key. Keep it stable and backed up; removing it after use fails closed. |
 | `allowed_origins` | `ALLOWED_ORIGINS` | _(empty)_ | Comma-separated browser-facing origins trusted for CORS, CSRF and the refresh/logout same-origin check. Accepts `https://host` or a bare `host`. Only needed when the reverse proxy rewrites `Host`. |
 | `domain` | `DOMAIN` | _(empty)_ | Public hostname of this instance (bare host, `http://host` or `https://host`; optional port kept, path/query ignored). Merged with `allowed_origins`. Only needed when the reverse proxy rewrites `Host`. |
+| `rescue_mode` | `RESCUE_MODE` | `false` | Recovery switch. When `true`, the next unauthenticated device to connect claims the `owner` role even if accounts already exist. One-shot (consumed after the first use); set it back to `false` once recovery is complete. |
 
-The `token_secret`, `secret_key`, `allowed_origins` and `domain` options are declared in the
-companion `config.yaml` as `password?` / `str?` and are all optional.
+The `token_secret`, `secret_key`, `allowed_origins`, `domain` and `rescue_mode` options are
+declared in the companion `config.yaml` as `password?` / `str?` / `bool` and are all optional.
 
 ### Runtime notes
 
@@ -67,11 +68,11 @@ companion `config.yaml` as `password?` / `str?` and are all optional.
   the authentication cookies are `__Host-` + `Secure`, opening that URL directly produces a login
   loop. Put a TLS reverse proxy in front and reach the UI over HTTPS; the proxy must forward
   `X-Forwarded-Proto: https`.
-- **First device**: bootstrap by reading the first `otp_issued` code from the add-on log; there is
-  no authenticated **Setup → Access** screen yet.
+- **First device**: open Walldash on the first tablet; it becomes the `owner` automatically.
+  No code is written to the log. Add further devices from **Setup → Access** (approve or invite).
 - **Revocation latency**: revoking a device kills its refresh tokens immediately, but an access
   token already issued remains valid until its 15-minute TTL expires.
-- **Single replica only**: pending enrollments and OTPs are held in memory, so run exactly one
+- **Single replica only**: pending enrollments and in-memory rescue state are held in memory, so run exactly one
   container per database.
 
 ## Release Process
@@ -126,12 +127,14 @@ options:
   secret_key: ""
   allowed_origins: ""
   domain: ""
+  rescue_mode: false
 schema:
   log_level: list(debug|info|warn|error)
   token_secret: password?
   secret_key: password?
   allowed_origins: str?
   domain: str?
+  rescue_mode: bool
 watchdog: http://[HOST]:8080/api/health
 panel_icon: mdi:tablet-dashboard
 stage: experimental
@@ -234,6 +237,13 @@ configuration:
       https://host; optional port kept). Used for the CORS header and the
       CSRF/same-origin checks. Only needed when a reverse proxy rewrites the
       Host header. Requires HTTPS (see the add-on documentation).
+  rescue_mode:
+    name: Rescue mode
+    description: >-
+      Recovery switch. When enabled, the next device that opens Walldash claims
+      the owner role even if other devices exist. Use it only to recover from a
+      lost owner device, then set it back to false; it is consumed after a single
+      use and a restart re-arms it.
 network:
   8080/tcp: Walldash web interface (direct access, HTTPS recommended).
 ```
@@ -245,8 +255,9 @@ network:
 
 Cover: prerequisites (HA OS/Supervised with add-on store), adding the repository,
 installing and starting Walldash, reaching the UI **over HTTPS** (terminate TLS in a
-reverse proxy; plain HTTP breaks the authentication cookies), enrolling the first device
-with the `otp_issued` code from the log, configuration options table, data persistence
+reverse proxy; plain HTTP breaks the authentication cookies), the first device becoming
+owner automatically, adding further devices (approve or invite) and recovering a lost
+owner with `rescue_mode`, configuration options table, data persistence
 (`/data`), updating, uninstallation, troubleshooting (port conflict, Supervisor API
 unreachable, login loop over HTTP, proxy Host rewriting and `allowed_origins`, logs).
 
@@ -261,8 +272,8 @@ unreachable, login loop over HTTP, proxy Host rewriting and `allowed_origins`, l
 - [ ] Add-on installs from the custom repository on a test instance.
 - [ ] Starts with default options; logs show Supervisor API in use, no token configured manually.
 - [ ] Dashboard reachable over **HTTPS** from a device without a Home Assistant session.
-- [ ] First device enrolls with the `otp_issued` code from the add-on log and becomes `owner`.
-- [ ] A second device enrolls and stays `device`; the owner can promote it to `admin` and revoke it.
+- [ ] First device becomes `owner` automatically; no code appears in the add-on log.
+- [ ] A second device is approved from Setup → Access (or enrolled through an invitation link).
 - [ ] A revoked device cannot refresh; its current access token stops working within the 15 min TTL.
 - [ ] `TOKEN_SECRET` is auto-generated on first boot and reused across an add-on restart (sessions survive).
 - [ ] Device toggle from the dashboard reflects in Home Assistant.

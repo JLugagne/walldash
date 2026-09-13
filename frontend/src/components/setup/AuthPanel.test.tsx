@@ -34,11 +34,17 @@ function meRoute(role: string): Handler {
   return () => jsonResponse(200, { status: 'success', data: { id: 'me', label: 'Owner', role } })
 }
 
+function emptyInvites(): Handler {
+  return () => jsonResponse(200, { status: 'success', data: [] })
+}
+
 const PENDING = [
   {
-    device_id: 'p1',
+    pending_id: 'p1',
+    device_id: 'dev1',
     label: 'Kitchen tablet',
-    code: '004217',
+    approved: false,
+    created_at: '2026-09-12T09:45:00Z',
     expires_at: '2026-09-12T10:00:00Z',
   },
 ]
@@ -67,17 +73,65 @@ beforeEach(() => {
 })
 
 describe('AuthPanel', () => {
-  it('renders pending enrollment codes', async () => {
+  it('renders pending approvals without any code', async () => {
     mockRoutes({
       'GET /api/auth/me': meRoute('owner'),
       'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: PENDING }),
+      'GET /api/setup/auth/invites': emptyInvites(),
       'GET /api/setup/auth/devices': () => jsonResponse(200, { status: 'success', data: DEVICES }),
     })
 
     render(<AuthPanel />)
 
-    expect(await screen.findByText('004217', {}, { timeout: 5000 })).toBeDefined()
-    expect(screen.getByText('Kitchen tablet')).toBeDefined()
+    expect(await screen.findByText('Kitchen tablet', {}, { timeout: 5000 })).toBeDefined()
+    expect(screen.getByRole('button', { name: /approve kitchen tablet/i })).toBeDefined()
+    expect(screen.getByRole('button', { name: /deny kitchen tablet/i })).toBeDefined()
+  })
+
+  it('approves a pending enrollment through the setup endpoint', async () => {
+    const fetchMock = mockRoutes({
+      'GET /api/auth/me': meRoute('owner'),
+      'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: PENDING }),
+      'GET /api/setup/auth/invites': emptyInvites(),
+      'GET /api/setup/auth/devices': () => jsonResponse(200, { status: 'success', data: DEVICES }),
+      'GET /api/csrf-token': csrfRoute(),
+      'POST /api/setup/auth/pending/p1/approve': () =>
+        jsonResponse(200, { status: 'success', data: { id: 'dev1', label: 'Kitchen tablet', role: 'device' } }),
+    })
+
+    render(<AuthPanel />)
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /approve kitchen tablet/i }, { timeout: 5000 }),
+    )
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map(
+        ([input, init]) => `${((init as RequestInit | undefined)?.method ?? 'GET').toUpperCase()} ${String(input)}`,
+      )
+      expect(calls).toContain('POST /api/setup/auth/pending/p1/approve')
+    })
+  })
+
+  it('creates an invitation and shows the one-time link', async () => {
+    mockRoutes({
+      'GET /api/auth/me': meRoute('owner'),
+      'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
+      'GET /api/setup/auth/invites': emptyInvites(),
+      'GET /api/setup/auth/devices': () => jsonResponse(200, { status: 'success', data: DEVICES }),
+      'GET /api/csrf-token': csrfRoute(),
+      'POST /api/setup/auth/invites': () =>
+        jsonResponse(200, {
+          status: 'success',
+          data: { selector: 'sel1', token: 'tok.abc', role: 'device', expires_at: '2026-09-12T10:15:00Z' },
+        }),
+    })
+
+    render(<AuthPanel />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /create invitation/i }, { timeout: 5000 }))
+
+    expect(await screen.findByDisplayValue(/invite=tok.abc/)).toBeDefined()
   })
 
   it('reloads devices after a silent token refresh on 401', async () => {
@@ -85,6 +139,7 @@ describe('AuthPanel', () => {
     mockRoutes({
       'GET /api/auth/me': meRoute('owner'),
       'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
+      'GET /api/setup/auth/invites': emptyInvites(),
       'GET /api/setup/auth/devices': () => {
         deviceLoads += 1
         if (deviceLoads === 1) return jsonResponse(401, { status: 'error' })
@@ -104,6 +159,7 @@ describe('AuthPanel', () => {
     const fetchMock = mockRoutes({
       'GET /api/auth/me': meRoute('owner'),
       'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
+      'GET /api/setup/auth/invites': emptyInvites(),
       'GET /api/setup/auth/devices': () => jsonResponse(200, { status: 'success', data: DEVICES }),
       'GET /api/csrf-token': csrfRoute(),
       'POST /api/setup/auth/devices/d2/revoke': () => jsonResponse(204, {}),
@@ -128,6 +184,7 @@ describe('AuthPanel', () => {
     const fetchMock = mockRoutes({
       'GET /api/auth/me': meRoute('owner'),
       'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
+      'GET /api/setup/auth/invites': emptyInvites(),
       'GET /api/setup/auth/devices': () => {
         deviceLoads += 1
         return jsonResponse(200, { status: 'success', data: DEVICES })
@@ -166,6 +223,7 @@ describe('AuthPanel', () => {
     mockRoutes({
       'GET /api/auth/me': meRoute('owner'),
       'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
+      'GET /api/setup/auth/invites': emptyInvites(),
       'GET /api/setup/auth/devices': () => jsonResponse(200, { status: 'success', data: DEVICES }),
       'GET /api/csrf-token': csrfRoute(),
       'POST /api/setup/auth/devices/d2/label': () =>
@@ -189,6 +247,7 @@ describe('AuthPanel', () => {
     mockRoutes({
       'GET /api/auth/me': meRoute('admin'),
       'GET /api/setup/auth/pending': () => jsonResponse(200, { status: 'success', data: [] }),
+      'GET /api/setup/auth/invites': emptyInvites(),
       'GET /api/setup/auth/devices': () => jsonResponse(200, { status: 'success', data: DEVICES }),
     })
 

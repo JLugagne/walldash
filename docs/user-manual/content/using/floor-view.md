@@ -12,7 +12,7 @@ The **floor view** renders one level as an isometric 3D scene. This is where you
 
 The controls layer shows your **actuators** — lights, switches, plugs and appliances.
 
-- **Tap a device** to toggle it. The state updates immediately through a WebSocket connection, with no page refresh.
+- **Tap a device** to toggle it. The state updates immediately, with no page refresh.
 - **Lights that are on** cast a colored halo around their room so you can see the state of the house from across the room.
 - A device being toggled shows a short **pending** state until Home Assistant confirms the new value.
 

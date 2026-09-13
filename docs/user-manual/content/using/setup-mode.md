@@ -44,13 +44,16 @@ Manage your dashboards: open one to edit it, or create a new one. Rename, delete
 
 ## Access
 
-{{< figure src="/images/setup-access.png" alt="Setup Access tab listing pending sign-in codes and enrolled devices with roles and a revoke action" caption="**Access** lists pending one-time codes, then every enrolled device with its role and a **revoke** action." >}}
+{{< figure src="/images/setup-access.png" alt="Setup Access tab listing devices waiting for approval and enrolled devices with roles and a revoke action" caption="**Access** lists devices waiting for approval, then every device with its role and a **revoke** action." >}}
 
-The **Access** area manages device sign-in and is available to **owner** and **admin** devices only. It is also reachable directly from the **shield button** in the top bar, which shows a badge while an enrollment is waiting — no need to open Setup first.
+The **Access** area manages who can use Walldash and is available to **owner** and **admin** devices only. It is also reachable directly from the **shield button** in the top bar, which shows a badge while a device is waiting — no need to open Setup first.
 
-- **Pending codes** — devices that have opened the sign-in screen and are waiting for their one-time code. Each entry shows the device label, the code and when it expires, so you can read it out instead of digging through the log.
-- **Devices** — every enrolled device with its label, role, status and last-seen time. Rename a device with the pencil icon — the default label is its User-Agent, so give it a name that says where it lives. Change a device's role (`admin` / `device`; only the **owner** can grant or remove `owner`) or **revoke** it.
-- **Revoke** deletes the device's refresh tokens immediately, but an access token already issued keeps working for up to 15 minutes. See [Sign in & device access](/getting-started/sign-in/).
+- **Pending approvals** — devices that have opened Walldash and are waiting to be let in. Each entry shows the device name. Choose **Approve** to sign it in, or **Deny** to turn it away.
+- **Invitations** — single-use links you create and share with a new device. Pick the role (**device** or **admin**), copy the link and send it. Each link works once and lasts **15 minutes**. You can revoke an invitation that has not been used yet.
+- **Devices** — every signed-in device with its name, role, status and last-seen time. Rename a device with the pencil icon, change its role (**admin** / **device**), or **revoke** it. Only the **owner** can grant or remove the **owner** role.
+- **Revoke** removes the device's access shortly after — within about **15 minutes**. To let it back in, approve it again or send a new invitation.
+
+See [Devices & access](/getting-started/sign-in/) for the full picture.
 
 ## Settings
 

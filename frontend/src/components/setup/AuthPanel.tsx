@@ -1,14 +1,45 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, KeyRound, Pencil, RefreshCw, ShieldCheck, Trash2, User, X } from 'lucide-react'
+import {
+  Check,
+  Copy,
+  Pencil,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  Ticket,
+  Trash2,
+  User,
+  X,
+} from 'lucide-react'
 import { readApiError } from '../../api'
 import { authFetch, useAuth } from '../../useAuth'
 
 type AccountRole = 'owner' | 'admin' | 'device'
 
 interface PendingEnrollment {
+  pending_id: string
   device_id: string
   label: string
-  code: string
+  approved: boolean
+  created_at: string
+  expires_at: string
+}
+
+interface Invite {
+  selector: string
+  role: AccountRole
+  created_by: string
+  created_at: string
+  expires_at: string
+  consumed_at: string | null
+  consumed_by: string
+  revoked_at: string | null
+}
+
+interface CreatedInvite {
+  selector: string
+  token: string
+  role: AccountRole
   expires_at: string
 }
 
@@ -22,6 +53,7 @@ interface AuthDevice {
 }
 
 const ALL_ROLES: AccountRole[] = ['owner', 'admin', 'device']
+const INVITE_ROLES: AccountRole[] = ['device', 'admin']
 
 function roleChoices(currentRole: string): AccountRole[] {
   return currentRole === 'owner' ? ALL_ROLES : ['admin', 'device']
@@ -40,7 +72,16 @@ function statusClass(status: string): string {
     : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
 }
 
-/** Owner/admin setup screen: pending enrollment codes plus device roles and revocation. */
+function inviteState(invite: Invite): { label: string; className: string } {
+  if (invite.revoked_at) return { label: 'revoked', className: 'border-rose-500/30 bg-rose-500/10 text-rose-300' }
+  if (invite.consumed_at) return { label: 'used', className: 'border-slate-500/30 bg-slate-500/10 text-slate-300' }
+  if (new Date(invite.expires_at).getTime() <= Date.now()) {
+    return { label: 'expired', className: 'border-amber-500/30 bg-amber-500/10 text-amber-300' }
+  }
+  return { label: 'active', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' }
+}
+
+/** Owner/admin setup screen: pending approvals, invitations, device roles and revocation. */
 export function AuthPanel() {
   const { checking, account } = useAuth()
   const role = account?.role ?? ''
@@ -48,11 +89,15 @@ export function AuthPanel() {
 
   const [pending, setPending] = useState<PendingEnrollment[]>([])
   const [devices, setDevices] = useState<AuthDevice[]>([])
+  const [invites, setInvites] = useState<Invite[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [inviteRole, setInviteRole] = useState<AccountRole>('device')
+  const [createdInvite, setCreatedInvite] = useState<CreatedInvite | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const loadPending = useCallback(async () => {
     try {
@@ -60,6 +105,18 @@ export function AuthPanel() {
       const payload = await res.json()
       if (res.ok && payload?.status === 'success' && Array.isArray(payload.data)) {
         setPending(payload.data)
+      }
+    } catch {
+      return
+    }
+  }, [])
+
+  const loadInvites = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/setup/auth/invites')
+      const payload = await res.json()
+      if (res.ok && payload?.status === 'success' && Array.isArray(payload.data)) {
+        setInvites(payload.data)
       }
     } catch {
       return
@@ -87,11 +144,13 @@ export function AuthPanel() {
   useEffect(() => {
     if (!canManage) return
     void loadPending()
+    void loadInvites()
     const timer = window.setInterval(() => {
       void loadPending()
+      void loadInvites()
     }, 3000)
     return () => window.clearInterval(timer)
-  }, [canManage, loadPending])
+  }, [canManage, loadPending, loadInvites])
 
   useEffect(() => {
     if (!canManage) return
@@ -174,6 +233,81 @@ export function AuthPanel() {
     }
   }
 
+  const decidePending = async (entry: PendingEnrollment, decision: 'approve' | 'deny') => {
+    setBusyId(entry.pending_id)
+    setError(null)
+    try {
+      const res = await authFetch(`/api/setup/auth/pending/${entry.pending_id}/${decision}`, {
+        method: 'POST',
+      })
+      if (res.ok) {
+        await loadPending()
+        if (decision === 'approve') await loadDevices()
+      } else {
+        setError(await readApiError(res))
+      }
+    } catch {
+      setError('Unable to reach the server')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const createInvite = async () => {
+    setBusyId('new-invite')
+    setError(null)
+    setCreatedInvite(null)
+    setCopied(false)
+    try {
+      const res = await authFetch('/api/setup/auth/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: inviteRole }),
+      })
+      const payload = await res.json()
+      if (res.ok && payload?.status === 'success') {
+        setCreatedInvite(payload.data as CreatedInvite)
+        await loadInvites()
+      } else {
+        setError(await readApiError(res))
+      }
+    } catch {
+      setError('Unable to reach the server')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const revokeInvite = async (invite: Invite) => {
+    setBusyId(invite.selector)
+    setError(null)
+    try {
+      const res = await authFetch(`/api/setup/auth/invites/${invite.selector}/revoke`, {
+        method: 'POST',
+      })
+      if (res.ok) {
+        await loadInvites()
+      } else {
+        setError(await readApiError(res))
+      }
+    } catch {
+      setError('Unable to reach the server')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const copyInvite = async () => {
+    if (!createdInvite) return
+    const link = `${window.location.origin}/?invite=${encodeURIComponent(createdInvite.token)}`
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopied(true)
+    } catch {
+      setError('Copy failed — select the link manually.')
+    }
+  }
+
   if (checking) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
@@ -199,12 +333,16 @@ export function AuthPanel() {
     )
   }
 
+  const inviteLink = createdInvite
+    ? `${window.location.origin}/?invite=${encodeURIComponent(createdInvite.token)}`
+    : ''
+
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-slate-800/80">
         <div className="space-y-0.5">
           <h1 className="text-sm font-semibold text-white">Access</h1>
-          <p className="text-[11.5px] text-slate-400">Device enrollments and permissions</p>
+          <p className="text-[11.5px] text-slate-400">Device approvals, invitations and permissions</p>
         </div>
         <div className="flex-1" />
         <button
@@ -227,38 +365,170 @@ export function AuthPanel() {
 
         <section className="space-y-2">
           <div className="flex items-center gap-2">
-            <KeyRound className="w-3.5 h-3.5 text-[#8b93ee]" />
+            <User className="w-3.5 h-3.5 text-[#8b93ee]" />
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
-              Pending enrollments
+              Pending approvals
             </h2>
           </div>
           {pending.length === 0 ? (
             <div className="rounded-xl border border-slate-800/80 bg-slate-900/70 px-4 py-5 text-center">
-              <p className="text-sm text-slate-300">No pending enrollment</p>
+              <p className="text-sm text-slate-300">No device waiting for approval</p>
               <p className="text-[11.5px] text-slate-500 mt-1">
-                New devices appear here with a 6-digit code.
+                New devices appear here and can be approved in one click.
               </p>
             </div>
           ) : (
             <ul className="rounded-xl border border-slate-800/80 bg-slate-900/70 backdrop-blur-md divide-y divide-slate-800/80 overflow-hidden">
-              {pending.map((entry) => (
-                <li key={entry.device_id} className="flex items-center gap-3 px-4 py-3">
-                  <span className="w-8 h-8 shrink-0 rounded-lg border border-slate-800/80 bg-slate-900/70 flex items-center justify-center text-slate-400">
-                    <User className="w-4 h-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-slate-100 truncate">{entry.label || entry.device_id}</p>
-                    <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500">
-                      Expires {formatTimestamp(entry.expires_at)}
-                    </p>
-                  </div>
-                  <span className="shrink-0 rounded-md border border-[#6d76e8]/40 bg-[#6d76e8]/10 px-3 py-1.5 text-lg font-semibold tracking-[0.3em] text-white tabular-nums">
-                    {entry.code}
-                  </span>
-                </li>
-              ))}
+              {pending.map((entry) => {
+                const isBusy = busyId === entry.pending_id
+                return (
+                  <li key={entry.pending_id} className="flex items-center gap-3 px-4 py-3">
+                    <span className="w-8 h-8 shrink-0 rounded-lg border border-slate-800/80 bg-slate-900/70 flex items-center justify-center text-slate-400">
+                      <User className="w-4 h-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-slate-100 truncate">{entry.label || entry.device_id}</p>
+                      <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500">
+                        {entry.approved ? 'Approved — waiting for device' : `Expires ${formatTimestamp(entry.expires_at)}`}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label={`Approve ${entry.label || entry.device_id}`}
+                      disabled={isBusy || entry.approved}
+                      onClick={() => void decidePending(entry, 'approve')}
+                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:text-emerald-200 hover:bg-emerald-500/20 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Approve</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Deny ${entry.label || entry.device_id}`}
+                      disabled={isBusy}
+                      onClick={() => void decidePending(entry, 'deny')}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-800/80 bg-slate-900/70 px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Deny</span>
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
           )}
+        </section>
+
+        <section className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Ticket className="w-3.5 h-3.5 text-[#8b93ee]" />
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+              Invitations
+            </h2>
+          </div>
+          <div className="rounded-xl border border-slate-800/80 bg-slate-900/70 backdrop-blur-md p-4 space-y-3">
+            <p className="text-[11.5px] leading-relaxed text-slate-400">
+              Create a single-use invitation to add a device. It expires after 15 minutes. Share the
+              link or token with the device you want to enroll.
+            </p>
+            <div className="flex items-center gap-2">
+              <select
+                aria-label="Invitation role"
+                value={inviteRole}
+                onChange={(event) => setInviteRole(event.target.value as AccountRole)}
+                className="rounded-lg border border-slate-800/80 bg-slate-950/60 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-[#6d76e8] cursor-pointer"
+              >
+                {INVITE_ROLES.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => void createInvite()}
+                disabled={busyId === 'new-invite'}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#6d76e8] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#7b83ea] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create invitation</span>
+              </button>
+            </div>
+
+            {createdInvite && (
+              <div className="rounded-lg border border-[#6d76e8]/40 bg-[#6d76e8]/10 p-3 space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#aab0f4]">
+                  New {createdInvite.role} invitation — shown only once
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    aria-label="Invitation link"
+                    value={inviteLink}
+                    onFocus={(event) => event.target.select()}
+                    className="flex-1 rounded-md border border-slate-800/80 bg-slate-950/60 px-2 py-1.5 text-[11px] text-slate-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void copyInvite()}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-800/80 bg-slate-900/70 px-2.5 py-1.5 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>{copied ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
+                <p className="text-[10.5px] text-slate-500 break-all">Token: {createdInvite.token}</p>
+              </div>
+            )}
+
+            {invites.length > 0 && (
+              <div className="rounded-lg border border-slate-800/80 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-800/80 text-[10.5px] uppercase tracking-[0.08em] text-slate-500">
+                        <th className="px-3 py-2 font-semibold">Role</th>
+                        <th className="px-3 py-2 font-semibold">Created</th>
+                        <th className="px-3 py-2 font-semibold">Expires</th>
+                        <th className="px-3 py-2 font-semibold">State</th>
+                        <th className="px-3 py-2 font-semibold text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/80">
+                      {invites.map((invite) => {
+                        const state = inviteState(invite)
+                        const isBusy = busyId === invite.selector
+                        return (
+                          <tr key={invite.selector}>
+                            <td className="px-3 py-2 text-slate-100">{invite.role}</td>
+                            <td className="px-3 py-2 text-slate-400">{formatTimestamp(invite.created_at)}</td>
+                            <td className="px-3 py-2 text-slate-400">{formatTimestamp(invite.expires_at)}</td>
+                            <td className="px-3 py-2">
+                              <span className={`rounded-md border px-2 py-0.5 text-[10.5px] font-semibold ${state.className}`}>
+                                {state.label}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <button
+                                type="button"
+                                aria-label={`Revoke invitation ${invite.selector}`}
+                                disabled={isBusy || state.label !== 'active'}
+                                onClick={() => void revokeInvite(invite)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-300 hover:text-rose-200 hover:bg-rose-500/20 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Revoke</span>
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         </section>
 
         <section className="space-y-2">

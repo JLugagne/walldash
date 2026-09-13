@@ -6,9 +6,9 @@ weight: 20
 
 ## Sign in first
 
-The very first time a device opens Walldash, it shows the **sign-in screen** instead of the app. The device requests a one-time code, which is written to the server log as an `otp_issued` line. Read that code and enter it to enroll the device.
+The first time a device opens Walldash, it is welcomed straight in — the first device becomes the **owner** automatically. Later tablets wait until an owner or admin lets them in from **Setup → Access**.
 
-The **first device** to enroll becomes **owner**; later tablets become **device** and can be promoted in **Setup → Access**. See [Sign in & device access](/getting-started/sign-in/) for the full flow, the code channels and the roles.
+See [Devices & access](/getting-started/sign-in/) for adding tablets, invitations and roles.
 
 Once a device is signed in, Walldash shows the onboarding wizard.
 
