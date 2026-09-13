@@ -42,6 +42,9 @@ skills-lock.json
 .artefacts/
 .scaffor/
 
+# Security audit runs (local only, never committed)
+.security-audit/
+
 # Hugo user manual build output
 docs/user-manual/public/
 docs/user-manual/resources/
