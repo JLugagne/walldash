@@ -6,7 +6,7 @@ disableKinds = ["taxonomy", "term", "RSS", "sitemap"]
 
 [params]
   description = "User manual for Walldash, the touch-first 3D home dashboard for Home Assistant."
-  version = "1.3.3"
+  version = "1.3.4"
   repo = "https://github.com/JLugagne/walldash"
   editBaseURL = "https://github.com/JLugagne/walldash/edit/main/docs/user-manual/content"
   latestRelease = "https://github.com/JLugagne/walldash/releases/latest"
