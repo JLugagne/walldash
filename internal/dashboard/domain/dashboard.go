@@ -3,9 +3,11 @@ package domain
 import (
 	"errors"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Widget types name what a widget is bound to and what a tap on it does.
@@ -252,7 +254,9 @@ type Dashboard struct {
 	Order int
 	Cols  int
 	Rows  int
-	// BackgroundImage is a URL path rendered behind the Widget Grid, or empty for none.
+	// BackgroundImage is the path of a background bundled with the application, or empty for
+	// none. It is rendered inside a CSS url() by the browser, so only paths the application
+	// ships are accepted; see IsAllowedBackgroundImage.
 	BackgroundImage string
 	// BackgroundOpacity is the image opacity in percent (0-100).
 	BackgroundOpacity int
@@ -265,6 +269,28 @@ type Dashboard struct {
 	Widgets       []Widget
 }
 
+// backgroundImagePattern matches the paths of the backgrounds shipped in frontend/public: a
+// literal "/backgrounds/" prefix followed by a simple file name. Anchored at both ends, so no
+// query, fragment, traversal or alternate scheme can ride along.
+var backgroundImagePattern = regexp.MustCompile(`^/backgrounds/[a-z0-9][a-z0-9._-]*\.(jpg|jpeg|png|webp)$`)
+
+// IsAllowedBackgroundImage reports whether a background image value is one the application can
+// render: an empty string (no background) or the path of a bundled background. The value ends up
+// inside a CSS url() in the browser, so anything else — a remote URL, a data: URI, a value that
+// closes the url() and appends declarations — is refused at the domain boundary, which every
+// write path (the API handlers and a restored backup) goes through.
+func IsAllowedBackgroundImage(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return true
+	}
+	return backgroundImagePattern.MatchString(value)
+}
+
+// MaxDashboardNameLength is the longest accepted dashboard name. The bound lives in the domain so
+// every write path — the API handlers and a replayed backup alike — applies the same rule.
+const MaxDashboardNameLength = 100
+
 // Validate checks identity, strictly positive grid dimensions, then every widget against
 // the grid, then rejects any pair of overlapping widgets. Returns an error wrapping
 // ErrInvalidDashboard, or ErrInvalidWidget when a single widget is at fault.
@@ -275,10 +301,18 @@ func (o Dashboard) Validate() error {
 	if strings.TrimSpace(o.Name) == "" {
 		return errors.Join(ErrInvalidDashboard, errors.New("dashboard name cannot be empty"))
 	}
+	if utf8.RuneCountInString(o.Name) > MaxDashboardNameLength {
+		return errors.Join(ErrInvalidDashboard, errors.New("dashboard name cannot exceed "+
+			strconv.Itoa(MaxDashboardNameLength)+" characters"))
+	}
 	if o.Cols <= 0 || o.Rows <= 0 {
 		return errors.Join(ErrInvalidDashboard, errors.New("dashboard grid dimensions must be strictly positive"))
 	}
 
+	if !IsAllowedBackgroundImage(o.BackgroundImage) {
+		return errors.Join(ErrInvalidDashboard,
+			errors.New("dashboard background image must be one of the bundled backgrounds or empty"))
+	}
 	if o.BackgroundOpacity < 0 || o.BackgroundOpacity > 100 {
 		return errors.Join(ErrInvalidDashboard, errors.New("dashboard background opacity must be between 0 and 100"))
 	}

@@ -327,9 +327,14 @@ func (c *Client) readPump(ctx context.Context) {
 			err := c.hub.actionCommands.ExecuteAction(actionCtx, actor, cmd)
 			cancel()
 			if err != nil {
+				// Mirror the sanitised HTTP error shape: the raw error from the Home Assistant
+				// client embeds the request URL, so forwarding it would hand every device the
+				// internal host and port of the home automation server.
+				code, message := executionErrorFrame(err)
 				errMsg, _ := json.Marshal(map[string]string{
 					"type":      "error",
-					"error":     err.Error(),
+					"code":      code,
+					"error":     message,
 					"entity_id": actionMsg.EntityID,
 				})
 				c.sendMsg(errMsg)
@@ -423,4 +428,13 @@ func sessionRevokedMessage() []byte {
 		"error": "session is no longer valid",
 	})
 	return msg
+}
+
+// executionErrorFrame maps a failed action to the code and generic message the HTTP API returns,
+// so a socket frame never carries internal detail such as the Home Assistant URL.
+func executionErrorFrame(err error) (code string, message string) {
+	if domainErr, ok := domain.AsDomainError(err); ok {
+		return domainErr.Code, "internal error"
+	}
+	return "INTERNAL_ERROR", "internal error"
 }

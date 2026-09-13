@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,7 +38,18 @@ func enrollClient(t *testing.T, ctx context.Context, dash *Dashboard, client *au
 	// Otherwise the device is pending: approve it server-side (as the owner would) and redeem.
 	pending := dash.Auth.ListPending(ctx)
 	require.NotEmpty(t, pending)
-	_, err := dash.Auth.ApprovePending(ctx, pending[len(pending)-1].PendingID)
+	// Approval is a privileged operation that re-loads the caller, so act as the existing owner.
+	accounts, err := dash.Accounts.FindAll(ctx)
+	require.NoError(t, err)
+	var owner domain.Account
+	for _, acct := range accounts {
+		if acct.Role == domain.RoleOwner && acct.Status == domain.StatusActive {
+			owner = acct
+			break
+		}
+	}
+	require.NotEmpty(t, owner.ID, "an owner must exist to approve a pending enrollment")
+	_, err = dash.Auth.ApprovePending(ctx, owner, pending[len(pending)-1].PendingID)
 	require.NoError(t, err)
 
 	resp = client.do(http.MethodPost, "/api/auth/redeem", nil, nil)

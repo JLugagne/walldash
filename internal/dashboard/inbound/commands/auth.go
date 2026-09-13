@@ -113,11 +113,9 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 // publishRevocation invalidates already-issued access tokens for the logging-out device so
-// they cannot be replayed after logout, before the access TTL elapses.
+// they cannot be replayed after logout, before the access TTL elapses. The cutoff is persisted
+// through the app layer, so the invalidation also survives a restart.
 func (h *AuthHandler) publishRevocation(r *http.Request) {
-	if h.revocations == nil {
-		return
-	}
 	raw, ok := h.cookies.Refresh(r)
 	if !ok || raw == "" {
 		return
@@ -126,14 +124,7 @@ func (h *AuthHandler) publishRevocation(r *http.Request) {
 	if err != nil || rt == nil {
 		return
 	}
-	_ = h.revocations.Publish(r.Context(), revocation.Revocation{
-		TenantID:   rt.TenantID,
-		TargetType: revocation.TargetUser,
-		TargetID:   rt.UserID.String(),
-		Scope:      revocation.ScopeAll,
-		Reason:     revocation.ReasonLogoutEverywhere,
-		CutoffTime: time.Now().UTC(),
-	})
+	h.auth.PublishRevocation(r.Context(), rt.UserID, revocation.ReasonLogoutEverywhere)
 }
 
 func pendingCookie(r *http.Request) (string, bool) {
@@ -169,6 +160,23 @@ func clientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// actorAccount resolves the token subject into the account row behind it. Privileged handlers use
+// it so the authorization decision never rests on the token alone: a token whose account has been
+// revoked or demoted since it was issued must not authorise anything.
+func (h *AuthHandler) actorAccount(w http.ResponseWriter, r *http.Request) (domain.Account, bool) {
+	actor, ok := tokens.ActorFromContext(r.Context())
+	if !ok {
+		middleware.WriteJSendError(w, http.StatusUnauthorized, "UNAUTHORIZED", "authentication required")
+		return domain.Account{}, false
+	}
+	current, err := h.auth.GetAccount(r.Context(), actor.UserID.String())
+	if err != nil {
+		h.controller.SendFail(w, r, nil, err)
+		return domain.Account{}, false
+	}
+	return current, true
 }
 
 // RevokeDevice disables a device account and kills all of its refresh tokens.

@@ -17,6 +17,11 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("Content-Security-Policy", contentSecurityPolicy)
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			// API responses carry configuration, device and account data; a shared intermediary
+			// cache must not be free to keep a copy. Static assets keep their own caching policy.
+			h.Set("Cache-Control", "no-store")
+		}
 		if isHTTPS(r) {
 			h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}

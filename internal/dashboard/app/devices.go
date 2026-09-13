@@ -63,6 +63,22 @@ func (a *App) SavePlacement(ctx context.Context, actor domain.Actor, placement d
 
 	if strings.TrimSpace(placement.ID) == "" {
 		placement.ID = uuid.NewString()
+	} else {
+		// The id is the primary key of an upsert, so a client-supplied id would otherwise let a
+		// write through one level's URL rewrite a placement belonging to another level. Refuse
+		// that mismatch, exactly as DeletePlacement does.
+		existing, err := a.placementsRepo.FindPlacementByID(ctx, placement.ID)
+		switch {
+		case err == nil:
+			if existing.LevelID != placement.LevelID {
+				return domain.DevicePlacement{}, errors.Join(domain.ErrPlacementNotFound,
+					errors.New("placement does not belong to specified level"))
+			}
+		case errors.Is(err, domain.ErrPlacementNotFound):
+			// A new placement saved under a caller-chosen id owns no other level yet.
+		default:
+			return domain.DevicePlacement{}, err
+		}
 	}
 
 	if strings.TrimSpace(placement.Layer) == "" {

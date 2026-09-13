@@ -12,6 +12,7 @@ import (
 
 	"github.com/JLugagne/walldash/frontend"
 	dashboard "github.com/JLugagne/walldash/internal/dashboard"
+	"github.com/JLugagne/walldash/internal/dashboard/inbound/middleware"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
@@ -76,7 +77,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           router,
+		Handler:           newHandler(router),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -111,6 +112,14 @@ func getEnv(key, defaultVal string) string {
 		return val
 	}
 	return defaultVal
+}
+
+// newHandler wraps the router so that responses gorilla/mux writes itself — its path-normalisation
+// 301s are emitted inside ServeHTTP, before any router.Use middleware runs — carry the hardening
+// headers too. Applying the middleware again inside the router keeps the headers on the matched
+// routes; setting the same headers twice is idempotent.
+func newHandler(router *mux.Router) http.Handler {
+	return middleware.SecurityHeaders(router)
 }
 
 func loadEnvFile(path string) {

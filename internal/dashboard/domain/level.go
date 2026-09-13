@@ -2,9 +2,15 @@ package domain
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
+
+// MaxLevelNameLength is the longest accepted level name. The bound lives in the domain so every
+// write path — the API handlers and a replayed backup alike — applies the same rule.
+const MaxLevelNameLength = 100
 
 // Point2D represents a 2D coordinate on a level's plan.
 type Point2D struct {
@@ -189,6 +195,10 @@ func (l Level) Validate() error {
 	}
 	if strings.TrimSpace(l.Name) == "" {
 		return errors.Join(ErrInvalidLevel, errors.New("level name cannot be empty"))
+	}
+	if utf8.RuneCountInString(l.Name) > MaxLevelNameLength {
+		return errors.Join(ErrInvalidLevel, errors.New("level name cannot exceed "+
+			strconv.Itoa(MaxLevelNameLength)+" characters"))
 	}
 	seen := make(map[string]bool, len(l.Layers))
 	for _, layer := range l.Layers {

@@ -15,3 +15,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+  # The Dockerfile pins its base images by digest, so without this entry nothing ever refreshes
+  # them and a base-image CVE would go unnoticed.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10

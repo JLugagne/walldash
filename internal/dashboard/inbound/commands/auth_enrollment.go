@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/JLugagne/egauth/tokens"
 	"github.com/JLugagne/walldash/internal/dashboard/app"
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	"github.com/JLugagne/walldash/internal/dashboard/inbound/middleware"
@@ -73,9 +72,8 @@ func (h *AuthHandler) RedeemInvite(w http.ResponseWriter, r *http.Request) {
 // CreateInvite mints a single-use invitation for a new device. The plaintext token is returned
 // exactly once; only its hash is stored.
 func (h *AuthHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
-	actor, ok := tokens.ActorFromContext(r.Context())
+	current, ok := h.actorAccount(w, r)
 	if !ok {
-		middleware.WriteJSendError(w, http.StatusUnauthorized, "UNAUTHORIZED", "authentication required")
 		return
 	}
 	var body struct {
@@ -89,13 +87,16 @@ func (h *AuthHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 	if role == "" {
 		role = domain.RoleDevice
 	}
-	invite, token, err := h.auth.CreateInvite(r.Context(), actor.UserID.String(), role)
+	invite, token, err := h.auth.CreateInvite(r.Context(), current, role)
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidInviteRole) {
+		switch {
+		case errors.Is(err, domain.ErrForbidden):
+			middleware.WriteJSendError(w, http.StatusForbidden, "FORBIDDEN", "operation not permitted")
+		case errors.Is(err, domain.ErrInvalidInviteRole):
 			middleware.WriteJSendError(w, http.StatusBadRequest, "INVALID_ROLE", "invalid role")
-			return
+		default:
+			h.controller.SendError(w, r, err)
 		}
-		h.controller.SendError(w, r, err)
 		return
 	}
 	h.controller.SendSuccess(w, r, map[string]any{
@@ -110,13 +111,20 @@ func (h *AuthHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 
 // RevokeInvite prevents an invitation from being used.
 func (h *AuthHandler) RevokeInvite(w http.ResponseWriter, r *http.Request) {
+	current, ok := h.actorAccount(w, r)
+	if !ok {
+		return
+	}
 	selector := mux.Vars(r)["selector"]
-	if _, err := h.auth.RevokeInvite(r.Context(), selector); err != nil {
-		if errors.Is(err, domain.ErrInviteNotFound) {
+	if _, err := h.auth.RevokeInvite(r.Context(), current, selector); err != nil {
+		switch {
+		case errors.Is(err, domain.ErrForbidden):
+			middleware.WriteJSendError(w, http.StatusForbidden, "FORBIDDEN", "operation not permitted")
+		case errors.Is(err, domain.ErrInviteNotFound):
 			middleware.WriteJSendError(w, http.StatusNotFound, "INVITE_NOT_FOUND", "invitation not found")
-			return
+		default:
+			h.controller.SendError(w, r, err)
 		}
-		h.controller.SendError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -124,13 +132,20 @@ func (h *AuthHandler) RevokeInvite(w http.ResponseWriter, r *http.Request) {
 
 // ApprovePending creates the account behind a pending enrollment so its device can sign in.
 func (h *AuthHandler) ApprovePending(w http.ResponseWriter, r *http.Request) {
-	acct, err := h.auth.ApprovePending(r.Context(), mux.Vars(r)["id"])
+	current, ok := h.actorAccount(w, r)
+	if !ok {
+		return
+	}
+	acct, err := h.auth.ApprovePending(r.Context(), current, mux.Vars(r)["id"])
 	if err != nil {
-		if errors.Is(err, app.ErrInvalidEnrollment) {
+		switch {
+		case errors.Is(err, domain.ErrForbidden):
+			middleware.WriteJSendError(w, http.StatusForbidden, "FORBIDDEN", "operation not permitted")
+		case errors.Is(err, app.ErrInvalidEnrollment):
 			middleware.WriteJSendError(w, http.StatusNotFound, "INVALID_ENROLLMENT", "enrollment not found")
-			return
+		default:
+			h.controller.SendError(w, r, err)
 		}
-		h.controller.SendError(w, r, err)
 		return
 	}
 	h.controller.SendSuccess(w, r, devicePayload(acct))
@@ -138,12 +153,19 @@ func (h *AuthHandler) ApprovePending(w http.ResponseWriter, r *http.Request) {
 
 // DenyPending drops a pending enrollment.
 func (h *AuthHandler) DenyPending(w http.ResponseWriter, r *http.Request) {
-	if err := h.auth.DenyPending(r.Context(), mux.Vars(r)["id"]); err != nil {
-		if errors.Is(err, app.ErrInvalidEnrollment) {
+	current, ok := h.actorAccount(w, r)
+	if !ok {
+		return
+	}
+	if err := h.auth.DenyPending(r.Context(), current, mux.Vars(r)["id"]); err != nil {
+		switch {
+		case errors.Is(err, domain.ErrForbidden):
+			middleware.WriteJSendError(w, http.StatusForbidden, "FORBIDDEN", "operation not permitted")
+		case errors.Is(err, app.ErrInvalidEnrollment):
 			middleware.WriteJSendError(w, http.StatusNotFound, "INVALID_ENROLLMENT", "enrollment not found")
-			return
+		default:
+			h.controller.SendError(w, r, err)
 		}
-		h.controller.SendError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

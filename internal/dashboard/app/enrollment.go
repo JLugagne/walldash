@@ -124,6 +124,12 @@ func (a *Auth) Redeem(ctx context.Context, pendingID string) (domain.Account, *b
 	if err != nil {
 		return domain.Account{}, nil, err
 	}
+	// The account can be revoked between approval and redemption. IssueTokenPair signs the
+	// supplied claims verbatim (the ClaimsProvider only runs on refresh rotation), so the status
+	// must be re-checked here; otherwise a revoked device still receives a live token pair.
+	if acct.Status != domain.StatusActive {
+		return domain.Account{}, nil, ErrInvalidEnrollment
+	}
 	pair, err := a.issuer.IssueTokenPair(ctx, ClaimsFor(acct))
 	if err != nil {
 		return domain.Account{}, nil, err
@@ -132,8 +138,12 @@ func (a *Auth) Redeem(ctx context.Context, pendingID string) (domain.Account, *b
 }
 
 // ApprovePending creates the device account behind a pending enrollment so the waiting device
-// can redeem it. Approving twice returns the already-created account.
-func (a *Auth) ApprovePending(ctx context.Context, pendingID string) (domain.Account, error) {
+// can redeem it. Approving twice returns the already-created account. The caller is re-loaded from
+// the store, so a stale token cannot approve an enrollment.
+func (a *Auth) ApprovePending(ctx context.Context, actor domain.Account, pendingID string) (domain.Account, error) {
+	if _, err := a.requireManager(ctx, actor); err != nil {
+		return domain.Account{}, err
+	}
 	a.sweep()
 	a.mu.Lock()
 	rec, ok := a.pending[pendingID]
@@ -159,8 +169,12 @@ func (a *Auth) ApprovePending(ctx context.Context, pendingID string) (domain.Acc
 	})
 }
 
-// DenyPending drops a pending enrollment so the waiting device may try again.
-func (a *Auth) DenyPending(_ context.Context, pendingID string) error {
+// DenyPending drops a pending enrollment so the waiting device may try again. The caller is
+// re-loaded from the store, so a stale token cannot deny an enrollment.
+func (a *Auth) DenyPending(ctx context.Context, actor domain.Account, pendingID string) error {
+	if _, err := a.requireManager(ctx, actor); err != nil {
+		return err
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if _, ok := a.pending[pendingID]; !ok {
@@ -172,8 +186,13 @@ func (a *Auth) DenyPending(_ context.Context, pendingID string) error {
 
 // CreateInvite mints a single-use invitation that lets a new device enroll with the given role.
 // Only the device and admin roles may be invited; owner is reserved for bootstrap and rescue.
-// The returned token is the only copy of the plaintext invitation secret.
-func (a *Auth) CreateInvite(ctx context.Context, actorID string, role domain.Role) (domain.Invite, string, error) {
+// The returned token is the only copy of the plaintext invitation secret. The caller is re-loaded
+// from the store, so an invitation can never be minted from a stale token's scopes.
+func (a *Auth) CreateInvite(ctx context.Context, actor domain.Account, role domain.Role) (domain.Invite, string, error) {
+	current, err := a.requireManager(ctx, actor)
+	if err != nil {
+		return domain.Invite{}, "", err
+	}
 	if !domain.InvitableRole(role) {
 		return domain.Invite{}, "", domain.ErrInvalidInviteRole
 	}
@@ -185,7 +204,7 @@ func (a *Auth) CreateInvite(ctx context.Context, actorID string, role domain.Rol
 		Selector:     selector,
 		VerifierHash: verifierHash,
 		Role:         role,
-		CreatedBy:    actorID,
+		CreatedBy:    current.ID,
 		ExpiresAt:    a.now().UTC().Add(a.inviteTTL),
 	})
 	if err != nil {
@@ -242,8 +261,12 @@ func (a *Auth) ListInvites(ctx context.Context) ([]domain.Invite, error) {
 	return a.invites.FindAll(ctx)
 }
 
-// RevokeInvite prevents an invitation from being used.
-func (a *Auth) RevokeInvite(ctx context.Context, selector string) (domain.Invite, error) {
+// RevokeInvite prevents an invitation from being used. The caller is re-loaded from the store, so
+// an invitation cannot be revoked from a stale token's scopes.
+func (a *Auth) RevokeInvite(ctx context.Context, actor domain.Account, selector string) (domain.Invite, error) {
+	if _, err := a.requireManager(ctx, actor); err != nil {
+		return domain.Invite{}, err
+	}
 	return a.invites.Revoke(ctx, selector)
 }
 

@@ -16,11 +16,15 @@ import (
 
 const unitsPerCm = 0.4
 
-var idSeq int
+// idGen hands out the element identifiers of a single import. It is deliberately per-call rather
+// than package-level: imports run concurrently (one goroutine per HTTP request) and a shared
+// counter let one import rewind another, producing plans whose walls, openings or zones ended up
+// sharing an identifier — the identity the plan editor keys on.
+type idGen struct{ seq int }
 
-func nextID(prefix string) string {
-	idSeq++
-	return fmt.Sprintf("%s-sh3d-%d", prefix, idSeq)
+func (g *idGen) next(prefix string) string {
+	g.seq++
+	return fmt.Sprintf("%s-sh3d-%d", prefix, g.seq)
 }
 
 func cmToUnits(cm float64) float64 {
@@ -87,7 +91,7 @@ func computeOpeningOffset(wall sh3dWall, wx, wy float64) float64 {
 	return ((wx-wall.XStart)*dx + (wy-wall.YStart)*dy) / wallLen
 }
 
-func parseXML(data []byte, levelID string) (domain.Plan, error) {
+func parseXML(data []byte, levelID string, gen *idGen) (domain.Plan, error) {
 	var home sh3dHome
 	if err := xml.Unmarshal(data, &home); err != nil {
 		return domain.Plan{}, fmt.Errorf("invalid Home.xml: %w", err)
@@ -95,16 +99,15 @@ func parseXML(data []byte, levelID string) (domain.Plan, error) {
 	if len(home.Walls) == 0 {
 		return domain.Plan{}, errors.New("Home.xml contains no walls")
 	}
-	return buildPlan(home.Walls, home.Rooms, home.Openings, levelID), nil
+	return buildPlan(home.Walls, home.Rooms, home.Openings, levelID, gen), nil
 }
 
 func FromReader(r io.Reader, levelID string) (domain.Plan, error) {
-	idSeq = 0
 	homeXML, err := readHomeXML(r)
 	if err != nil {
 		return domain.Plan{}, err
 	}
-	return parseXML(homeXML, levelID)
+	return parseXML(homeXML, levelID, &idGen{})
 }
 
 type sh3dLevel struct {
@@ -117,7 +120,7 @@ type sh3dLevel struct {
 // Degenerate geometry is tolerated: zero-length wall segments (often slivers
 // that collapse after unit rounding) are skipped with their openings, and
 // sub-unit thickness/width values are clamped to one unit so the plan validates.
-func buildPlan(walls []sh3dWall, rooms []sh3dRoom, openings []sh3dOpening, levelID string) domain.Plan {
+func buildPlan(walls []sh3dWall, rooms []sh3dRoom, openings []sh3dOpening, levelID string, gen *idGen) domain.Plan {
 	segments := make([]domain.WallSegment, 0, len(walls))
 	keptWallIDs := make(map[string]bool, len(walls))
 	wallSourceIDs := make([]string, 0, len(walls))
@@ -135,7 +138,7 @@ func buildPlan(walls []sh3dWall, rooms []sh3dRoom, openings []sh3dOpening, level
 			thicknessUnits = 1
 		}
 		seg := domain.WallSegment{
-			ID:        nextID("wall"),
+			ID:        gen.next("wall"),
 			X1:        cmToUnits(w.XStart),
 			Y1:        cmToUnits(w.YStart),
 			X2:        cmToUnits(w.XEnd),
@@ -178,7 +181,7 @@ func buildPlan(walls []sh3dWall, rooms []sh3dRoom, openings []sh3dOpening, level
 				offsetCm = halfW
 			}
 			opening := domain.WallOpening{
-				ID:        nextID(openingType(o.Name)),
+				ID:        gen.next(openingType(o.Name)),
 				Type:      openingType(o.Name),
 				Offset:    cmToUnits(offsetCm),
 				Width:     widthUnits,
@@ -209,7 +212,7 @@ func buildPlan(walls []sh3dWall, rooms []sh3dRoom, openings []sh3dOpening, level
 		}
 		color := zoneColorPalette[i%len(zoneColorPalette)]
 		zones = append(zones, domain.Zone{
-			ID:     nextID("zone"),
+			ID:     gen.next("zone"),
 			Name:   name,
 			Color:  color,
 			Points: points,
@@ -276,7 +279,7 @@ func readHomeXML(r io.Reader) ([]byte, error) {
 // so callers can create them; items referencing an unknown level fall back to
 // the first level. Files declaring no levels import as a single unnamed level.
 func FromReaderLevels(r io.Reader) ([]ImportedLevel, error) {
-	idSeq = 0
+	gen := &idGen{}
 	homeXML, err := readHomeXML(r)
 	if err != nil {
 		return nil, err
@@ -330,7 +333,7 @@ func FromReaderLevels(r io.Reader) ([]ImportedLevel, error) {
 		if name == "" {
 			name = fmt.Sprintf("Level %d", i+1)
 		}
-		plan := buildPlan(groupedWalls[l.ID], groupedRooms[l.ID], groupedOpenings[l.ID], l.ID)
+		plan := buildPlan(groupedWalls[l.ID], groupedRooms[l.ID], groupedOpenings[l.ID], l.ID, gen)
 		imported = append(imported, ImportedLevel{
 			Name:      name,
 			Elevation: l.Elevation,

@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/JLugagne/egauth/keystore"
-	"github.com/JLugagne/egauth/origin"
 	"github.com/JLugagne/egauth/revocation"
 	"github.com/JLugagne/egauth/tokens"
 	"github.com/JLugagne/egauth/tokens/basic"
@@ -128,7 +127,7 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		Store:      tokenStore,
 		Issuer:     "walldash",
 		SecretKey:  tokenSecret,
-		AccessTTL:  15 * time.Minute,
+		AccessTTL:  accessTokenTTL,
 		RefreshTTL: 60 * 24 * time.Hour,
 		// ReuseGracePeriod widens the window during which replaying an already-consumed
 		// refresh token is treated as benign concurrency instead of theft. egauth's zero
@@ -153,8 +152,18 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	revocationBus := revocation.NewMemBus()
 	revocationTracker := tokens.NewRevocationTracker(revocationBus)
 
+	// The tracker above is an in-process map that a restart rebuilds empty, so the persisted
+	// cutoffs are replayed into it before the server accepts a single request; otherwise a token
+	// revoked, demoted or logged out before the restart would be accepted again.
+	revocationStore := sqlite.NewRevocationStore(adapter.DB())
+	if err := seedRevocationTracker(ctx, revocationStore, revocationTracker); err != nil {
+		_ = adapter.Close()
+		return nil, err
+	}
+
 	inviteRepo := sqlite.NewInviteRepository(adapter.DB())
 	authApp := app.NewAuth(accountRepo, inviteRepo, issuer, tokenStore, revocationBus, conf.RescueMode)
+	authApp.SetRevocationStore(revocationStore)
 
 	haClient := homeassistant.NewClient(conf.HAUrl, conf.HAToken, nil)
 	application := app.New(adapter, adapter, adapter, adapter, haClient, adapter, adapter, adapter, conf.Version)
@@ -187,10 +196,10 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	}))
 
 	if !conf.DisableCSRF {
-		trustedOrigins := conf.AllowedOrigins
-		router.Use(func(next http.Handler) http.Handler {
-			return origin.Middleware(next, origin.WithTrustedOrigins(trustedOrigins...))
-		})
+		// Compare full canonical origins (scheme, host and port) rather than hosts alone: a page
+		// served over plain HTTP from the same host must not count as same-origin on an HTTPS
+		// deployment.
+		router.Use(middleware.SameOrigin(conf.AllowedOrigins))
 	}
 
 	// Register WebSocket endpoint
@@ -400,9 +409,41 @@ func trustedOriginHosts(origins []string) []string {
 	return hosts
 }
 
+// accessTokenTTL is how long an issued access token stays valid. A revocation cutoff older than
+// this can no longer match a live token, so those rows are pruned rather than replayed.
+const accessTokenTTL = 15 * time.Minute
+
+// seedRevocationTracker replays every persisted revocation cutoff into the in-process tracker
+// before the server starts serving, so a token revoked, demoted or logged out before a restart
+// stays rejected after it. Cutoffs that have outlived the access-token TTL are pruned instead:
+// they cannot reject anything any more.
+func seedRevocationTracker(ctx context.Context, store *sqlite.RevocationStore, tracker *tokens.RevocationTracker) error {
+	cutoffs, err := store.RevocationCutoffs(ctx)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	for userID, cutoff := range cutoffs {
+		if now.Sub(cutoff) >= accessTokenTTL {
+			continue
+		}
+		// The tracker records only the cutoff per account; reason and scope are carried for
+		// observability on the bus and are ignored here.
+		if err := tracker.HandleRevocation(ctx, revocation.Revocation{
+			TargetType: revocation.TargetUser,
+			TargetID:   userID.String(),
+			Scope:      revocation.ScopeAll,
+			Reason:     revocation.ReasonAccountDisabled,
+			CutoffTime: cutoff,
+		}); err != nil {
+			return fmt.Errorf("restoring access-token revocation cutoff for %s: %w", userID, err)
+		}
+	}
+	return store.PruneRevocations(ctx, now.Add(-accessTokenTTL))
+}
+
 // secretEnvelopePrefix marks values in app_secrets that were envelope-encrypted with a KEK.
 const secretEnvelopePrefix = "enc:v1:"
-
 func secretEnvelopeAAD() []byte { return []byte("walldash.app_secrets") }
 
 // wrapSecret seals plaintext with the KEK when one is configured, otherwise it returns the

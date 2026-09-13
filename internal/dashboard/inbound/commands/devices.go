@@ -58,7 +58,7 @@ func (h *DevicesHandler) SavePlacement(w http.ResponseWriter, r *http.Request) {
 
 	saved, err := h.commands.SavePlacement(r.Context(), actor, domainPlacement)
 	if err != nil {
-		if errors.Is(err, domain.ErrLevelNotFound) || errors.Is(err, domain.ErrInvalidPlacement) {
+		if errors.Is(err, domain.ErrLevelNotFound) || errors.Is(err, domain.ErrInvalidPlacement) || errors.Is(err, domain.ErrPlacementNotFound) {
 			h.controller.SendFail(w, r, nil, err)
 			return
 		}

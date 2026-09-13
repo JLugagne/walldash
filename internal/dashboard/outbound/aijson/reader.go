@@ -13,11 +13,15 @@ const unitsPerMeter = 40
 
 var zoneColorPalette = []string{"#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#64748b", "#059669"}
 
-var idSeq int
+// idGen hands out the element identifiers of a single import. It is deliberately per-call rather
+// than package-level: imports run concurrently (one goroutine per HTTP request) and a shared
+// counter let one import rewind another, producing plans whose walls, openings or zones ended up
+// sharing an identifier — the identity the plan editor keys on.
+type idGen struct{ seq int }
 
-func nextID(prefix string) string {
-	idSeq++
-	return fmt.Sprintf("%s-import-%d", prefix, idSeq)
+func (g *idGen) next(prefix string) string {
+	g.seq++
+	return fmt.Sprintf("%s-import-%d", prefix, g.seq)
 }
 
 func metersToUnits(m float64) float64 {
@@ -60,7 +64,7 @@ type rawPlan struct {
 	Zones []rawZone `json:"zones"`
 }
 
-func convertOpening(raw rawOpening, wallLenUnits float64) (domain.WallOpening, error) {
+func convertOpening(raw rawOpening, wallLenUnits float64, gen *idGen) (domain.WallOpening, error) {
 	if raw.Type != "door" && raw.Type != "window" {
 		return domain.WallOpening{}, fmt.Errorf("opening type must be 'door' or 'window', got %q", raw.Type)
 	}
@@ -92,7 +96,7 @@ func convertOpening(raw rawOpening, wallLenUnits float64) (domain.WallOpening, e
 	}
 
 	return domain.WallOpening{
-		ID:        nextID(raw.Type),
+		ID:        gen.next(raw.Type),
 		Type:      raw.Type,
 		Offset:    math.Round(offset),
 		Width:     math.Round(width),
@@ -102,7 +106,7 @@ func convertOpening(raw rawOpening, wallLenUnits float64) (domain.WallOpening, e
 	}, nil
 }
 
-func convertWall(raw rawWall) (domain.WallSegment, error) {
+func convertWall(raw rawWall, gen *idGen) (domain.WallSegment, error) {
 	x1 := metersToUnits(raw.Start.X)
 	y1 := metersToUnits(raw.Start.Y)
 	x2 := metersToUnits(raw.End.X)
@@ -116,7 +120,7 @@ func convertWall(raw rawWall) (domain.WallSegment, error) {
 	wallLen := math.Hypot(x2-x1, y2-y1)
 	openings := make([]domain.WallOpening, 0, len(raw.Openings))
 	for _, o := range raw.Openings {
-		opening, err := convertOpening(o, wallLen)
+		opening, err := convertOpening(o, wallLen, gen)
 		if err != nil {
 			return domain.WallSegment{}, err
 		}
@@ -124,7 +128,7 @@ func convertWall(raw rawWall) (domain.WallSegment, error) {
 	}
 
 	return domain.WallSegment{
-		ID:        nextID("wall"),
+		ID:        gen.next("wall"),
 		X1:        math.Round(x1),
 		Y1:        math.Round(y1),
 		X2:        math.Round(x2),
@@ -134,7 +138,7 @@ func convertWall(raw rawWall) (domain.WallSegment, error) {
 	}, nil
 }
 
-func convertZone(raw rawZone, index int) (domain.Zone, error) {
+func convertZone(raw rawZone, index int, gen *idGen) (domain.Zone, error) {
 	if len(raw.Points) < 3 {
 		return domain.Zone{}, fmt.Errorf("zone %d must have at least 3 points", index+1)
 	}
@@ -158,7 +162,7 @@ func convertZone(raw rawZone, index int) (domain.Zone, error) {
 	}
 
 	return domain.Zone{
-		ID:     nextID("zone"),
+		ID:     gen.next("zone"),
 		Name:   name,
 		Color:  color,
 		Points: points,
@@ -166,7 +170,7 @@ func convertZone(raw rawZone, index int) (domain.Zone, error) {
 }
 
 func FromJSON(data []byte, levelID string) (domain.Plan, error) {
-	idSeq = 0
+	gen := &idGen{}
 	var raw rawPlan
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return domain.Plan{}, fmt.Errorf("invalid JSON: %w", err)
@@ -178,7 +182,7 @@ func FromJSON(data []byte, levelID string) (domain.Plan, error) {
 
 	walls := make([]domain.WallSegment, 0, len(raw.Walls))
 	for i, w := range raw.Walls {
-		wall, err := convertWall(w)
+		wall, err := convertWall(w, gen)
 		if err != nil {
 			return domain.Plan{}, fmt.Errorf("walls[%d]: %w", i, err)
 		}
@@ -187,7 +191,7 @@ func FromJSON(data []byte, levelID string) (domain.Plan, error) {
 
 	zones := make([]domain.Zone, 0, len(raw.Zones))
 	for i, z := range raw.Zones {
-		zone, err := convertZone(z, i)
+		zone, err := convertZone(z, i, gen)
 		if err != nil {
 			return domain.Plan{}, fmt.Errorf("zones[%d]: %w", i, err)
 		}

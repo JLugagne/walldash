@@ -16,6 +16,7 @@ import (
 	"github.com/JLugagne/walldash/internal/dashboard/domain"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/accounts"
 	"github.com/JLugagne/walldash/internal/dashboard/domain/repositories/invites"
+	"github.com/JLugagne/walldash/internal/pkg/logger"
 	"github.com/google/uuid"
 )
 
@@ -56,19 +57,35 @@ type PendingEnrollment struct {
 // pending enrollments, single-use invitations, rescue recovery and account lookup. Pending
 // enrollment state is kept in memory and is intentionally lost on restart.
 type Auth struct {
-	accounts       accounts.AccountRepository
-	invites        invites.Repository
-	issuer         *basic.Issuer
-	now            func() time.Time
-	ttl            time.Duration
-	inviteTTL      time.Duration
-	rescueEnabled  bool
-	rescueConsumed bool
-	mu             sync.Mutex
-	pending        map[string]*PendingEnrollment
-	revoker        RefreshRevoker
-	revocations    revocation.Bus
-	sessionCloser  SessionCloser
+	accounts        accounts.AccountRepository
+	invites         invites.Repository
+	issuer          *basic.Issuer
+	now             func() time.Time
+	ttl             time.Duration
+	inviteTTL       time.Duration
+	rescueEnabled   bool
+	rescueConsumed  bool
+	mu              sync.Mutex
+	pending         map[string]*PendingEnrollment
+	revoker         RefreshRevoker
+	revocations     revocation.Bus
+	revocationStore RevocationStore
+	sessionCloser   SessionCloser
+}
+
+// RevocationStore persists account-scoped revocation cutoffs so they outlive the process. The
+// access-token checker egauth installs is an in-process map, so this durable copy is what keeps a
+// revoked token revoked after a restart.
+type RevocationStore interface {
+	RecordRevocation(ctx context.Context, userID uuid.UUID, reason string, cutoff time.Time) error
+	RevocationCutoffs(ctx context.Context) (map[uuid.UUID]time.Time, error)
+	PruneRevocations(ctx context.Context, before time.Time) error
+}
+
+// SetRevocationStore installs the durable store behind PublishRevocation. Without it, revocations
+// are published in memory only and do not survive a restart.
+func (a *Auth) SetRevocationStore(store RevocationStore) {
+	a.revocationStore = store
 }
 
 // NewAuth builds the authentication use-cases over its outbound dependencies. When
@@ -156,9 +173,24 @@ func (a *Auth) ListDevices(ctx context.Context) ([]domain.Account, error) {
 	return a.accounts.FindAll(ctx)
 }
 
-// publishRevocation publishes an account-scoped revocation so already-issued access tokens
-// are rejected before their TTL expires, not just the refresh family.
-func (a *Auth) publishRevocation(ctx context.Context, subject uuid.UUID, reason revocation.Reason) {
+// PublishRevocation records an account-scoped revocation durably and publishes it, so
+// already-issued access tokens are rejected before their TTL expires and stay rejected after a
+// restart. Revoking the refresh family is the caller's job.
+func (a *Auth) PublishRevocation(ctx context.Context, subject uuid.UUID, reason revocation.Reason) {
+	cutoff := a.now().UTC()
+
+	if a.revocationStore != nil {
+		if err := a.revocationStore.RecordRevocation(ctx, subject, string(reason), cutoff); err != nil {
+			// The caller has already revoked the account row and the refresh family durably; a
+			// failed cutoff write only means the access token could be replayed across a restart
+			// for the rest of its short TTL, so this is logged loudly rather than failing an
+			// operation that has already taken effect.
+			logger.LoggerFromContext(ctx).WithError(err).
+				WithField("account_id", subject.String()).
+				Error("failed to persist the access-token revocation cutoff: the revocation will not survive a restart")
+		}
+	}
+
 	if a.revocations == nil {
 		return
 	}
@@ -167,8 +199,31 @@ func (a *Auth) publishRevocation(ctx context.Context, subject uuid.UUID, reason 
 		TargetID:   subject.String(),
 		Scope:      revocation.ScopeAll,
 		Reason:     reason,
-		CutoffTime: a.now().UTC(),
+		CutoffTime: cutoff,
 	})
+}
+
+// requireManager re-loads the caller from the store and asserts it may administer devices and
+// invitations. Privileged use-cases call it so a token whose account was revoked or demoted
+// since it was issued can never authorise anything: token scopes are never the authority.
+func (a *Auth) requireManager(ctx context.Context, actor domain.Account) (domain.Account, error) {
+	if actor.ID == "" {
+		return domain.Account{}, domain.ErrForbidden
+	}
+	current, err := a.accounts.FindByID(ctx, actor.ID)
+	if err != nil {
+		if errors.Is(err, domain.ErrAccountNotFound) {
+			return domain.Account{}, domain.ErrForbidden
+		}
+		return domain.Account{}, err
+	}
+	if current.Status != domain.StatusActive {
+		return domain.Account{}, domain.ErrForbidden
+	}
+	if current.Role != domain.RoleOwner && current.Role != domain.RoleAdmin {
+		return domain.Account{}, domain.ErrForbidden
+	}
+	return current, nil
 }
 
 type SessionCloser interface {
@@ -241,9 +296,25 @@ func (a *Auth) RevokeDevice(ctx context.Context, actor domain.Account, id string
 	if err := a.revoker.RevokeAllRefreshTokensForUser(ctx, "", subject); err != nil {
 		return domain.Account{}, err
 	}
-	a.publishRevocation(ctx, subject, revocation.ReasonAccountDisabled)
+	a.dropPendingForDevice(id)
+	a.PublishRevocation(ctx, subject, revocation.ReasonAccountDisabled)
 	a.closeUser(subject.String())
 	return acct, nil
+}
+
+// dropPendingForDevice discards any in-flight enrollment record belonging to a device, so a
+// revoked device cannot keep polling /api/auth/redeem with its pending cookie.
+func (a *Auth) dropPendingForDevice(deviceID string) {
+	if deviceID == "" {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for pendingID, rec := range a.pending {
+		if rec.DeviceID == deviceID {
+			delete(a.pending, pendingID)
+		}
+	}
 }
 
 func (a *Auth) SetRole(ctx context.Context, actor domain.Account, id string, role domain.Role) (domain.Account, error) {
@@ -283,7 +354,7 @@ func (a *Auth) SetRole(ctx context.Context, actor domain.Account, id string, rol
 		// Promotion: keep the device signed in. Reject the already-issued access token so the
 		// next request re-issues one carrying the new scopes, but leave the refresh family
 		// and the live socket untouched.
-		a.publishRevocation(ctx, subject, reasonPrivilegeGranted)
+		a.PublishRevocation(ctx, subject, reasonPrivilegeGranted)
 		return updated, nil
 	}
 	// Demotion: privileges are reduced, so end the session immediately — revoke the refresh
@@ -291,7 +362,7 @@ func (a *Auth) SetRole(ctx context.Context, actor domain.Account, id string, rol
 	if err := a.revoker.RevokeAllRefreshTokensForUser(ctx, "", subject); err != nil {
 		return domain.Account{}, err
 	}
-	a.publishRevocation(ctx, subject, revocation.ReasonLogoutEverywhere)
+	a.PublishRevocation(ctx, subject, revocation.ReasonLogoutEverywhere)
 	a.closeUser(subject.String())
 	return updated, nil
 }
