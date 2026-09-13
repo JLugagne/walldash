@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var Version = "1.3.4"
+var Version = "1.3.5"
 
 const (
 	// defaultSupervisorURL is the Home Assistant Supervisor API proxy base URL.
