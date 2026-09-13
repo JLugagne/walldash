@@ -265,3 +265,42 @@ func TestRefreshTrustsAllowedOrigins(t *testing.T) {
 	require.NotEqual(t, http.StatusForbidden, resp.StatusCode, "an allowed origin must not be rejected by the egauth same-origin check")
 	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
+
+func findSetCookie(t *testing.T, resp *http.Response, name string) *http.Cookie {
+	t.Helper()
+	for _, c := range resp.Cookies() {
+		if c.Name == name {
+			return c
+		}
+	}
+	return nil
+}
+
+// TestAutoRefreshKeepsRefreshCookiePersistent guards against a silent persistence downgrade:
+// at login and on POST /api/auth/refresh the refresh cookie is persistent ("remember me"), but
+// a transparent middleware rotation must not turn it into a session cookie. Kiosk browsers and
+// WebViews drop session cookies when they are recycled, which logged devices out after idle.
+func TestAutoRefreshKeepsRefreshCookiePersistent(t *testing.T) {
+	_, dash, _, client := setupAuthServer(t)
+
+	resp := client.do(http.MethodPost, "/api/auth/connect", nil, nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	loginRefresh := findSetCookie(t, resp, dash.Cookies.RefreshName)
+	resp.Body.Close()
+	require.NotNil(t, loginRefresh)
+	require.Greater(t, loginRefresh.MaxAge, 0, "login refresh cookie must be persistent")
+
+	// Drop the access cookie so the next protected request takes the transparent
+	// auto-refresh path using the persistent refresh cookie.
+	u, err := url.Parse(client.base)
+	require.NoError(t, err)
+	client.client.Jar.SetCookies(u, []*http.Cookie{{Name: dash.Cookies.AccessName, Value: "", MaxAge: -1, Path: "/"}})
+
+	resp = client.do(http.MethodGet, "/api/health", nil, nil)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	rotatedRefresh := findSetCookie(t, resp, dash.Cookies.RefreshName)
+	resp.Body.Close()
+
+	require.NotNil(t, rotatedRefresh, "auto-refresh must rotate and set a refresh cookie")
+	require.Greater(t, rotatedRefresh.MaxAge, 0, "auto-refresh must not downgrade the refresh cookie to a session cookie")
+}

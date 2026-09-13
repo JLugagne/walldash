@@ -27,6 +27,11 @@ func authOptions(cookies tokens.Cookies, issuer *basic.Issuer, revocation tokens
 	opts := []tokens.AuthOption[struct{}]{
 		tokens.WithCookieAuth[struct{}](cookies),
 		tokens.WithAutoRefresh[struct{}](issuer, cookies),
+		// Keep automatic rotations persistent: login and POST /api/auth/refresh issue a
+		// persistent "remember me" refresh cookie, and egauth's session-cookie default
+		// would silently downgrade it on every transparent rotation, logging kiosk
+		// devices out as soon as the browser or WebView is recycled.
+		tokens.WithPersistentAutoRefresh[struct{}](),
 	}
 	if revocation != nil {
 		opts = append(opts, tokens.WithAccessTokenRevocation[struct{}](revocation))
