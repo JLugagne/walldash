@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { Archive, ArrowLeft, CheckCircle2, Loader2, Plus, Upload, X } from 'lucide-react'
 import type { Level, RestoreSummary } from '../types'
-import { apiFetch, readApiError } from '../api'
+import { readApiError } from '../api'
+import { authFetch } from '../useAuth'
 
 type WizardStep = 'choose' | 'sh3d' | 'restore' | 'blank' | 'done'
 
@@ -49,7 +50,7 @@ export function OnboardingWizard({ onDone, onClose }: OnboardingWizardProps) {
     try {
       const form = new FormData()
       form.append('file', file)
-      const res = await apiFetch('/api/levels/import/sh3d', { method: 'POST', body: form })
+      const res = await authFetch('/api/levels/import/sh3d', { method: 'POST', body: form })
       if (!res.ok) {
         setError(await readApiError(res))
         return
@@ -88,7 +89,7 @@ export function OnboardingWizard({ onDone, onClose }: OnboardingWizardProps) {
         setError('Unsupported backup version (expected version "1")')
         return
       }
-      const res = await apiFetch('/api/restore', {
+      const res = await authFetch('/api/restore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -129,7 +130,7 @@ export function OnboardingWizard({ onDone, onClose }: OnboardingWizardProps) {
     setBusy(true)
     setError(null)
     try {
-      const res = await apiFetch('/api/levels', {
+      const res = await authFetch('/api/levels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, is_outdoor: blankOutdoor }),

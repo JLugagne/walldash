@@ -50,15 +50,22 @@ export function refreshSession(): Promise<boolean> {
 
 /**
  * authFetch wraps apiFetch and retries the request exactly once after a successful
- * silent refresh when the access cookie has expired. It returns the final response,
- * so callers still decide whether to treat a 401 as unauthenticated.
+ * silent refresh when the access cookie is stale: 401 means it expired, and 403 means
+ * the route is gated on a scope the token does not carry yet. The 403 case is how a
+ * freshly promoted device picks up its new scopes — a role change never invalidates an
+ * issued token (the server re-checks the account itself for every privileged operation),
+ * so the smaller scope set is rotated away on the first gated request that needs it. A
+ * genuinely forbidden operation just answers 403 again. Both statuses are written by the
+ * authentication middleware before any handler runs, so retrying cannot replay a side
+ * effect. It returns the final response, so callers still decide whether to treat a 401
+ * as unauthenticated.
  */
 export async function authFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
 ): Promise<Response> {
   const res = await apiFetch(input, init)
-  if (res.status !== 401) return res
+  if (res.status !== 401 && res.status !== 403) return res
   if (!(await refreshSession())) return res
   return apiFetch(input, init)
 }

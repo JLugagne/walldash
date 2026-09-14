@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { AlertCircle, Check, Copy, FileArchive, Sparkles, Upload, X } from 'lucide-react'
 import type { Plan } from '../types'
 import { PLAN_IMPORT_PROMPT } from '../planImport'
-import { apiFetch } from '../api'
+import { authFetch } from '../useAuth'
 
 interface ImportPlanModalProps {
   isOpen: boolean
@@ -69,7 +69,7 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await apiFetch(`/api/levels/${levelId}/plan/import`, {
+      const res = await authFetch(`/api/levels/${levelId}/plan/import`, {
         method: 'POST',
         body: formData,
       })
@@ -99,7 +99,7 @@ export function ImportPlanModal({ isOpen, levelId, onClose, onImport }: ImportPl
     }
     setImporting(true)
     try {
-      const res = await apiFetch(`/api/levels/${levelId}/plan/import`, {
+      const res = await authFetch(`/api/levels/${levelId}/plan/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: jsonText,

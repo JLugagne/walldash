@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import { useAuth } from './useAuth'
+import { authFetch, useAuth } from './useAuth'
 
 function jsonResponse(status: number, body: unknown): Response {
   return {
@@ -87,5 +87,42 @@ describe('useAuth', () => {
 
     await waitFor(() => expect(screen.getByTestId('checking').textContent).toBe('false'))
     expect(screen.getByTestId('authenticated').textContent).toBe('false')
+  })
+})
+
+describe('authFetch', () => {
+  it('refreshes once and retries after a 403, so a freshly promoted device gains its scope', async () => {
+    let exportCalls = 0
+    const fetchMock = mockRoutes({
+      'GET /api/export': () => {
+        exportCalls += 1
+        return exportCalls === 1
+          ? jsonResponse(403, { status: 'error', code: 'FORBIDDEN' })
+          : jsonResponse(200, { status: 'success', data: {} })
+      },
+      'POST /api/auth/refresh': () => emptyResponse(204),
+    })
+
+    const res = await authFetch('/api/export')
+
+    expect(res.status).toBe(200)
+    expect(exportCalls).toBe(2)
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toContain('/api/auth/refresh')
+  })
+
+  it('returns the original 403 when the silent refresh fails', async () => {
+    let exportCalls = 0
+    mockRoutes({
+      'GET /api/export': () => {
+        exportCalls += 1
+        return jsonResponse(403, { status: 'error', code: 'FORBIDDEN' })
+      },
+      'POST /api/auth/refresh': () => jsonResponse(401, { status: 'error' }),
+    })
+
+    const res = await authFetch('/api/export')
+
+    expect(res.status).toBe(403)
+    expect(exportCalls).toBe(1)
   })
 })

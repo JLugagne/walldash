@@ -7,7 +7,8 @@ import { AutomationListWidget } from './dashboard/widgets/AutomationListWidget'
 import { AutomationSwitchWidget } from './dashboard/widgets/AutomationSwitchWidget'
 import { WeatherWidget } from './dashboard/widgets/WeatherWidget'
 import { AddWidgetModal, type NewWidgetInput, type WidgetContentInput } from './AddWidgetModal'
-import { apiFetch, readApiError } from '../api'
+import { readApiError } from '../api'
+import { authFetch } from '../useAuth'
 import { useRealtimeDevices } from '../hooks/useRealtimeDevices'
 import { NumberWidget } from './dashboard/widgets/NumberWidget'
 import { BarWidget } from './dashboard/widgets/BarWidget'
@@ -168,7 +169,7 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
       backgroundTimerRef.current = window.setTimeout(async () => {
         backgroundTimerRef.current = null
         try {
-          const res = await apiFetch(`/api/dashboards/${activeDashboard.id}`, {
+          const res = await authFetch(`/api/dashboards/${activeDashboard.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -200,7 +201,7 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
     async (rects: Rect[]): Promise<string | null> => {
       if (!activeDashboardId) return null
       try {
-        const res = await apiFetch(`/api/dashboards/${activeDashboardId}/layout`, {
+        const res = await authFetch(`/api/dashboards/${activeDashboardId}/layout`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -232,7 +233,7 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
   const updateDashboard = useCallback(
     async (patch: { name?: string; cols?: number; rows?: number }): Promise<boolean> => {
       if (!activeDashboardId || !activeDashboard) return false
-      const res = await apiFetch(`/api/dashboards/${activeDashboardId}`, {
+      const res = await authFetch(`/api/dashboards/${activeDashboardId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -263,7 +264,7 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
     if (!window.confirm('Are you sure you want to delete this dashboard?')) return
 
     try {
-      const res = await apiFetch(`/api/dashboards/${id}`, {
+      const res = await authFetch(`/api/dashboards/${id}`, {
         method: 'DELETE',
       })
       if (res.ok) {
@@ -283,7 +284,7 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
 
   const handleCreateDashboard = async () => {
     try {
-      const res = await apiFetch('/api/dashboards', {
+      const res = await authFetch('/api/dashboards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -310,7 +311,7 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
 
   const handleCreateWidget = async (input: NewWidgetInput) => {
     if (!activeDashboardId) return
-    const res = await apiFetch(`/api/dashboards/${activeDashboardId}/widgets`, {
+    const res = await authFetch(`/api/dashboards/${activeDashboardId}/widgets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -323,7 +324,7 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
 
   const handleUpdateWidgetContent = async (widgetId: string, input: WidgetContentInput) => {
     if (!activeDashboardId) return
-    const res = await apiFetch(`/api/dashboards/${activeDashboardId}/widgets/${widgetId}`, {
+    const res = await authFetch(`/api/dashboards/${activeDashboardId}/widgets/${widgetId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -339,7 +340,7 @@ export const DashboardsView: React.FC<DashboardsViewProps> = ({
     if (!window.confirm('Delete this widget?')) return
 
     try {
-      const res = await apiFetch(`/api/dashboards/${activeDashboardId}/widgets/${widgetId}`, {
+      const res = await authFetch(`/api/dashboards/${activeDashboardId}/widgets/${widgetId}`, {
         method: 'DELETE',
       })
       if (res.ok) {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowDown, ArrowUp, Check, Home, Layers, Pencil, Plus, Trash2, Trees, Upload, X, Gauge, SlidersHorizontal } from 'lucide-react'
 import type { Level } from '../types'
-import { apiFetch } from '../api'
+import { authFetch } from '../useAuth'
 
 interface LevelsManagerProps {
   levels: Level[]
@@ -31,7 +31,7 @@ export function LevelsManager({ levels, activeLevelId, onSelectLevel, onRefreshL
     setBusy(true)
     setError(null)
     try {
-      const res = await apiFetch(input, init)
+      const res = await authFetch(input, init)
       const result = res.status === 204 ? { status: 'success' } : await res.json().catch(() => ({}))
       if (!res.ok || (result.status && result.status !== 'success')) {
         setError(result.error?.message || failure)

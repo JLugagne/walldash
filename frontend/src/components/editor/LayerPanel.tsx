@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Check, Eye, EyeOff, Layers, Pencil, Plus, Trash2, X, Gauge, SlidersHorizontal } from 'lucide-react'
 import type { DevicePlacement, Level, Layer } from '../../types'
-import { apiFetch } from '../../api'
+import { authFetch } from '../../useAuth'
 
 interface LayerPanelProps {
   level: Level | null
@@ -42,7 +42,7 @@ export function LayerPanel({ level, placements, activeLayer, onSelectLayer, onRe
     setBusy(true)
     setError(null)
     try {
-      const res = await apiFetch(`/api/levels/${level.id}`, {
+      const res = await authFetch(`/api/levels/${level.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: level.name, is_outdoor: level.is_outdoor, layers: newLayers }),
@@ -99,7 +99,7 @@ export function LayerPanel({ level, placements, activeLayer, onSelectLayer, onRe
     setError(null)
     try {
       const updatedLayers = layers.map((l) => (l.name === oldName ? { ...l, name: trimmed } : l))
-      const res = await apiFetch(`/api/levels/${level.id}`, {
+      const res = await authFetch(`/api/levels/${level.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: level.name, is_outdoor: level.is_outdoor, layers: updatedLayers }),
@@ -112,7 +112,7 @@ export function LayerPanel({ level, placements, activeLayer, onSelectLayer, onRe
 
       const affected = placements.filter((p) => (p.layer || 'controls') === oldName)
       for (const p of affected) {
-        await apiFetch(`/api/levels/${level.id}/placements`, {
+        await authFetch(`/api/levels/${level.id}/placements`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

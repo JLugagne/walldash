@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, ChevronRight, Edit2, LayoutDashboard, Plus, RefreshCw, Trash2, X } from 'lucide-react'
 import type { Dashboard } from '../../types'
-import { apiFetch, readApiError } from '../../api'
+import { readApiError } from '../../api'
+import { authFetch } from '../../useAuth'
 import {
   DEFAULT_BACKGROUND_BLUR,
   DEFAULT_BACKGROUND_DIM,
@@ -44,7 +45,7 @@ export function DashboardsManager() {
     setCreating(true)
     setError(null)
     try {
-      const res = await apiFetch('/api/dashboards', {
+      const res = await authFetch('/api/dashboards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -84,7 +85,7 @@ export function DashboardsManager() {
     setBusyId(dashboard.id)
     setError(null)
     try {
-      const res = await apiFetch(`/api/dashboards/${dashboard.id}`, {
+      const res = await authFetch(`/api/dashboards/${dashboard.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,7 +117,7 @@ export function DashboardsManager() {
     setBusyId(dashboard.id)
     setError(null)
     try {
-      const res = await apiFetch(`/api/dashboards/${dashboard.id}`, { method: 'DELETE' })
+      const res = await authFetch(`/api/dashboards/${dashboard.id}`, { method: 'DELETE' })
       if (res.ok) {
         await load()
       } else {

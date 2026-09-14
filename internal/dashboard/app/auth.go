@@ -26,10 +26,6 @@ const (
 	defaultPendingTTL = 15 * time.Minute
 	// defaultInviteTTL is how long an administrator-minted invitation stays valid.
 	defaultInviteTTL = 15 * time.Minute
-	// reasonPrivilegeGranted marks an access-token-only revocation published after a role
-	// promotion: the target's current access token is rejected so its next request re-issues
-	// one with the new scopes, while its refresh family and live socket stay valid.
-	reasonPrivilegeGranted revocation.Reason = "privilege_granted"
 )
 
 var (
@@ -351,10 +347,20 @@ func (a *Auth) SetRole(ctx context.Context, actor domain.Account, id string, rol
 		return updated, nil
 	}
 	if roleRank(role) > roleRank(target.Role) {
-		// Promotion: keep the device signed in. Reject the already-issued access token so the
-		// next request re-issues one carrying the new scopes, but leave the refresh family
-		// and the live socket untouched.
-		a.PublishRevocation(ctx, subject, reasonPrivilegeGranted)
+		// Promotion: keep the device signed in and publish nothing. A promotion grants
+		// privileges, so the target's already-issued access token — which carries the smaller,
+		// older scope set — is harmless to accept: every privileged use-case re-loads the
+		// account from the store, so a stale scope can never authorise more than the account's
+		// current role. The client picks the new scopes up by refreshing once when a
+		// setup-scoped route answers 403, and otherwise at its next rotation.
+		//
+		// This deliberately does NOT publish an access-token revocation. Publishing one used to
+		// sign promoted devices out: the tracker rejects any token whose `iat` is at or before
+		// the cutoff, and because a JWT `iat` is truncated to whole seconds while the cutoff
+		// keeps sub-second precision, the freshly re-issued token was rejected too whenever the
+		// device's next request fell in the promotion's second. The client retries a 401 only
+		// once, so that false positive dropped the device to the login screen, which enrolled it
+		// again as a new pending device and lost the role it had just been granted.
 		return updated, nil
 	}
 	// Demotion: privileges are reduced, so end the session immediately — revoke the refresh

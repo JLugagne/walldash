@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useBlocker } from 'react-router-dom'
 import { AlertCircle, Cpu, Layers, Loader2, Maximize2, SlidersHorizontal, X, ZoomIn, ZoomOut } from 'lucide-react'
 import type { Device, DevicePlacement, Level, Plan, Point2D, SavePlacementRequest, WallOpening, WallSegment, Zone } from '../types'
-import { apiFetch } from '../api'
+import { authFetch } from '../useAuth'
 import { shouldBlockPlanExit } from './editor/navigationGuard'
 import { ImportPlanModal } from './ImportPlanModal'
 import { OnboardingWizard } from './OnboardingWizard'
@@ -449,7 +449,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, al
       if (!level) return null
       setError(null)
       try {
-        const res = await apiFetch(`/api/levels/${level.id}/placements`, {
+        const res = await authFetch(`/api/levels/${level.id}/placements`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(req),
@@ -482,7 +482,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, al
       if (!level) return
       setError(null)
       try {
-        const res = await apiFetch(`/api/levels/${level.id}/placements/${placementId}`, { method: 'DELETE' })
+        const res = await authFetch(`/api/levels/${level.id}/placements/${placementId}`, { method: 'DELETE' })
         const payload = await res.json()
         if (res.ok && payload.status === 'success') {
           setPlacements((prev) => prev.filter((p) => p.id !== placementId))
@@ -552,7 +552,7 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, al
     setSaveState('saving')
     setError(null)
     try {
-      const res = await apiFetch(`/api/levels/${level.id}/plan`, {
+      const res = await authFetch(`/api/levels/${level.id}/plan`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walls: plan.walls, zones: plan.zones }),
@@ -1211,7 +1211,9 @@ export function PlanEditor2D({ level, levels, onSelectLevel, onRefreshLevels, al
 
   const handleExport = async () => {
     try {
-      const res = await fetch('/api/export')
+      // /api/export is setup-scoped: authFetch re-issues the token when the one held by a
+      // freshly promoted device does not carry the scope yet.
+      const res = await authFetch('/api/export')
       if (!res.ok) throw new Error('Export failed')
       const payload = await res.json()
       const blob = new Blob([JSON.stringify(payload.data, null, 2)], { type: 'application/json' })

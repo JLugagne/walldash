@@ -112,8 +112,13 @@ func TestCanManageAccount(t *testing.T) {
 }
 
 // TestSetRolePromotionKeepsSession pins the rule that promoting a device does not sign it out:
-// only privilege reduction ends the session. The access token is still invalidated so the next
-// request re-issues one carrying the new scopes, but the refresh family and live socket stay.
+// only privilege reduction ends the session. Nothing is revoked either — not the refresh family,
+// not the live socket, and not the issued access token. A promotion grants privileges, so the
+// target's older token carries only a smaller scope set; the client re-issues it by refreshing
+// once when a setup-scoped route answers 403. Revoking it instead (as an "access-token-only"
+// revocation cutoff) is what used to drop promoted devices: the tracker rejects any token whose
+// second-truncated `iat` is at or before the sub-second cutoff, so the freshly re-issued token was
+// rejected too, and the client's single 401 retry landed on the login screen.
 func TestSetRolePromotionKeepsSession(t *testing.T) {
 	targetID := uuid.NewString()
 	target := domain.Account{ID: targetID, Role: domain.RoleDevice, Status: domain.StatusActive}
@@ -144,6 +149,5 @@ func TestSetRolePromotionKeepsSession(t *testing.T) {
 	require.Equal(t, domain.RoleAdmin, updated.Role)
 	require.False(t, revoker.called, "promotion must not revoke the refresh family")
 	require.Empty(t, closer.closed, "promotion must not close live sockets")
-	require.Len(t, published, 1, "promotion should still force the access token to be re-issued")
-	assert.Equal(t, targetID, published[0].TargetID)
+	require.Empty(t, published, "promotion must not publish any access-token revocation")
 }
