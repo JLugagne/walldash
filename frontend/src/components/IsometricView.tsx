@@ -15,6 +15,28 @@ interface IsometricViewProps {
   onOpenHouseOverview?: () => void
 }
 
+// Shown when the 3D canvas cannot render: either the browser refused to
+// create a WebGL context (Canvas `fallback`), or the mobile GPU dropped it
+// afterwards (`webglcontextlost`, common when the scene exceeds the device's
+// limits). A blank canvas gives no clue; this tells the user what to try.
+function WebGLFallback({ title, message }: { title: string; message: string }) {
+  return (
+    <div className="absolute inset-0 z-10 flex items-center justify-center p-4 bg-[#0b0f19]">
+      <div className="max-w-md w-full bg-slate-900/95 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center space-y-3">
+        <h3 className="text-base font-semibold text-white">{title}</h3>
+        <p className="text-xs text-slate-400 leading-relaxed">{message}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg shadow-indigo-500/30 transition-all"
+        >
+          Reload the view
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function IsometricView({
   level,
   levels,
@@ -25,6 +47,7 @@ export function IsometricView({
   const [plan, setPlan] = useState<Plan | null>(null)
   const [loading, setLoading] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [contextLost, setContextLost] = useState(false)
   const [viewAngle, setViewAngle] = useState(() => {
     try {
       const stored = localStorage.getItem('ha_dash_view_angle')
@@ -181,9 +204,21 @@ export function IsometricView({
           // pegged a CPU core while idled, so only render on invalidate.
           frameloop="demand"
           dpr={[1, 1.5]}
-          gl={{ antialias: true, powerPreference: 'high-performance' }}
+          gl={{ antialias: true }}
           camera={{ position: [0, 22, 32], fov: 42, near: 0.5, far: 500 }}
           className="w-full h-full"
+          fallback={
+            <WebGLFallback
+              title="3D view unavailable"
+              message="This browser could not create a WebGL context. On mobile this is usually Brave Shields fingerprinting protection or an old GPU driver: try Shields down (or Chrome) and reload."
+            />
+          }
+          onCreated={({ gl }) => {
+            gl.domElement.addEventListener('webglcontextlost', (e) => {
+              e.preventDefault()
+              setContextLost(true)
+            })
+          }}
         >
           <color attach="background" args={['#0b0f19']} />
           <IsometricScene
@@ -198,6 +233,13 @@ export function IsometricView({
           />
         </Canvas>
       </div>
+
+      {contextLost && (
+        <WebGLFallback
+          title="3D rendering stopped"
+          message="The graphics processor dropped the 3D context — on phones this happens when the scene exceeds the device's graphics limits. Reload to try again."
+        />
+      )}
 
       {/* Top-center house overview, level & layer selectors */}
       <ViewTopSelectors

@@ -7,6 +7,7 @@ import { ZoneCeilingDisplay } from './ZoneCeilingDisplay'
 import { buildWallGeometry, toWorldX, toWorldZ, WALL_HEIGHT } from './wallGeometry'
 import { createWallMaterial } from './wallMaterial'
 import { getFloorTileTexture } from './floorTexture'
+import { computePlanBounds } from '../utils/planBounds'
 import { hasConfiguredSensors, isCeilingHiddenForActiveLayer } from '../utils/ceilingDisplay'
 
 export { WALL_HEIGHT }
@@ -49,7 +50,7 @@ function PerspectiveSceneCamera({ bounds, viewAngle = 0.6 }: { bounds: PlanBound
   useEffect(() => {
     if (!(camera instanceof THREE.PerspectiveCamera)) return
 
-    const aspect = size.width / size.height
+    const aspect = size.width / Math.max(size.height, 1)
     camera.aspect = aspect
     camera.updateProjectionMatrix()
 
@@ -671,6 +672,19 @@ export function IsometricScene({
   const walls = plan?.walls || []
   const zones = plan?.zones || []
 
+  // frameloop="demand" only draws after invalidate(): re-request a frame
+  // whenever a visual input changes. Without this the scene (and the drei
+  // Html badges positioned from it) stays frozen — e.g. after switching
+  // floors on a touch device, where no wheel event ever triggers a re-fit.
+  const invalidate = useThree((s) => s.invalidate)
+  const visualRevision = useMemo(
+    () => ({ plan, pan, viewAngle, placements, deviceMap, pendingDevices, activeLayer, layers }),
+    [plan, pan, viewAngle, placements, deviceMap, pendingDevices, activeLayer, layers],
+  )
+  useEffect(() => {
+    invalidate()
+  }, [invalidate, visualRevision])
+
   // Build a map of layer_name -> hide_gauges
   const layerHideGaugesMap = useMemo(() => {
     const map: Record<string, boolean> = {}
@@ -700,48 +714,10 @@ export function IsometricScene({
     })
   }, [deviceMap, onlyLights, visiblePlacements])
 
-  // Bounding box dimensions of the plan in 3D world space
-  const planBounds = useMemo(() => {
-    if (!plan || (plan.walls.length === 0 && plan.zones.length === 0)) {
-      return { minX: -10, maxX: 10, minZ: -7, maxZ: 7 }
-    }
-    let minX = Infinity
-    let maxX = -Infinity
-    let minZ = Infinity
-    let maxZ = -Infinity
-    for (const w of plan.walls) {
-      minX = Math.min(minX, toWorldX(w.x1), toWorldX(w.x2))
-      maxX = Math.max(maxX, toWorldX(w.x1), toWorldX(w.x2))
-      minZ = Math.min(minZ, toWorldZ(w.y1), toWorldZ(w.y2))
-      maxZ = Math.max(maxZ, toWorldZ(w.y1), toWorldZ(w.y2))
-    }
-    for (const z of plan.zones) {
-      for (const p of z.points) {
-        minX = Math.min(minX, toWorldX(p.x))
-        maxX = Math.max(maxX, toWorldX(p.x))
-        minZ = Math.min(minZ, toWorldZ(p.y))
-        maxZ = Math.max(maxZ, toWorldZ(p.y))
-      }
-    }
-    for (const p of placements) {
-      const wx = toWorldX(p.x)
-      const wz = toWorldZ(p.y)
-      minX = Math.min(minX, wx)
-      maxX = Math.max(maxX, wx)
-      minZ = Math.min(minZ, wz)
-      maxZ = Math.max(maxZ, wz)
-    }
-    if (!isFinite(minX)) return { minX: -10, maxX: 10, minZ: -7, maxZ: 7 }
-
-    // Expand by 0.6 units to include outer wall faces and cylinder corners
-    const wallPadding = 0.6
-    return {
-      minX: minX - wallPadding,
-      maxX: maxX + wallPadding,
-      minZ: minZ - wallPadding,
-      maxZ: maxZ + wallPadding,
-    }
-  }, [plan, placements])
+  // Bounding box of the plan in 3D world space, used to fit the camera.
+  // Placements are always included (even for an empty plan) so devices never
+  // end up off-frame with the default bounds.
+  const planBounds = useMemo(() => computePlanBounds(plan, placements), [plan, placements])
 
   // Detect closed room volumes from walls
   const detectedRooms = useMemo(() => {
