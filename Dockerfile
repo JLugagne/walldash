@@ -5,7 +5,7 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/base:3.23@sha256:1c7a8c7321c15cdc327c264232a76e6fbfdaf7f2b1734a8d8da6fcc994f66015
 
 # Stage 1: Build the frontend assets
-FROM node:26-alpine@sha256:ef24c5053d50fdc3e4e56eb4e7ddb7861874ab0fdc797046ba897581deb8e868 AS frontend-builder
+FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS frontend-builder
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
