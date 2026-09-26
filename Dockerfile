@@ -16,7 +16,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build the Go backend binary with embedded frontend assets
-FROM golang:1.27-alpine@sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125 AS backend-builder
+FROM golang:1.27-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS backend-builder
 WORKDIR /app
 
 # BUILD_VERSION and BUILD_ARCH are provided automatically by the official
