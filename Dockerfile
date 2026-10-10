@@ -2,10 +2,10 @@
 # Pinned for build stability; the official builder overrides BUILD_FROM per
 # architecture, the default below keeps local `docker build` working.
 # https://developers.home-assistant.io/docs/apps/configuration#app-dockerfile
-ARG BUILD_FROM=ghcr.io/home-assistant/base:3.23@sha256:1c7a8c7321c15cdc327c264232a76e6fbfdaf7f2b1734a8d8da6fcc994f66015
+ARG BUILD_FROM=ghcr.io/home-assistant/base:3.24@sha256:8fde4170393bdf7a121ea4d6e34b417e1d0b90125948459f9f9f70cdf5d77c16
 
 # Stage 1: Build the frontend assets
-FROM node:26-alpine@sha256:ef24c5053d50fdc3e4e56eb4e7ddb7861874ab0fdc797046ba897581deb8e868 AS frontend-builder
+FROM node:26-alpine@sha256:143494b1da2945f061539253adc65e4f1569ddf07da2d384c022c791a9d90a4a AS frontend-builder
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
@@ -16,7 +16,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build the Go backend binary with embedded frontend assets
-FROM golang:1.27-alpine@sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125 AS backend-builder
+FROM golang:1.27-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS backend-builder
 WORKDIR /app
 
 # BUILD_VERSION and BUILD_ARCH are provided automatically by the official
