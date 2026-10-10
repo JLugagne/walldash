@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/JLugagne/egauth/keystore"
 	"github.com/JLugagne/walldash/internal/dashboard/outbound/sqlite"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
@@ -65,8 +64,7 @@ func TestLegacyPlaintextResealWriteFailureIsFatal(t *testing.T) {
 	defer func() { _ = ro.Close() }()
 	store := sqlite.NewSecretsStore(ro)
 
-	kek, err := keystore.NewKEK(bytes.Repeat([]byte{7}, 32))
-	require.NoError(t, err)
+	kek := newTestKEK(t)
 
 	_, err = resolveTokenSecret(ctx, store, "", kek)
 	require.Error(t, err, "a failed plaintext-to-KEK migration must fail startup")
@@ -170,8 +168,7 @@ func TestLegacyPlaintextTokenSecretIsResealedWithKEK(t *testing.T) {
 	legacy := bytes.Repeat([]byte{6}, 32)
 	require.NoError(t, store.Set(ctx, sqlite.TokenSecretName, legacy))
 
-	kek, err := keystore.NewKEK(bytes.Repeat([]byte{7}, 32))
-	require.NoError(t, err)
+	kek := newTestKEK(t)
 
 	got, err := resolveTokenSecret(ctx, store, "", kek)
 	require.NoError(t, err)

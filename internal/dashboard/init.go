@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JLugagne/egauth/event"
 	"github.com/JLugagne/egauth/keystore"
 	"github.com/JLugagne/egauth/revocation"
 	"github.com/JLugagne/egauth/tokens"
@@ -100,7 +101,7 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		k, err := keystore.NewKEK([]byte(conf.SecretKey))
 		if err != nil {
 			_ = adapter.Close()
-			return nil, fmt.Errorf("SECRET_KEY must be exactly 32 bytes: %w", err)
+			return nil, fmt.Errorf("SECRET_KEY is not a usable key-encryption key (need >=32 bytes and non-trivial key material): %w", err)
 		}
 		kek = k
 	} else if conf.TokenSecret == "" {
@@ -135,6 +136,7 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 		// (a phone waking from sleep can replay a consumed token seconds later); 30s
 		// absorbs those retries while keeping a stolen token's replay window short.
 		ReuseGracePeriod: reuseGrace,
+		EventSink:        event.SinkFunc(logAuthEvent),
 		ClaimsProvider: basic.ClaimsProviderFunc(func(ctx context.Context, userID uuid.UUID, tenantID string) (basic.Claims, error) {
 			acct, err := accountRepo.FindByID(ctx, userID.String())
 			if err != nil || acct.Status != domain.StatusActive {
@@ -444,6 +446,7 @@ func seedRevocationTracker(ctx context.Context, store *sqlite.RevocationStore, t
 
 // secretEnvelopePrefix marks values in app_secrets that were envelope-encrypted with a KEK.
 const secretEnvelopePrefix = "enc:v1:"
+
 func secretEnvelopeAAD() []byte { return []byte("walldash.app_secrets") }
 
 // wrapSecret seals plaintext with the KEK when one is configured, otherwise it returns the
@@ -532,4 +535,37 @@ func createAutoKEKFile(path string) ([]byte, error) {
 		return nil, fmt.Errorf("writing key-encryption key file %s: %w", path, err)
 	}
 	return key, nil
+}
+
+// logAuthEvent surfaces egauth's security events (session issuance, refresh reuse, family
+// revocation, logout, ...) through the application logger. egauth v0.14+ emits them on the
+// issuer's EventSink, but without a sink they are dropped and a spurious logout — a refresh
+// family revoked by reuse/theft detection, for instance — leaves no trace in the logs. Family
+// revocations and post-grace reuse are logged at warn; a benign within-grace replay (concurrent
+// tabs racing the same rotation) is only debug, since it does not end the session.
+func logAuthEvent(_ context.Context, e event.Event) {
+	fields := logrus.Fields{
+		"auth_event": string(e.Type),
+		"tenant_id":  e.TenantID,
+		"user_id":    e.UserID,
+	}
+	if e.Reason != "" {
+		fields["reason"] = e.Reason
+	}
+	for k, v := range e.Attrs {
+		fields["attr_"+k] = v
+	}
+	entry := logrus.WithFields(fields)
+	if e.Err != nil {
+		entry = entry.WithError(e.Err)
+	}
+	msg := "auth event: " + string(e.Type)
+	switch {
+	case e.Type == event.TokenFamilyRevoked:
+		entry.Warn(msg)
+	case e.Type == event.RefreshReuseDetected && e.Reason != "within_grace":
+		entry.Warn(msg)
+	default:
+		entry.Debug(msg)
+	}
 }

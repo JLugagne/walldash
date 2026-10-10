@@ -1,8 +1,8 @@
 package dashboard
 
 import (
-	"bytes"
 	"context"
+	"crypto/rand"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -19,8 +19,7 @@ func TestResolveTokenSecret(t *testing.T) {
 	require.NoError(t, err)
 	store := sqlite.NewSecretsStore(adapter.DB())
 
-	kek, err := keystore.NewKEK(bytes.Repeat([]byte{4}, 32))
-	require.NoError(t, err)
+	kek := newTestKEK(t)
 
 	first, err := resolveTokenSecret(ctx, store, "", kek)
 	require.NoError(t, err)
@@ -51,8 +50,7 @@ func TestResolveTokenSecretSealedWithKEK(t *testing.T) {
 	defer func() { _ = adapter.Close() }()
 	store := sqlite.NewSecretsStore(adapter.DB())
 
-	kek, err := keystore.NewKEK(bytes.Repeat([]byte{7}, 32))
-	require.NoError(t, err)
+	kek := newTestKEK(t)
 
 	secret, err := resolveTokenSecret(ctx, store, "", kek)
 	require.NoError(t, err)
@@ -69,12 +67,24 @@ func TestResolveTokenSecretSealedWithKEK(t *testing.T) {
 	require.Equal(t, secret, again)
 
 	// A wrong KEK must fail loudly rather than silently rotate the signing key.
-	otherKek, err := keystore.NewKEK(bytes.Repeat([]byte{9}, 32))
-	require.NoError(t, err)
+	otherKek := newTestKEK(t)
 	_, err = resolveTokenSecret(ctx, store, "", otherKek)
 	require.Error(t, err)
 
 	// Without the KEK the app must refuse to start rather than downgrade to plaintext.
 	_, err = resolveTokenSecret(ctx, store, "", nil)
 	require.Error(t, err)
+}
+
+// newTestKEK returns a random, non-trivial key-encryption key. egauth v0.15 rejects KEKs that
+// are all-zero or a single repeated byte, so tests must draw real random key material.
+func newTestKEK(t *testing.T) *keystore.KEK {
+	t.Helper()
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		t.Fatalf("generate test KEK: %v", err)
+	}
+	kek, err := keystore.NewKEK(raw)
+	require.NoError(t, err)
+	return kek
 }

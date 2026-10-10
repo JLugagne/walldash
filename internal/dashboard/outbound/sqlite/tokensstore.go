@@ -29,10 +29,15 @@ func NewTokensStore(db *sql.DB, reuseGrace time.Duration) *TokensStore {
 
 func scanRefreshToken(row accountRowScanner) (*tokens.RefreshToken, error) {
 	var rt tokens.RefreshToken
-	var familyID, userID string
+	var familyID, userID, amr string
 	var consumedAt sql.NullTime
-	if err := row.Scan(&rt.Hash, &familyID, &userID, &rt.TenantID, &rt.AuthTime, &rt.MustChangePassword, &rt.ExpiresAt, &rt.CreatedAt, &consumedAt); err != nil {
+	if err := row.Scan(&rt.Hash, &familyID, &userID, &rt.TenantID, &rt.AuthTime, &rt.MustChangePassword, &rt.RememberMe, &amr, &rt.ExpiresAt, &rt.CreatedAt, &consumedAt); err != nil {
 		return nil, err
+	}
+	if amr != "" {
+		if err := json.Unmarshal([]byte(amr), &rt.AMR); err != nil {
+			return nil, err
+		}
 	}
 	fid, err := uuid.Parse(familyID)
 	if err != nil {
@@ -94,8 +99,16 @@ func (s *TokensStore) SaveRefreshToken(ctx context.Context, tenantID string, rt 
 	if rt.ConsumedAt != nil {
 		consumedAt = rt.ConsumedAt.UTC()
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO auth_refresh_tokens (hash, family_id, user_id, tenant_id, auth_time, must_change_password, expires_at, created_at, consumed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		rt.Hash, rt.FamilyID.String(), rt.UserID.String(), rt.TenantID, rt.AuthTime.UTC(), rt.MustChangePassword, rt.ExpiresAt.UTC(), rt.CreatedAt.UTC(), consumedAt)
+	var amr string
+	if len(rt.AMR) > 0 {
+		raw, err := json.Marshal(rt.AMR)
+		if err != nil {
+			return errors.Join(domain.ErrDatabaseUnavailable, err)
+		}
+		amr = string(raw)
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO auth_refresh_tokens (hash, family_id, user_id, tenant_id, auth_time, must_change_password, remember_me, amr, expires_at, created_at, consumed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		rt.Hash, rt.FamilyID.String(), rt.UserID.String(), rt.TenantID, rt.AuthTime.UTC(), rt.MustChangePassword, rt.RememberMe, amr, rt.ExpiresAt.UTC(), rt.CreatedAt.UTC(), consumedAt)
 	if err != nil {
 		return errors.Join(domain.ErrDatabaseUnavailable, err)
 	}
@@ -103,7 +116,7 @@ func (s *TokensStore) SaveRefreshToken(ctx context.Context, tenantID string, rt 
 }
 
 func (s *TokensStore) FindRefreshToken(ctx context.Context, tenantID string, tokenHash string) (*tokens.RefreshToken, error) {
-	query := `SELECT hash, family_id, user_id, tenant_id, auth_time, must_change_password, expires_at, created_at, consumed_at FROM auth_refresh_tokens WHERE hash = ? AND tenant_id = ?`
+	query := `SELECT hash, family_id, user_id, tenant_id, auth_time, must_change_password, remember_me, amr, expires_at, created_at, consumed_at FROM auth_refresh_tokens WHERE hash = ? AND tenant_id = ?`
 	rt, err := scanRefreshToken(s.db.QueryRowContext(ctx, query, tokenHash, tenantID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

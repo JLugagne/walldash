@@ -244,3 +244,52 @@ func TestBasicIssuerReuseGraceKeepsFamilySynctest(t *testing.T) {
 		require.NotEmpty(t, next.RefreshToken)
 	})
 }
+
+func TestSQLiteTokensStorePersistsRememberMeAndAMR(t *testing.T) {
+	adapter := setupTestDB(t)
+	store := sqlite.NewTokensStore(adapter.DB(), 30*time.Second)
+	ctx := context.Background()
+
+	rt := &tokens.RefreshToken{
+		Hash:       "remember-amr",
+		FamilyID:   uuid.Must(uuid.NewV7()),
+		UserID:     uuid.Must(uuid.NewV7()),
+		RememberMe: true,
+		AMR:        []string{"device", "mfa"},
+		ExpiresAt:  time.Now().Add(time.Hour),
+		CreatedAt:  time.Now(),
+	}
+	require.NoError(t, store.SaveRefreshToken(ctx, "", rt))
+
+	found, err := store.FindRefreshToken(ctx, "", rt.Hash)
+	require.NoError(t, err)
+	assert.True(t, found.RememberMe, "remember_me must round-trip so a rotation keeps the cookie persistence choice")
+	assert.Equal(t, []string{"device", "mfa"}, found.AMR, "amr must round-trip so a stepped-up session keeps its assurance across a silent rotation")
+}
+
+func TestSQLiteTokensStoreReadsLegacyRefreshTokenRow(t *testing.T) {
+	adapter := setupTestDB(t)
+	store := sqlite.NewTokensStore(adapter.DB(), 30*time.Second)
+	ctx := context.Background()
+
+	familyID := uuid.Must(uuid.NewV7())
+	userID := uuid.Must(uuid.NewV7())
+	now := time.Now().UTC().Truncate(time.Second)
+	expiresAt := now.Add(time.Hour)
+
+	// Simulate a row written by a pre-v0.16 binary: remember_me/amr are not mentioned, so they
+	// take their migration defaults. The row must stay readable and rotatable after the upgrade.
+	_, err := adapter.DB().ExecContext(ctx,
+		`INSERT INTO auth_refresh_tokens (hash, family_id, user_id, tenant_id, auth_time, must_change_password, expires_at, created_at, consumed_at)
+		 VALUES (?, ?, ?, '', ?, 0, ?, ?, NULL)`,
+		"legacy-rt", familyID.String(), userID.String(), now, expiresAt, now)
+	require.NoError(t, err)
+
+	found, err := store.FindRefreshToken(ctx, "", "legacy-rt")
+	require.NoError(t, err, "a refresh token issued before the migration must still be found")
+	assert.False(t, found.RememberMe, "a legacy row reads back as a non-remember-me family")
+	assert.Empty(t, found.AMR, "a legacy row reads back with no recorded assurance")
+
+	// It must still rotate: consuming the legacy token succeeds like any live one.
+	require.NoError(t, store.ConsumeRefreshToken(ctx, "", "legacy-rt"))
+}
