@@ -3,7 +3,7 @@ module github.com/JLugagne/walldash
 go 1.26.7
 
 require (
-	github.com/JLugagne/egauth v0.13.0
+	github.com/JLugagne/egauth v0.15.0
 	github.com/go-playground/validator/v10 v10.30.4
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
