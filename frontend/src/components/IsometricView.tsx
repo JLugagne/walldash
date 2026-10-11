@@ -80,6 +80,15 @@ export function IsometricView({
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
+    // The floor selector is portaled into the app top bar, and the layer/overlay
+    // controls sit inside this section, so their pointer events bubble through
+    // the React tree into this handler. Capturing the pointer here would retarget
+    // the ensuing click to the section, so the control never receives its onClick
+    // and the button appears dead. Only start a tilt drag for pointers that land
+    // on the section's own drag surface.
+    const target = e.target as Node
+    if (!e.currentTarget.contains(target)) return
+    if (target instanceof Element && target.closest('button, a, input, select, textarea, [role="button"]')) return
     dragRef.current = { pointerId: e.pointerId, lastY: e.clientY }
     e.currentTarget.setPointerCapture?.(e.pointerId)
   }, [])

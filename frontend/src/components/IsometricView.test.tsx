@@ -3,7 +3,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { IsometricView } from './IsometricView'
+import { TopBarSlotProvider, useSetTopBarSlot } from './TopBarSlot'
 import type { Level, DevicePlacement, Layer } from '../types'
+
+// The floor selector is portaled into the app top bar, so its DOM ancestor
+// chain does not include the 3D <section>. React, however, still bubbles its
+// events through the React tree into the section's drag handler.
+function TopBarHarness({ level, levels, onSelectLevel }: {
+  level: Level
+  levels: Level[]
+  onSelectLevel: (id: string) => void
+}) {
+  const setSlot = useSetTopBarSlot()
+  return (
+    <div>
+      <div ref={setSlot} data-testid="topbar" />
+      <IsometricView level={level} levels={levels} onSelectLevel={onSelectLevel} />
+    </div>
+  )
+}
 
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children }: { children: React.ReactNode }) => (
@@ -170,5 +188,41 @@ describe('IsometricView Layer Selection and Filtering', () => {
       const stored = parseFloat(localStorage.getItem('ha_dash_view_angle') ?? '')
       expect(stored).toBeGreaterThan(0.6)
     })
+  })
+
+  it('does not grab the pointer on a portaled top-bar floor button, so its click still lands', async () => {
+    const capture = vi.fn()
+    Element.prototype.setPointerCapture = capture as unknown as typeof Element.prototype.setPointerCapture
+
+    render(
+      <MemoryRouter>
+        <TopBarSlotProvider>
+          <TopBarHarness level={level1} levels={[level1, level2]} onSelectLevel={vi.fn()} />
+        </TopBarSlotProvider>
+      </MemoryRouter>
+    )
+
+    const button = await screen.findByRole('button', { name: 'Level Jardin' })
+    expect(button.closest('section')).toBeNull()
+
+    fireEvent.pointerDown(button, { pointerId: 3, pointerType: 'touch', clientY: 120 })
+
+    expect(capture).not.toHaveBeenCalled()
+  })
+
+  it('does not grab the pointer on a selector control nested in the canvas', async () => {
+    const capture = vi.fn()
+    Element.prototype.setPointerCapture = capture as unknown as typeof Element.prototype.setPointerCapture
+
+    const { container } = renderInRouter(
+      <IsometricView level={level1} levels={[level1]} onSelectLevel={vi.fn()} />
+    )
+    const section = container.firstElementChild as HTMLElement
+    const button = screen.getByRole('button', { name: 'Level Ground Floor' })
+    expect(section.contains(button)).toBe(true)
+
+    fireEvent.pointerDown(button, { pointerId: 4, pointerType: 'touch', clientY: 120 })
+
+    expect(capture).not.toHaveBeenCalled()
   })
 })
