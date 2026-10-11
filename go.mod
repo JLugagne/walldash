@@ -1,6 +1,6 @@
 module github.com/JLugagne/walldash
 
-go 1.26.7
+go 1.27.2
 
 require (
 	github.com/JLugagne/egauth v0.16.1

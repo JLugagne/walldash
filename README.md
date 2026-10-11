@@ -1,7 +1,7 @@
 # Walldash
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](go.mod)
+[![Go Version](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go)](go.mod)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](frontend/package.json)
 [![Three.js](https://img.shields.io/badge/Three.js-r185-black?logo=threedotjs)](frontend/package.json)
 
@@ -280,7 +280,7 @@ walldash/
 └── frontend/        # React 19 SPA (Vite, TypeScript, Three.js, React Three Fiber, Tailwind CSS v4)
 ```
 
-- **Backend**: Go (Go 1.26+), Hexagonal / Clean Architecture, Gorilla Mux, Gorilla WebSocket, modernc SQLite, Logrus.
+- **Backend**: Go (Go 1.27+), Hexagonal / Clean Architecture, Gorilla Mux, Gorilla WebSocket, modernc SQLite, Logrus.
 - **Frontend**: React 19, TypeScript, Three.js, React Three Fiber, Drei, Tailwind CSS v4, Lucide React, Vitest.
 
 ---
@@ -288,7 +288,7 @@ walldash/
 ## 🛠️ Local Development
 
 ### Prerequisites
-- [Go](https://go.dev/) (1.26+)
+- [Go](https://go.dev/) (1.27+)
 - [Node.js](https://nodejs.org/) (22+) and `npm`
 
 ### 1. Run the Frontend (Dev server with HMR)
