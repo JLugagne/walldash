@@ -189,68 +189,13 @@ var (
 )
 
 // GetStates fetches all states from Home Assistant, filtering to supported domains.
+// When the instance is unconfigured or unreachable it falls back to mock devices so the
+// REST endpoint always answers; use FetchStates when placeholder data must never be served.
 func (c *Client) GetStates(ctx context.Context) ([]domain.Device, error) {
-	log := logger.LoggerFromContext(ctx)
-
-	if c.baseURL == "" || c.token == "" {
-		log.Info("HA URL or token unconfigured, using fallback devices")
-		return copyFallbackDevices(), nil
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/states", nil)
+	devices, err := c.FetchStates(ctx)
 	if err != nil {
-		log.WithError(err).Error("failed to create HA states request")
+		logger.LoggerFromContext(ctx).WithError(err).Warn("HA states unavailable, falling back to mock devices")
 		return copyFallbackDevices(), nil
-	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		log.WithError(err).Warn("HA API unreachable, falling back to mock devices")
-		return copyFallbackDevices(), nil
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		log.WithField("status_code", resp.StatusCode).Warn("HA API returned non-200, falling back to mock devices")
-		return copyFallbackDevices(), nil
-	}
-
-	var rawStates []haEntityState
-	if err := json.NewDecoder(resp.Body).Decode(&rawStates); err != nil {
-		log.WithError(err).Error("failed to decode HA states JSON")
-		return copyFallbackDevices(), nil
-	}
-
-	var devices []domain.Device
-	for _, raw := range rawStates {
-		parts := strings.Split(raw.EntityID, ".")
-		if len(parts) < 2 {
-			continue
-		}
-		domainStr := parts[0]
-		if !domain.IsSupportedDomain(domainStr) {
-			continue
-		}
-
-		name := raw.EntityID
-		if fn, ok := raw.Attributes["friendly_name"].(string); ok && strings.TrimSpace(fn) != "" {
-			name = fn
-		}
-
-		devices = append(devices, domain.Device{
-			ID:          raw.EntityID,
-			Name:        name,
-			Domain:      domainStr,
-			State:       raw.State,
-			Attributes:  raw.Attributes,
-			LastUpdated: raw.LastUpdated.UTC(),
-		})
-	}
-
-	if devices == nil {
-		devices = []domain.Device{}
 	}
 	return devices, nil
 }
@@ -643,4 +588,66 @@ func (c *Client) GetConfig(ctx context.Context) (domain.HomeConfig, error) {
 		TemperatureUnit: raw.UnitSystem.Temperature,
 		LengthUnit:      raw.UnitSystem.Length,
 	}, nil
+}
+
+func (c *Client) FetchStates(ctx context.Context) ([]domain.Device, error) {
+	log := logger.LoggerFromContext(ctx)
+
+	if c.baseURL == "" || c.token == "" {
+		return nil, fmt.Errorf("fetch HA states: %w", ErrHomeAssistantUnavailable)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/states", nil)
+	if err != nil {
+		log.WithError(err).Error("failed to create HA states request")
+		return nil, fmt.Errorf("create HA states request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		log.WithError(err).Warn("HA API unreachable")
+		return nil, errors.Join(ErrHomeAssistantUnavailable, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.WithField("status_code", resp.StatusCode).Warn("HA API returned non-200")
+		return nil, fmt.Errorf("%w: status %d", ErrHomeAssistantUnavailable, resp.StatusCode)
+	}
+
+	var rawStates []haEntityState
+	if err := json.NewDecoder(resp.Body).Decode(&rawStates); err != nil {
+		log.WithError(err).Error("failed to decode HA states JSON")
+		return nil, errors.Join(ErrHomeAssistantUnavailable, err)
+	}
+
+	devices := make([]domain.Device, 0, len(rawStates))
+	for _, raw := range rawStates {
+		parts := strings.Split(raw.EntityID, ".")
+		if len(parts) < 2 {
+			continue
+		}
+		domainStr := parts[0]
+		if !domain.IsSupportedDomain(domainStr) {
+			continue
+		}
+
+		name := raw.EntityID
+		if fn, ok := raw.Attributes["friendly_name"].(string); ok && strings.TrimSpace(fn) != "" {
+			name = fn
+		}
+
+		devices = append(devices, domain.Device{
+			ID:          raw.EntityID,
+			Name:        name,
+			Domain:      domainStr,
+			State:       raw.State,
+			Attributes:  raw.Attributes,
+			LastUpdated: raw.LastUpdated.UTC(),
+		})
+	}
+
+	return devices, nil
 }

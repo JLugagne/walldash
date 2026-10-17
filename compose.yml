@@ -16,6 +16,7 @@ services:
       - DB_PATH=/app/data/walldash.db
       - HA_URL=${HA_URL:-http://homeassistant.local:8123}
       - HA_TOKEN=${HA_TOKEN:-}
+      - DEVICE_POLL_INTERVAL=${DEVICE_POLL_INTERVAL:-10}
     volumes:
       - walldash-data:/app/data
 

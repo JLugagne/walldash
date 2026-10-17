@@ -160,7 +160,7 @@ func (h *Hub) BroadcastDevice(device domain.Device) {
 		Type:     "state_changed",
 		EntityID: device.ID,
 		State:    device.State,
-		Device:   device,
+		Device:   newDevicePayload(device),
 	}
 
 	payload, err := json.Marshal(event)

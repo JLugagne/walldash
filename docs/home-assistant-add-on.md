@@ -59,9 +59,11 @@ Each one has the same environment-variable equivalent, which always wins when se
 | `allowed_origins` | `ALLOWED_ORIGINS` | _(empty)_ | Comma-separated browser-facing origins trusted for CORS, CSRF and the refresh/logout same-origin check. Accepts `https://host` or a bare `host`. Only needed when the reverse proxy rewrites `Host`. |
 | `domain` | `DOMAIN` | _(empty)_ | Public hostname of this instance (bare host, `http://host` or `https://host`; optional port kept, path/query ignored). Merged with `allowed_origins`. Only needed when the reverse proxy rewrites `Host`. |
 | `rescue_mode` | `RESCUE_MODE` | `false` | Recovery switch. When `true`, the next unauthenticated device to connect claims the `owner` role even if accounts already exist. One-shot (consumed after the first use); set it back to `false` once recovery is complete. |
+| `device_poll_interval` | `DEVICE_POLL_INTERVAL` | `10` | Seconds between background Home Assistant state polls. Every change (including a device dropping to `unavailable`) is pushed to connected clients so the 3D view flags a disconnected lamp or plug in real time. Lower values react faster at the cost of more requests. |
 
 The `token_secret`, `secret_key`, `secret_key_file`, `allowed_origins`, `domain` and `rescue_mode`
-options are declared in the companion `config.yaml` as `password?` / `str?` / `bool` and are all optional.
+options are declared in the companion `config.yaml` as `password?` / `str?` / `bool` and are all optional;
+`device_poll_interval` is declared as `int(1,3600)`.
 
 ### Runtime notes
 
@@ -131,6 +133,7 @@ options:
   allowed_origins: ""
   domain: ""
   rescue_mode: false
+  device_poll_interval: 10
 schema:
   log_level: list(debug|info|warn|error)
   token_secret: password?
@@ -138,6 +141,7 @@ schema:
   allowed_origins: str?
   domain: str?
   rescue_mode: bool
+  device_poll_interval: int(1,3600)
 watchdog: http://[HOST]:8080/api/health
 panel_icon: mdi:tablet-dashboard
 stage: experimental

@@ -9,8 +9,10 @@ import {
   Music,
   Cpu,
   Droplets,
+  WifiOff,
 } from 'lucide-react'
 import type { Device, DevicePlacement, WallSegment } from '../types'
+import { isDeviceOffline } from '../utils/deviceStatus'
 import { toWorldX, toWorldZ, snapToNearestWall, type WallSnap } from './wallGeometry'
 import { getRadialGlowTexture } from './floorTexture'
 
@@ -140,8 +142,9 @@ function WallPlate({ mount, color }: { mount: Mount; color: string }) {
   )
 }
 
-function pinColor(domain: string, isOn: boolean, isSensor: boolean, isPending: boolean): string {
+function pinColor(domain: string, isOn: boolean, isSensor: boolean, isPending: boolean, isOffline: boolean): string {
   if (isPending) return '#818cf8'
+  if (isOffline) return '#ef4444'
   if (isSensor) return '#34d399'
   if (!isOn) return '#64748b'
   if (domain === 'light') return '#f59e0b'
@@ -191,23 +194,26 @@ export function DeviceBadge3D({ placement, device, isPending = false, onToggle, 
   )
   const state = device?.state || 'off'
   const isOn = state === 'on' || state === 'playing' || state === 'heat'
+  const isOffline = isDeviceOffline(device)
 
   const isActuator = domain === 'light' || domain === 'switch' || domain === 'media_player'
   const isSensor = domain === 'sensor' || domain === 'climate'
 
   const name = placement.custom_name || device?.name || placement.device_id
-  const sensorValue = isSensor ? formatSensorValue(domain, device) : null
+  const sensorValue = isSensor && !isOffline ? formatSensorValue(domain, device) : null
   const title = isPending
-    ? `${name} • En cours de traitement (Home Assistant)...`
+    ? `${name} • Processing (Home Assistant)...`
+    : isOffline
+    ? `${name} • Offline`
     : isSensor && sensorValue
     ? `${name}: ${sensorValue}`
     : `${name} • ${isOn ? 'ON' : 'OFF'}`
 
-  const color = pinColor(domain, isOn, isSensor, isPending)
+  const color = pinColor(domain, isOn, isSensor, isPending, isOffline)
 
   const handleTap = (e: React.SyntheticEvent) => {
     e.stopPropagation()
-    if (interactive && isActuator && !isPending) {
+    if (interactive && isActuator && !isPending && !isOffline) {
       onToggle(placement.device_id)
     }
   }
@@ -257,7 +263,7 @@ export function DeviceBadge3D({ placement, device, isPending = false, onToggle, 
             type="button"
             data-interactive="true"
             aria-label={title}
-             disabled={!interactive || !isActuator || isPending}
+            disabled={!interactive || !isActuator || isPending || isOffline}
             onClick={handleTap}
             onPointerDown={handlePointerStop}
             onPointerUp={handlePointerStop}
@@ -270,19 +276,21 @@ export function DeviceBadge3D({ placement, device, isPending = false, onToggle, 
             } ${
               isPending
                 ? 'cursor-wait bg-indigo-950/90 border-indigo-400/90 text-indigo-300 shadow-indigo-500/50'
-                 : interactive && isActuator
+                : isOffline
+                ? 'cursor-not-allowed bg-slate-900/95 border-red-500/80 text-red-300 shadow-red-500/30 opacity-80'
+                : interactive && isActuator
                 ? 'cursor-pointer hover:scale-110 active:scale-95'
                 : 'cursor-default'
             } ${
-              !isPending && isOn && domain === 'light'
+              !isPending && !isOffline && isOn && domain === 'light'
                 ? 'bg-amber-500 border-amber-300 text-slate-950 shadow-amber-500/60'
-                : !isPending && isOn && domain === 'switch'
+                : !isPending && !isOffline && isOn && domain === 'switch'
                 ? 'bg-cyan-500 border-cyan-300 text-slate-950 shadow-cyan-500/60'
-                : !isPending && isOn && domain === 'media_player'
+                : !isPending && !isOffline && isOn && domain === 'media_player'
                 ? 'bg-purple-500 border-purple-300 text-white shadow-purple-500/60'
-                : !isPending && isSensor
+                : !isPending && !isOffline && isSensor
                 ? 'bg-slate-900/95 border-emerald-500/70 text-emerald-300 shadow-emerald-500/30'
-                : !isPending
+                : !isPending && !isOffline
                 ? 'bg-slate-800/90 border-slate-600 text-slate-400 shadow-black/50'
                 : ''
             }`}
@@ -292,12 +300,24 @@ export function DeviceBadge3D({ placement, device, isPending = false, onToggle, 
             ) : (
               getIcon(domain, placement.device_id, 'w-5 h-5')
             )}
+
+            {/* Offline indicator: red struck-through Wi-Fi dot pinned to the badge corner */}
+            {isOffline && (
+              <span
+                role="img"
+                aria-label="Device offline"
+                data-offline="true"
+                className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-red-500 border border-red-200 text-white shadow-lg shadow-red-500/50 pointer-events-none"
+              >
+                <WifiOff className="w-2.5 h-2.5" />
+              </span>
+            )}
           </button>
 
-          {/* Discrete "En cours..." pill badge below button when processing */}
+          {/* Discrete "Processing..." pill badge below button when processing */}
           {isPending && (
             <div className="absolute -bottom-5 whitespace-nowrap bg-indigo-950/95 text-indigo-200 border border-indigo-500/50 text-[9px] font-semibold px-1.5 py-0.5 rounded shadow-lg backdrop-blur-md pointer-events-none animate-pulse">
-              En cours...
+              Processing...
             </div>
           )}
         </div>

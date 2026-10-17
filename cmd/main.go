@@ -46,18 +46,20 @@ func main() {
 	}
 	frontendDir := os.Getenv("FRONTEND_DIR")
 	allowedOrigins := resolveAllowedOrigins(options)
+	devicePollInterval := configSeconds("DEVICE_POLL_INTERVAL", "device_poll_interval", 10, options)
 
 	conf := dashboard.Config{
-		DBPath:         dbPath,
-		HAUrl:          haURL,
-		HAToken:        haToken,
-		Version:        Version,
-		FrontendDir:    frontendDir,
-		AssetsFS:       frontend.FS(),
-		AllowedOrigins: allowedOrigins,
-		TokenSecret:    tokenSecret,
-		SecretKey:      secretKey,
-		RescueMode:     rescueMode,
+		DBPath:             dbPath,
+		HAUrl:              haURL,
+		HAToken:            haToken,
+		Version:            Version,
+		FrontendDir:        frontendDir,
+		AssetsFS:           frontend.FS(),
+		AllowedOrigins:     allowedOrigins,
+		TokenSecret:        tokenSecret,
+		SecretKey:          secretKey,
+		RescueMode:         rescueMode,
+		DevicePollInterval: devicePollInterval,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

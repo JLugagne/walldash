@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -239,4 +240,20 @@ func resolveSecretKey(inline, filePath string) (string, error) {
 		return "", fmt.Errorf("SECRET_KEY_FILE %s is empty", filePath)
 	}
 	return key, nil
+}
+
+// configSeconds resolves a positive whole-second setting (environment variable first,
+// then add-on option), returning fallbackSeconds when unset or not a positive integer.
+func configSeconds(envKey, optionKey string, fallbackSeconds int, options map[string]string) time.Duration {
+	raw := strings.TrimSpace(configValue(envKey, optionKey, "", options))
+	if raw == "" {
+		return time.Duration(fallbackSeconds) * time.Second
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds <= 0 {
+		logrus.WithFields(logrus.Fields{"setting": envKey, "value": raw, "fallback_seconds": fallbackSeconds}).
+			Warn("invalid duration setting, using default")
+		return time.Duration(fallbackSeconds) * time.Second
+	}
+	return time.Duration(seconds) * time.Second
 }

@@ -228,3 +228,50 @@ func TestWebSocketHub_OriginCheck(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 	})
 }
+
+func TestBroadcastDevice_UsesSnakeCaseWireShape(t *testing.T) {
+	hub := ws.NewHub(&actionstest.MockActionCommands{})
+	go hub.Run()
+	defer hub.Stop()
+
+	server := httptest.NewServer(http.HandlerFunc(hub.ServeWS))
+	defer server.Close()
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	dialer := gorilla_ws.Dialer{}
+	conn, _, err := dialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+	_, _, err = conn.ReadMessage() // initial connected frame
+	require.NoError(t, err)
+
+	updated := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	hub.BroadcastDevice(domain.Device{
+		ID:          "light.kitchen",
+		Name:        "Kitchen lamp",
+		Domain:      domain.DomainLight,
+		State:       "unavailable",
+		Attributes:  map[string]any{"brightness": 128},
+		LastUpdated: updated,
+	})
+
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, frame, err := conn.ReadMessage()
+	require.NoError(t, err)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(frame, &payload))
+	device, ok := payload["device"].(map[string]any)
+	require.True(t, ok, "frame must carry a device object")
+
+	// The browser merges the frame into the same device map the REST fetch produced,
+	// keyed by these snake_case field names.
+	assert.Equal(t, "light.kitchen", device["id"])
+	assert.Equal(t, "Kitchen lamp", device["name"])
+	assert.Equal(t, "light", device["domain"])
+	assert.Equal(t, "unavailable", device["state"])
+	assert.NotNil(t, device["attributes"])
+	assert.Equal(t, "2026-01-01T12:00:00Z", device["last_updated"])
+	assert.NotContains(t, device, "ID")
+	assert.NotContains(t, device, "LastUpdated")
+}

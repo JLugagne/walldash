@@ -55,22 +55,29 @@ type Config struct {
 	// accounts already exist. It is a one-shot recovery switch (consumed after one use)
 	// and must be disabled again once recovery is complete.
 	RescueMode bool
+	// DevicePollInterval is how often Home Assistant device states are polled and
+	// broadcast to clients. Zero selects the default.
+	DevicePollInterval time.Duration
 }
 
 // Dashboard represents the initialized composition root for the dashboard service.
 type Dashboard struct {
-	App        *app.App
-	Adapter    *sqlite.Adapter
-	Hub        *websocket.Hub
-	Issuer     *basic.Issuer
-	TokenStore *sqlite.TokensStore
-	Cookies    tokens.Cookies
-	Accounts   accounts.AccountRepository
-	Auth       *app.Auth
+	App          *app.App
+	Adapter      *sqlite.Adapter
+	Hub          *websocket.Hub
+	Issuer       *basic.Issuer
+	TokenStore   *sqlite.TokensStore
+	Cookies      tokens.Cookies
+	Accounts     accounts.AccountRepository
+	Auth         *app.Auth
+	pollerCancel context.CancelFunc
 }
 
 // Close gracefully shuts down dashboard resources such as database connections.
 func (d *Dashboard) Close() error {
+	if d.pollerCancel != nil {
+		d.pollerCancel()
+	}
 	if d.Hub != nil {
 		d.Hub.Stop()
 	}
@@ -174,6 +181,13 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	wsHub := websocket.NewHub(application, conf.AllowedOrigins...)
 	go wsHub.Run()
 	application.SetBroadcaster(wsHub)
+	var pollerCancel context.CancelFunc
+	if conf.HAUrl != "" && conf.HAToken != "" {
+		pollerCtx, cancel := context.WithCancel(ctx)
+		pollerCancel = cancel
+		poller := app.NewDevicePoller(haClient, wsHub, conf.DevicePollInterval)
+		go poller.Run(pollerCtx)
+	}
 	authApp.SetSessionCloser(wsHub)
 	wsHub.SetSessionValidator(func(ctx context.Context, subject string) error {
 		acct, err := accountRepo.FindByID(ctx, subject)
@@ -253,14 +267,15 @@ func New(ctx context.Context, conf Config, router *mux.Router) (*Dashboard, erro
 	setupFrontendServing(router, conf.FrontendDir, conf.AssetsFS)
 
 	return &Dashboard{
-		App:        application,
-		Adapter:    adapter,
-		Hub:        wsHub,
-		Issuer:     issuer,
-		TokenStore: tokenStore,
-		Cookies:    cookies,
-		Accounts:   accountRepo,
-		Auth:       authApp,
+		App:          application,
+		Adapter:      adapter,
+		Hub:          wsHub,
+		Issuer:       issuer,
+		TokenStore:   tokenStore,
+		Cookies:      cookies,
+		Accounts:     accountRepo,
+		Auth:         authApp,
+		pollerCancel: pollerCancel,
 	}, nil
 }
 
